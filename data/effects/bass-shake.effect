@@ -1,0 +1,41 @@
+// Bass Shake - samples the source with a UV offset.
+// Outside the [0,1] range the border color (transparent) is used, so the
+// displaced edges show through cleanly instead of smearing the edge pixels.
+
+uniform float4x4 ViewProj;
+uniform texture2d image;
+uniform float2 uv_offset;
+
+sampler_state shakeSampler {
+	Filter      = Linear;
+	AddressU    = Border;
+	AddressV    = Border;
+	BorderColor = 00000000;
+};
+
+struct VertInOut {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+VertInOut VSDefault(VertInOut vert_in)
+{
+	VertInOut vert_out;
+	vert_out.pos = mul(float4(vert_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv  = vert_in.uv;
+	return vert_out;
+}
+
+float4 PSShake(VertInOut vert_in) : TARGET
+{
+	return image.Sample(shakeSampler, vert_in.uv + uv_offset);
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSDefault(vert_in);
+		pixel_shader  = PSShake(vert_in);
+	}
+}
