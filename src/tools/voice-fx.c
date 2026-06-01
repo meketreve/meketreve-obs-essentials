@@ -35,8 +35,8 @@ struct biquad {
 struct fx_chan {
 	/* pitch shifter (two-tap crossfade granular) */
 	float pbuf[GRAIN];
-	uint32_t pw;  /* write index */
-	float pr;     /* fractional read index */
+	uint32_t pw; /* write index */
+	float pr;    /* fractional read index */
 
 	/* telephone band-pass: high-pass then low-pass biquad */
 	struct biquad hp;
