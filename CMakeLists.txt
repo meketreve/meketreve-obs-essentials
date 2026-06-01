@@ -39,6 +39,7 @@ target_sources(
   PRIVATE
     src/plugin-main.c
     src/tools/bass-shake.c
+    src/tools/voice-fx.c
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

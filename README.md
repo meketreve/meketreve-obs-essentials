@@ -10,6 +10,24 @@ GitHub Actions — no local OBS dev dependencies required.
 | Tool | Type | What it does |
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
+| **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
+
+### Voice FX Mixer
+
+Add it as a filter on a microphone / audio input (Edit → Advanced Audio, or the
+source's **Filters**). Each module is a checkbox section you can enable and chain:
+
+- **Input/Output Gain (dB)** — level trim before/after the chain.
+- **Pitch Shift** — ±12 semitones. Down = deep/monster, up = chipmunk.
+- **Telephone / Radio** — 300–3400 Hz band-pass for a phone/radio voice.
+- **Distortion** — tanh drive for a gritty/aggressive tone.
+- **Ring Mod** — multiplies by a sine carrier → robot/alien (try 80–300 Hz).
+- **Bitcrusher** — bit + sample-rate reduction for lo-fi/glitch.
+- **Tremolo** — amplitude LFO (rate + depth).
+- **Echo / Delay** — time, feedback, wet mix.
+
+> Pitch is a real-time granular shifter (time-domain), so extreme settings add
+> some artifacts — expected for live use without latency.
 
 ### Bass Shake
 
