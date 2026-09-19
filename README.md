@@ -64,7 +64,7 @@ builds and runs natively on Linux.
 **From the `.deb`** (Debian / Ubuntu / Mint), attached to each release:
 
 ```bash
-sudo apt install ./meketreve-obs-essentials-1.0.0-x86_64.deb
+sudo apt install ./meketreve-obs-essentials-1.0.0-x86_64-linux-gnu.deb
 ```
 
 **From source**, which also installs into your user plugin directory:
