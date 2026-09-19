@@ -2,8 +2,10 @@
 
 A toolkit of small OBS Studio filters/tools bundled in a single native plugin.
 Built on the official [obs-plugintemplate](https://github.com/obsproject/obs-plugintemplate),
-so Windows / macOS / Linux binaries **and a Windows installer** are produced by
-GitHub Actions — no local OBS dev dependencies required.
+so Windows / macOS / Linux binaries — a Windows installer and a Linux `.deb`
+included — are produced by GitHub Actions. No local OBS dev dependencies
+required, though building locally on Linux is a one-liner (see
+[Install](#install)).
 
 ## Tools
 
@@ -45,28 +47,81 @@ Add it as a filter on the source you want to shake:
 > The shake displaces the rendered source; edges reveal transparency. Oversize
 > the source slightly (or use a source bigger than the canvas) to hide the gaps.
 
+## Install
+
+### Windows
+
+Download the installer (`.exe`) from the [latest release](https://github.com/meketreve/meketreve-obs-essentials/releases)
+and run it. It drops the plugin into
+`%ProgramData%\obs-studio\plugins\meketreve-obs-essentials\`, which OBS 30+
+loads automatically. No admin rights needed.
+
+### Linux
+
+The plugin is plain C against `libobs` with no platform-specific code, so it
+builds and runs natively on Linux.
+
+**From the `.deb`** (Debian / Ubuntu / Mint), attached to each release:
+
+```bash
+sudo apt install ./meketreve-obs-essentials-1.0.0-x86_64.deb
+```
+
+**From source**, which also installs into your user plugin directory:
+
+```bash
+sudo apt install libobs-dev cmake build-essential
+./build-aux/install-linux.sh
+```
+
+Then restart OBS. The script installs to
+`~/.config/obs-studio/plugins/meketreve-obs-essentials/`. Use `--flatpak` if you
+run the Flatpak build of OBS, which reads plugins from
+`~/.var/app/com.obsproject.Studio/config/obs-studio/plugins/` instead:
+
+```bash
+./build-aux/install-linux.sh --flatpak
+```
+
+> The bundled CMake presets (`cmake --preset ubuntu-x86_64`) require **Ninja**.
+> If you do not have it (`sudo apt install ninja-build`), the install script
+> falls back to Unix Makefiles automatically.
+
+Confirm it loaded by checking the OBS log:
+
+```
+[meketreve-obs-essentials] Meketreve OBS Essentials loaded (version 1.0.0)
+```
+
+### macOS
+
+CI produces a `.pkg`; it is built and uploaded but not regularly tested.
+
+## Language
+
+The UI ships with **English (en-US)** and **Portuguese (pt-BR)** strings, and
+follows the language configured in OBS. Other languages fall back to English.
+
 ## Build / Release (CI)
 
 Everything builds in GitHub Actions:
 
-- **Any push** to `main` → builds all platforms, uploads artifacts (zip + Windows installer `.exe`).
-- **Tag** like `1.0.0` → also creates a draft GitHub Release with the installer attached.
+- **Any push** to `main` → builds all platforms and uploads artifacts:
+  Windows `.zip` + installer `.exe`, Linux `.deb` / `.ddeb` / `.tar.xz`, macOS `.pkg`.
+- **Tag** like `1.0.0` → also creates a draft GitHub Release with those attached.
 
 ```bash
 git tag 1.0.0
 git push origin 1.0.0
 ```
 
-The Windows installer drops the plugin into
-`%ProgramData%\obs-studio\plugins\meketreve-obs-essentials\`, which OBS 30+
-loads automatically. No admin rights needed.
-
 ## Adding a new tool
 
 1. Create `src/tools/<tool>.c` + `.h` exposing `void <tool>_register(void);`.
 2. Add the `.c` to `target_sources(...)` in `CMakeLists.txt`.
 3. Call `<tool>_register();` in `obs_module_load()` (`src/plugin-main.c`).
-4. Add any shader to `data/effects/` and locale strings to `data/locale/en-US.ini`.
+4. Add any shader to `data/effects/` and locale strings to **both**
+   `data/locale/en-US.ini` and `data/locale/pt-BR.ini` (keep the keys in sync).
 
 ## License
 
