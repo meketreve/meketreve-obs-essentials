@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tiktok-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
+#include "chat-accounts.hpp"
 
 #include "../unified-chat.h"
 #include "../config/config-share.hpp"
@@ -33,6 +34,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QCheckBox>
 #include <QDateTime>
+#include <QComboBox>
+#include <QCursor>
+#include <QDesktopServices>
+#include <QMenu>
+#include <QMessageBox>
+#include <QUrl>
+#include <QApplication>
+#include <QClipboard>
+#include <QGroupBox>
+#include <QPushButton>
 #include <QDialog>
 #include <QTextBlock>
 #include <QTextCursor>
@@ -50,12 +61,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <memory>
 
 namespace {
 
 constexpr const char *kDockId = "meketreve-unified-chat";
 constexpr const char *kActivityDockId = "meketreve-activity";
 constexpr const char *kConfigFile = "unified-chat.json";
+constexpr const char *kAccountsFile = "chat-accounts.json";
+constexpr int kRecentMessages = 500;
 constexpr int kMaxLines = 500;
 
 struct PlatformInfo {
@@ -84,14 +98,14 @@ size_t indexOf(ChatPlatform p)
 	return static_cast<size_t>(p);
 }
 
-QString configPath()
+QString configPath(const char *fileName = kConfigFile)
 {
 	char *dir = obs_module_config_path("");
 	if (dir) {
 		os_mkdirs(dir);
 		bfree(dir);
 	}
-	char *file = obs_module_config_path(kConfigFile);
+	char *file = obs_module_config_path(fileName);
 	const QString path = QString::fromUtf8(file ? file : "");
 	bfree(file);
 	return path;
@@ -163,7 +177,37 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	m_view = new QTextBrowser(this);
 	m_view->setOpenLinks(false);
 	m_view->document()->setMaximumBlockCount(kMaxLines);
+	/* Author names are links that open the moderation menu. */
+	m_view->document()->setDefaultStyleSheet(QStringLiteral("a { text-decoration: none; }"));
+	connect(m_view, &QTextBrowser::anchorClicked, this, &UnifiedChatDock::onAuthorClicked);
 	layout->addWidget(m_view);
+
+	m_sendBar = new QWidget(this);
+	auto *send = new QHBoxLayout(m_sendBar);
+	send->setContentsMargins(0, 0, 0, 0);
+	m_sendTarget = new QComboBox(m_sendBar);
+	m_input = new QLineEdit(m_sendBar);
+	m_input->setPlaceholderText(T("UnifiedChat.SendPlaceholder"));
+	m_input->setMaxLength(500);
+	auto *sendButton = new QToolButton(m_sendBar);
+	sendButton->setText(T("UnifiedChat.Send"));
+	connect(m_input, &QLineEdit::returnPressed, this, &UnifiedChatDock::sendInput);
+	connect(sendButton, &QToolButton::clicked, this, &UnifiedChatDock::sendInput);
+	send->addWidget(m_sendTarget);
+	send->addWidget(m_input, 1);
+	send->addWidget(sendButton);
+	layout->addWidget(m_sendBar);
+
+	m_accounts = new ChatAccounts(configPath(kAccountsFile), this);
+	connect(m_accounts, &ChatAccounts::accountChanged, this, [this]() {
+		updateSendBar();
+		m_accounts->watchTwitchFollows(m_targets[indexOf(ChatPlatform::Twitch)]);
+	});
+	connect(m_accounts, &ChatAccounts::actionFailed, this, [this](ChatPlatform p, const QString &error) {
+		appendSystemLine(p, T("UnifiedChat.ActionFailed").arg(error));
+	});
+	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::appendMessage);
+	connect(m_accounts, &ChatAccounts::openBrowser, this, [](const QUrl &url) { QDesktopServices::openUrl(url); });
 
 	m_connectors[indexOf(ChatPlatform::Twitch)] = new TwitchChat(&m_net, this);
 	m_connectors[indexOf(ChatPlatform::YouTube)] = new YouTubeChat(&m_net, this);
@@ -183,6 +227,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	loadSettings();
 	showPlaceholder();
 	applySettings();
+	updateSendBar();
 }
 
 UnifiedChatDock::~UnifiedChatDock()
@@ -256,6 +301,8 @@ void UnifiedChatDock::saveSettings()
 
 void UnifiedChatDock::applySettings()
 {
+	m_accounts->watchTwitchFollows(m_targets[indexOf(ChatPlatform::Twitch)]);
+	updateSendBar();
 	for (size_t i = 0; i < kPlatforms; i++) {
 		if (m_targets[i].trimmed().isEmpty())
 			m_connectors[i]->stop();
@@ -268,7 +315,7 @@ void UnifiedChatDock::openSettings()
 {
 	QDialog dialog(this);
 	dialog.setWindowTitle(T("UnifiedChat.SettingsTitle"));
-	dialog.setMinimumWidth(420);
+	dialog.setMinimumWidth(480);
 
 	auto *layout = new QVBoxLayout(&dialog);
 	auto *form = new QFormLayout();
@@ -298,6 +345,17 @@ void UnifiedChatDock::openSettings()
 	small.setPointSizeF(small.pointSizeF() * 0.9);
 	tiktokNote->setFont(small);
 	layout->addWidget(tiktokNote);
+
+	auto *accountsBox = new QGroupBox(T("UnifiedChat.Accounts"), &dialog);
+	auto *accountsLayout = new QVBoxLayout(accountsBox);
+	auto *intro = new QLabel(T("UnifiedChat.AccountsIntro"), accountsBox);
+	intro->setWordWrap(true);
+	intro->setOpenExternalLinks(true);
+	accountsLayout->addWidget(intro);
+	auto *accountsForm = new QFormLayout();
+	accountsLayout->addLayout(accountsForm);
+	addAccountRows(accountsForm, &dialog);
+	layout->addWidget(accountsBox);
 
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -417,9 +475,14 @@ void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 	if (!msg.highlight.isEmpty())
 		html += QStringLiteral("<span style=\"color:#FFB300;font-weight:bold\">[%1]</span> ")
 				.arg(msg.highlight.toHtmlEscaped());
-	html += QStringLiteral("<b style=\"color:%1\">%2</b>: %3")
-			.arg(readableColor(msg.authorColor, msg.author, background), msg.author.toHtmlEscaped(),
-			     msg.text.toHtmlEscaped());
+	const QString color = readableColor(msg.authorColor, msg.author, background);
+	const QString name = QStringLiteral("<b style=\"color:%1\">%2</b>").arg(color, msg.author.toHtmlEscaped());
+	html += QStringLiteral("%1: %2").arg(canModerate(msg)
+						     ? QStringLiteral("<a href=\"msg:%1\" style=\"color:%2\">%3</a>")
+							       .arg(remember(msg))
+							       .arg(color, name)
+						     : name,
+					     msg.text.toHtmlEscaped());
 
 	m_view->append(html);
 	if (atBottom)
@@ -447,6 +510,172 @@ void UnifiedChatDock::appendEventLine(const ChatMessage &msg, const QString &des
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());
+}
+
+void UnifiedChatDock::addAccountRows(QFormLayout *form, QWidget *dialog)
+{
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
+		const PlatformInfo &info = kPlatformInfo[indexOf(p)];
+		auto *clientId = new QLineEdit(m_accounts->account(p).clientId, dialog);
+		clientId->setPlaceholderText(T("UnifiedChat.ClientId"));
+		QLineEdit *secret = nullptr;
+		if (p == ChatPlatform::Kick) {
+			secret = new QLineEdit(m_accounts->account(p).clientSecret, dialog);
+			secret->setEchoMode(QLineEdit::Password);
+			secret->setPlaceholderText(T("UnifiedChat.ClientSecret"));
+		}
+		auto *status = new QLabel(dialog);
+		auto *button = new QPushButton(dialog);
+
+		const auto refresh = [this, p, status, button, clientId, secret]() {
+			const ChatAccount &a = m_accounts->account(p);
+			status->setText(a.loggedIn() ? T("UnifiedChat.LoggedInAs").arg(a.login)
+						     : T("UnifiedChat.LoggedOut"));
+			button->setText(a.loggedIn() ? T("UnifiedChat.LogOut") : T("UnifiedChat.LogIn"));
+			button->setEnabled(a.loggedIn() || (!clientId->text().trimmed().isEmpty() &&
+							    (!secret || !secret->text().trimmed().isEmpty())));
+		};
+		refresh();
+		connect(clientId, &QLineEdit::textChanged, dialog, refresh);
+		if (secret)
+			connect(secret, &QLineEdit::textChanged, dialog, refresh);
+		connect(m_accounts, &ChatAccounts::accountChanged, dialog, [p, refresh](ChatPlatform changed) {
+			if (changed == p)
+				refresh();
+		});
+		connect(button, &QPushButton::clicked, dialog, [this, p, clientId, secret, dialog]() {
+			if (m_accounts->account(p).loggedIn()) {
+				m_accounts->logOut(p);
+				return;
+			}
+			m_accounts->setClient(p, clientId->text(), secret ? secret->text() : QString());
+			if (p == ChatPlatform::Kick)
+				QMessageBox::information(
+					dialog, T("UnifiedChat.LogIn"),
+					T("UnifiedChat.KickLoginHint").arg(ChatAccounts::kickRedirectUri()));
+			m_accounts->logIn(p);
+		});
+
+		auto *row = new QHBoxLayout();
+		row->addWidget(clientId, 1);
+		if (secret)
+			row->addWidget(secret, 1);
+		row->addWidget(button);
+		form->addRow(T(info.labelKey), row);
+		form->addRow(QString(), status);
+	}
+
+	/* Twitch: show the device code while the user approves it. */
+	auto *codeBox = new QMessageBox(QMessageBox::Information, T("UnifiedChat.LogIn"), QString(),
+					QMessageBox::Cancel, dialog);
+	QPushButton *openButton = codeBox->addButton(T("UnifiedChat.OpenBrowser"), QMessageBox::ActionRole);
+	codeBox->setModal(false);
+	const auto url = std::make_shared<QUrl>();
+	connect(openButton, &QPushButton::clicked, dialog, [url]() { QDesktopServices::openUrl(*url); });
+	connect(m_accounts, &ChatAccounts::deviceCode, codeBox, [codeBox, url](const QString &code, const QUrl &uri) {
+		*url = uri;
+		QApplication::clipboard()->setText(code);
+		codeBox->setText(T("UnifiedChat.DeviceCode").arg(uri.toString().toHtmlEscaped(), code.toHtmlEscaped()));
+		codeBox->show();
+		QDesktopServices::openUrl(uri);
+	});
+	connect(codeBox, &QMessageBox::rejected, m_accounts, &ChatAccounts::cancelLogin);
+	connect(m_accounts, &ChatAccounts::accountChanged, codeBox, &QMessageBox::hide);
+	connect(m_accounts, &ChatAccounts::loginFailed, dialog, [dialog, codeBox](ChatPlatform, const QString &error) {
+		codeBox->hide();
+		QMessageBox::warning(dialog, T("UnifiedChat.LogIn"), T("UnifiedChat.LoginFailed").arg(error));
+	});
+}
+
+bool UnifiedChatDock::canModerate(const ChatMessage &msg) const
+{
+	return ChatAccounts::supports(msg.platform) && m_accounts->account(msg.platform).loggedIn() &&
+	       !msg.userId.isEmpty();
+}
+
+quint64 UnifiedChatDock::remember(const ChatMessage &msg)
+{
+	const quint64 id = ++m_lastRecentId;
+	m_recent.insert(id, msg);
+	m_recentOrder.append(id);
+	while (m_recentOrder.size() > kRecentMessages)
+		m_recent.remove(m_recentOrder.takeFirst());
+	return id;
+}
+
+void UnifiedChatDock::onAuthorClicked(const QUrl &url)
+{
+	if (url.scheme() != QLatin1String("msg"))
+		return;
+	const auto it = m_recent.constFind(url.path().toULongLong());
+	if (it == m_recent.constEnd())
+		return;
+	const ChatMessage msg = it.value();
+	const QString channel = m_targets[indexOf(msg.platform)];
+
+	QMenu menu(this);
+	menu.addSection(msg.author);
+	menu.addAction(T("UnifiedChat.Timeout60"), this,
+		       [this, msg, channel]() { m_accounts->timeoutUser(msg.platform, channel, msg.userId, 60); });
+	menu.addAction(T("UnifiedChat.Timeout600"), this,
+		       [this, msg, channel]() { m_accounts->timeoutUser(msg.platform, channel, msg.userId, 600); });
+	menu.addAction(T("UnifiedChat.Ban"), this, [this, msg, channel]() {
+		if (QMessageBox::question(this, T("UnifiedChat.Ban"), T("UnifiedChat.BanConfirm").arg(msg.author)) ==
+		    QMessageBox::Yes)
+			m_accounts->banUser(msg.platform, channel, msg.userId);
+	});
+	QAction *del = menu.addAction(T("UnifiedChat.DeleteMessage"), this, [this, msg, channel]() {
+		m_accounts->deleteMessage(msg.platform, channel, msg.id);
+	});
+	del->setEnabled(!msg.id.isEmpty());
+	menu.exec(QCursor::pos());
+}
+
+void UnifiedChatDock::updateSendBar()
+{
+	const QString previous = m_sendTarget->currentData().toString();
+	m_sendTarget->clear();
+	QList<ChatPlatform> ready;
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
+		if (m_accounts->account(p).loggedIn() && !m_targets[indexOf(p)].trimmed().isEmpty())
+			ready.append(p);
+	}
+	if (ready.size() > 1)
+		m_sendTarget->addItem(T("UnifiedChat.SendAll"), QStringLiteral("all"));
+	for (ChatPlatform p : ready)
+		m_sendTarget->addItem(T(kPlatformInfo[indexOf(p)].labelKey),
+				      QString::fromLatin1(kPlatformInfo[indexOf(p)].configKey));
+	const int keep = m_sendTarget->findData(previous);
+	if (keep >= 0)
+		m_sendTarget->setCurrentIndex(keep);
+	m_sendTarget->setVisible(ready.size() > 1);
+	m_sendBar->setVisible(!ready.isEmpty());
+}
+
+void UnifiedChatDock::sendInput()
+{
+	const QString text = m_input->text().trimmed();
+	if (text.isEmpty())
+		return;
+	const QString target = m_sendTarget->currentData().toString();
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
+		const QString key = QString::fromLatin1(kPlatformInfo[indexOf(p)].configKey);
+		if ((target == QLatin1String("all") || target == key) && m_accounts->account(p).loggedIn())
+			m_accounts->sendMessage(p, m_targets[indexOf(p)], text);
+	}
+	m_input->clear();
+}
+
+void UnifiedChatDock::appendSystemLine(ChatPlatform platform, const QString &text)
+{
+	if (!m_hasMessages) {
+		m_view->clear();
+		m_hasMessages = true;
+	}
+	const PlatformInfo &info = kPlatformInfo[indexOf(platform)];
+	m_view->append(QStringLiteral("<span style=\"color:gray\">%1 [%2] %3</span>")
+			       .arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tag),
+				    text.toHtmlEscaped()));
 }
 
 void UnifiedChatDock::updateStatus(ChatPlatform platform, ConnectorState state, const QString &detail)

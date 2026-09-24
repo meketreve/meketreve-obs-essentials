@@ -95,6 +95,32 @@ off in Settings). TikTok likes are off by default. Twitch follows need a login
 (see below); Kick follows arrive on their own.
 
 Without logging in the chat is read-only and nothing is sent to any platform.
+
+#### Chat login
+
+Logging in to Twitch and/or Kick adds a message box under the chat (send to
+one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
+ban, delete message. On Twitch it also brings follows into Activity (you must
+be the broadcaster or a moderator). YouTube stays read-only and TikTok has no
+sending.
+
+Both platforms only let registered apps log in, and a plugin cannot ship a
+secret, so you create your own app once (free):
+
+- **Twitch:** go to [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps)
+  → *Register Your Application*. Name: anything; OAuth Redirect URL:
+  `http://localhost`; Category: *Chat Bot*; **Client Type: Public**. Copy the
+  *Client ID* into Unified Chat → Settings → Twitch and click **Log in**. OBS
+  shows a code and opens twitch.tv/activate; approve it there.
+- **Kick:** go to [kick.com/settings/developer](https://kick.com/settings/developer)
+  → create an app with Redirect URL `http://localhost:53682/callback` and the
+  scopes *user:read, channel:read, chat:write, moderation:ban,
+  moderation:chat_message:manage*. Paste its *Client ID* and *Client Secret*
+  and click **Log in**; the browser opens Kick's login and comes back to OBS.
+
+Tokens are kept as plain text in the plugin's config folder
+(`chat-accounts.json`, readable only by your user). Use **Log out** to revoke
+them.
 YouTube and TikTok use unofficial endpoints, so a change on their side can
 break those two until the plugin is updated.
 

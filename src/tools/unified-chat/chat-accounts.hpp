@@ -1,0 +1,122 @@
+/*
+Meketreve OBS Essentials - Unified Chat
+Copyright (C) 2026 meketreve
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>
+*/
+#pragma once
+
+#include "chat-connector.hpp"
+#include "ws-client.hpp"
+
+#include <QHash>
+#include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QObject>
+#include <QPointer>
+#include <QTimer>
+#include <QUrl>
+
+#include <array>
+#include <functional>
+
+class QTcpServer;
+
+/* A logged-in account on Twitch or Kick. The client id (and Kick's client
+ * secret) belong to an app the user registers; the plugin ships none. */
+struct ChatAccount {
+	QString clientId;
+	QString clientSecret;
+	QString accessToken;
+	QString refreshToken;
+	QString userId;
+	QString login;
+	qint64 expiresAt = 0; /* ms since epoch */
+
+	bool loggedIn() const { return !accessToken.isEmpty(); }
+};
+
+/* Logins (Twitch device code flow, Kick OAuth 2.1 + PKCE with a loopback
+ * redirect), sending chat, moderation and Twitch follows over EventSub.
+ * Tokens are stored as plain text in the module's config folder. */
+class ChatAccounts : public QObject {
+	Q_OBJECT
+
+public:
+	static constexpr quint16 kKickRedirectPort = 53682;
+	static QString kickRedirectUri();
+
+	ChatAccounts(const QString &storePath, QObject *parent = nullptr);
+	~ChatAccounts() override;
+
+	const ChatAccount &account(ChatPlatform p) const;
+	static bool supports(ChatPlatform p) { return p == ChatPlatform::Twitch || p == ChatPlatform::Kick; }
+	bool canLogIn(ChatPlatform p) const;
+	void setClient(ChatPlatform p, const QString &clientId, const QString &clientSecret);
+	void logIn(ChatPlatform p);
+	void logOut(ChatPlatform p);
+	void cancelLogin();
+
+	/* channel = what the user typed as the chat target (name or link). */
+	void sendMessage(ChatPlatform p, const QString &channel, const QString &text);
+	void timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds);
+	void banUser(ChatPlatform p, const QString &channel, const QString &userId);
+	void deleteMessage(ChatPlatform p, const QString &channel, const QString &messageId);
+
+	/* Twitch follows need a moderator token: subscribe over EventSub. */
+	void watchTwitchFollows(const QString &channel);
+
+signals:
+	void accountChanged(ChatPlatform p);
+	void deviceCode(const QString &userCode, const QUrl &verificationUrl);
+	void openBrowser(const QUrl &url);
+	void loginFailed(ChatPlatform p, const QString &error);
+	void actionFailed(ChatPlatform p, const QString &error);
+	void eventReceived(const ChatMessage &msg);
+
+private:
+	using Done = std::function<void(int status, const QJsonObject &body, const QString &error)>;
+
+	ChatAccount &acc(ChatPlatform p);
+	void load();
+	void save();
+	void finishLogin(ChatPlatform p, const QJsonObject &token);
+	void fetchIdentity(ChatPlatform p);
+	void pollTwitchDevice();
+	void onKickCallback();
+	void refresh(ChatPlatform p, std::function<void(bool)> done);
+	void api(ChatPlatform p, const QByteArray &verb, const QUrl &url, const QJsonObject &body, Done done,
+		 bool retried = false);
+	void post(const QUrl &url, const QByteArray &form, Done done);
+	void withBroadcaster(ChatPlatform p, const QString &channel, std::function<void(const QString &)> then);
+	void onEventSubText(const QByteArray &data);
+
+	QString m_storePath;
+	QNetworkAccessManager m_net;
+	std::array<ChatAccount, 2> m_accounts;    /* Twitch, Kick */
+	QHash<QString, QString> m_broadcasterIds; /* "t:login" / "k:slug" -> id */
+
+	/* Twitch device flow in progress. */
+	QString m_deviceCode;
+	QTimer m_devicePoll;
+	qint64 m_deviceDeadline = 0;
+
+	/* Kick authorization in progress. */
+	QList<QTcpServer *> m_callbackServers;
+	QByteArray m_kickVerifier;
+	QByteArray m_kickState;
+
+	WsClient m_eventSub;
+	QString m_followChannelId;
+};

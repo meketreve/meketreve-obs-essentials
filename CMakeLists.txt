@@ -53,12 +53,16 @@ target_sources(
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp
     src/tools/tabs/tab-bar.hpp
+    src/tools/unified-chat/chat-accounts.cpp
+    src/tools/unified-chat/chat-accounts.hpp
     src/tools/unified-chat/chat-connector.cpp
     src/tools/unified-chat/chat-connector.hpp
     src/tools/unified-chat/irc-message.cpp
     src/tools/unified-chat/irc-message.hpp
     src/tools/unified-chat/kick-chat.cpp
     src/tools/unified-chat/kick-chat.hpp
+    src/tools/unified-chat/oauth-util.cpp
+    src/tools/unified-chat/oauth-util.hpp
     src/tools/unified-chat/tiktok-chat.cpp
     src/tools/unified-chat/tiktok-chat.hpp
     src/tools/unified-chat/tiktok-proto.cpp

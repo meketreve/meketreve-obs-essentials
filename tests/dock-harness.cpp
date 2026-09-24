@@ -41,6 +41,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QDir>
 #include <QPixmap>
 #include <QTimer>
+#include <QToolButton>
 
 #include <cstdio>
 
@@ -98,7 +99,7 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|activity|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|chat-settings|activity|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -135,6 +136,24 @@ int main(int argc, char **argv)
 			configShareOpenExport();
 		else
 			configShareOpenImport();
+		delete chat;
+		text_lookup_destroy(g_lookup);
+		return 0;
+	}
+
+	if (args[1] == QLatin1String("chat-settings")) {
+		chat = new UnifiedChatDock();
+		QTimer::singleShot(seconds * 1000, &app, [&out]() {
+			QWidget *w = QApplication::activeModalWidget();
+			const bool ok = w && w->grab().save(out);
+			std::printf("%s %s\n", ok ? "saved" : "FAILED to save", qPrintable(out));
+			if (w)
+				w->close();
+		});
+		for (QToolButton *b : chat->findChildren<QToolButton *>()) {
+			if (b->text() == QString::fromUtf8(obs_module_text("UnifiedChat.Settings")))
+				b->click();
+		}
 		delete chat;
 		text_lookup_destroy(g_lookup);
 		return 0;

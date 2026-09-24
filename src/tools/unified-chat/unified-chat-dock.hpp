@@ -20,12 +20,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "chat-connector.hpp"
 
+#include <QHash>
 #include <QJsonObject>
+#include <QList>
 #include <QWidget>
 
 #include <array>
 
+class ChatAccounts;
 class QCheckBox;
+class QComboBox;
+class QFormLayout;
+class QUrl;
+class QLineEdit;
 class QLabel;
 class QTextBrowser;
 
@@ -80,6 +87,13 @@ private:
 	void applySettings();
 	void openSettings();
 	void appendEventLine(const ChatMessage &msg, const QString &description);
+	void appendSystemLine(ChatPlatform platform, const QString &text);
+	bool canModerate(const ChatMessage &msg) const;
+	quint64 remember(const ChatMessage &msg);
+	void onAuthorClicked(const QUrl &url);
+	void updateSendBar();
+	void sendInput();
+	void addAccountRows(QFormLayout *form, QWidget *dialog);
 	void showPlaceholder();
 	void updateStatus(ChatPlatform platform, ConnectorState state, const QString &detail);
 
@@ -89,6 +103,14 @@ private:
 	std::array<QString, kPlatforms> m_targets;
 	QTextBrowser *m_view = nullptr;
 	bool m_hasMessages = false;
+	ChatAccounts *m_accounts = nullptr;
+	QWidget *m_sendBar = nullptr;
+	QComboBox *m_sendTarget = nullptr;
+	QLineEdit *m_input = nullptr;
+	/* Recent messages by link id, for the moderation menu. */
+	QHash<quint64, ChatMessage> m_recent;
+	QList<quint64> m_recentOrder;
+	quint64 m_lastRecentId = 0;
 	bool m_eventsInChat = true;
 	bool m_activityLikes = false;
 };

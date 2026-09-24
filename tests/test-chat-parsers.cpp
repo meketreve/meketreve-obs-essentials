@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "irc-message.hpp"
 #include "kick-chat.hpp"
+#include "oauth-util.hpp"
 #include "tiktok-proto.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
@@ -274,6 +275,29 @@ private slots:
 		QVERIFY(parseTikTokLike(like, l));
 		QCOMPARE(l.count, 15);
 		QCOMPARE(l.total, 99999);
+	}
+
+	void pkceMatchesRfc7636()
+	{
+		/* RFC 7636 appendix B. */
+		QCOMPARE(OAuthUtil::codeChallengeS256("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+			 QByteArray("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+		const QByteArray v = OAuthUtil::newCodeVerifier();
+		QVERIFY(v.size() >= 43 && v.size() <= 128);
+		QVERIFY(!v.contains('+') && !v.contains('/') && !v.contains('='));
+		QVERIFY(OAuthUtil::newState() != OAuthUtil::newState());
+	}
+
+	void callbackRequestLine()
+	{
+		QUrlQuery q;
+		QCOMPARE(OAuthUtil::parseRequestLine("GET /callback?code=abc%20d&state=xyz HTTP/1.1\r\n", q),
+			 QStringLiteral("/callback"));
+		QCOMPARE(q.queryItemValue(QStringLiteral("code"), QUrl::FullyDecoded), QStringLiteral("abc d"));
+		QCOMPARE(q.queryItemValue(QStringLiteral("state")), QStringLiteral("xyz"));
+		QVERIFY(OAuthUtil::parseRequestLine("POST /callback HTTP/1.1", q).isEmpty());
+		QCOMPARE(OAuthUtil::formBody({{QStringLiteral("a b"), QStringLiteral("c&d")}}),
+			 QByteArray("a%20b=c%26d"));
 	}
 
 	void protobufRoundTrip()

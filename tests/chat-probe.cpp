@@ -20,12 +20,16 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  *   chat-probe twitch xqc 25
  * Exit code 0 when at least one message arrived, 1 otherwise. */
 
+#include "chat-accounts.hpp"
 #include "kick-chat.hpp"
 #include "tiktok-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QNetworkReply>
+#include <QUrlQuery>
 #include <QTextStream>
 #include <QTimer>
 
@@ -63,6 +67,39 @@ int main(int argc, char **argv)
 
 	QNetworkAccessManager net;
 	const QString platform = args[1].toLower();
+
+	/* chat-probe login-twitch <client id> | login-kick <client id> <secret>:
+	 * runs the login flow; for Kick the browser step is simulated by
+	 * calling the local callback with a made-up code. */
+	if (platform.startsWith(QLatin1String("login-"))) {
+		const ChatPlatform p = platform == QLatin1String("login-kick") ? ChatPlatform::Kick
+									       : ChatPlatform::Twitch;
+		ChatAccounts accounts(QDir::tempPath() + QStringLiteral("/chat-probe-accounts.json"));
+		accounts.setClient(p, args[2], args.size() > 3 ? args[3] : QString());
+		QTextStream out(stdout);
+		QObject::connect(&accounts, &ChatAccounts::deviceCode, [&out](const QString &code, const QUrl &url) {
+			out << "[device] open " << url.toString() << " code " << code << Qt::endl;
+		});
+		QObject::connect(&accounts, &ChatAccounts::openBrowser, [&out, &net](const QUrl &url) {
+			out << "[browser] " << url.toString() << Qt::endl;
+			const QString state = QUrlQuery(url).queryItemValue(QStringLiteral("state"));
+			net.get(QNetworkRequest(QUrl(ChatAccounts::kickRedirectUri() +
+						     QStringLiteral("?code=fake-code&state=") + state)));
+		});
+		QObject::connect(&accounts, &ChatAccounts::loginFailed, [&out, &app](ChatPlatform, const QString &e) {
+			out << "[login failed] " << e << Qt::endl;
+			app.exit(3);
+		});
+		QObject::connect(&accounts, &ChatAccounts::accountChanged, [&out, &accounts, &app, p](ChatPlatform) {
+			if (accounts.account(p).loggedIn()) {
+				out << "[logged in] " << accounts.account(p).login << Qt::endl;
+				app.exit(0);
+			}
+		});
+		QTimer::singleShot(args.size() > 4 ? args[4].toInt() * 1000 : 20000, &app, [&app]() { app.exit(4); });
+		accounts.logIn(p);
+		return app.exec();
+	}
 	ChatConnector *c = nullptr;
 	if (platform == QLatin1String("twitch"))
 		c = new TwitchChat(&net, &app);

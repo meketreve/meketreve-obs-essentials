@@ -9,12 +9,16 @@ add_library(chat-core STATIC)
 target_sources(
   chat-core
   PRIVATE
+    ${_chat}/chat-accounts.cpp
+    ${_chat}/chat-accounts.hpp
     ${_chat}/chat-connector.cpp
     ${_chat}/chat-connector.hpp
     ${_chat}/irc-message.cpp
     ${_chat}/irc-message.hpp
     ${_chat}/kick-chat.cpp
     ${_chat}/kick-chat.hpp
+    ${_chat}/oauth-util.cpp
+    ${_chat}/oauth-util.hpp
     ${_chat}/tiktok-chat.cpp
     ${_chat}/tiktok-chat.hpp
     ${_chat}/tiktok-proto.cpp

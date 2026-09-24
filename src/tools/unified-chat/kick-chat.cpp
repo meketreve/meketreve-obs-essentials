@@ -151,8 +151,11 @@ void KickChat::handleEvent(const QByteArray &data)
 
 	if (event == QLatin1String("pusher:connection_established")) {
 		subscribe(QStringLiteral("chatrooms.%1.v2").arg(m_chatroomId));
-		if (!m_channelId.isEmpty())
+		if (!m_channelId.isEmpty()) {
 			subscribe(QStringLiteral("channel.%1").arg(m_channelId));
+			/* The legacy channel carries the activity feed (follows). */
+			subscribe(QStringLiteral("channel_%1").arg(m_channelId));
+		}
 	} else if (event == QLatin1String("pusher_internal:subscription_succeeded")) {
 		markHealthy();
 	} else if (event == QLatin1String("pusher:ping")) {
@@ -181,6 +184,11 @@ void KickChat::handleEvent(const QByteArray &data)
 	} else if (event == QLatin1String("App\\Events\\FollowersUpdated")) {
 		/* Also sent on unfollow, and without a name for anonymous updates. */
 		if (payload.value(QStringLiteral("followed")).toBool() && !str("username").isEmpty())
+			emitEvent(ChatEvent::Follow, str("username"));
+	} else if (event == QLatin1String("App\\Events\\NewActivityFeedEvent")) {
+		/* Seen live with type "new_subscriber" (already covered by
+		 * SubscriptionEvent); follows are taken from here too. */
+		if (str("type").contains(QLatin1String("follow")) && !str("username").isEmpty())
 			emitEvent(ChatEvent::Follow, str("username"));
 	} else if (event.endsWith(QLatin1String("KicksGifted"))) {
 		/* Kick's paid "Kicks": not seen live yet, parsed defensively. */
