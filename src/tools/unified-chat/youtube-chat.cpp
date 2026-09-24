@@ -40,7 +40,7 @@ QJsonValue path(QJsonValue v, std::initializer_list<const char *> keys)
 QString runsToText(const QJsonArray &runs)
 {
 	QString out;
-	for (const QJsonValue &run : runs) {
+	for (const QJsonValue run : runs) {
 		const QJsonObject r = run.toObject();
 		if (r.contains(QStringLiteral("text"))) {
 			out += r.value(QStringLiteral("text")).toString();
@@ -308,7 +308,7 @@ void YouTubeChat::onPoll(QNetworkReply *reply)
 	}
 
 	if (!m_skipBacklog) {
-		for (const QJsonValue &action : live.value(QStringLiteral("actions")).toArray())
+		for (const QJsonValue action : live.value(QStringLiteral("actions")).toArray())
 			handleAction(action.toObject());
 	}
 	m_skipBacklog = false;
