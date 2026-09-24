@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * Exit code 0 when at least one message arrived, 1 otherwise. */
 
 #include "chat-accounts.hpp"
+#include "tts-client.hpp"
 #include "kick-chat.hpp"
 #include "tiktok-chat.hpp"
 #include "twitch-chat.hpp"
@@ -28,6 +29,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QNetworkReply>
 #include <QUrlQuery>
 #include <QTextStream>
@@ -67,6 +69,25 @@ int main(int argc, char **argv)
 
 	QNetworkAccessManager net;
 	const QString platform = args[1].toLower();
+
+	/* chat-probe tts "<text>" <out.mp3>: Google TTS as the Texuguito uses it. */
+	if (platform == QLatin1String("tts") && args.size() > 3) {
+		int rc = 1;
+		GoogleTts::synthesize(
+			&net, args[2],
+			[&](QByteArray mp3, QString error) {
+				QFile out(args[3]);
+				if (!mp3.isEmpty() && out.open(QIODevice::WriteOnly))
+					out.write(mp3);
+				std::printf("[tts] %lld bytes %s\n", static_cast<long long>(mp3.size()),
+					    qPrintable(error));
+				rc = mp3.isEmpty() ? 1 : 0;
+				app.quit();
+			},
+			&app);
+		app.exec();
+		return rc;
+	}
 
 	/* chat-probe login-twitch <client id> | login-kick <client id> <secret>:
 	 * runs the login flow; for Kick the browser step is simulated by

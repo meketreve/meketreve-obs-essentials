@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Texuguito overlay</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- width/height are only a pre-JS fallback; overlay.js sizes the canvas to
+       the window on load and on every resize, so the OBS Browser Source can be
+       any size the streamer picks. -->
+  <canvas id="parade" width="1920" height="160"></canvas>
+  <script src="/static/overlay.js"></script>
+</body>
+</html>

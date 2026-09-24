@@ -16,6 +16,7 @@ required, though building locally on Linux is a one-liner (see
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
+| **Texuguito** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
 | **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, TikTok, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
 | **Vertical canvas** | Docks | A second 9:16 canvas with its own scenes, sources, preview, recording, backtrack and streaming. Port of Aitum Vertical Canvas. Needs OBS 32+. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
@@ -36,6 +37,33 @@ can place it anywhere. Hotkeys for *next tab*, *previous tab* and *go to tab
 1–9* are in **Settings → Hotkeys**. To turn the tabs off, uncheck
 **Tools → Meketreve: Layout tabs**: your original layout comes back, and after
 a restart the preview is back in the center.
+
+### Texuguito (chat bot and parade overlay)
+
+The [texuguito-seu-bot-amigo](https://github.com/meketreve/texuguito-seu-bot-amigo)
+bot now runs inside OBS: no Python, no separate window. Open **Docks →
+Texuguito** and click **Add overlay to scene** (or copy the URL
+`http://localhost:8901/overlay` into a Browser Source).
+
+- **Parade:** everyone chatting walks along the bottom of the stream with an
+  LPC pixel-art avatar they customize with `!cor`, `!chapeu`, `!acessorio`,
+  `!apelido` and `!dança`. Bits, Super Chats and TikTok gifts make them cheer.
+- **Points:** a point per minute in chat, spent on `!tocar <clip>` (clips in
+  the audio folder, in subfolders named after their price, e.g.
+  `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points).
+- **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
+  `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
+  the full list. Every command also has an English alias (`!color`, `!play`…).
+
+It reads every platform set up in Unified Chat. Replies go back to the
+platform the command came from when you are logged in there (Twitch and Kick,
+see [Chat login](#chat-login)); YouTube and TikTok viewers can use the
+commands, but the bot cannot answer them. With a Twitch login as the
+broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
+elsewhere a viewer stays in the parade for 10 minutes after their last
+message. Coming from the Python bot? **Import old bot** copies its `data/`
+and `audios/` folders. Clips and TTS play through the Browser Source, so they
+show up in the OBS mixer.
 
 ### Outputs (multistream)
 

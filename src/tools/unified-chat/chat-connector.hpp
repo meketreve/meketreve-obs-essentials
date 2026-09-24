@@ -40,6 +40,10 @@ struct ChatMessage {
 	QString detail; /* tier, recipient, gift name, paid amount */
 	QString id;     /* platform message id */
 	QString userId; /* platform user id */
+	bool isMod = false;
+	bool isSub = false;
+	bool isBroadcaster = false;
+	bool isReply = false; /* Twitch "Reply": the text starts with "@user " */
 };
 
 enum class ConnectorState { Idle, Connecting, Connected, Offline, Error };

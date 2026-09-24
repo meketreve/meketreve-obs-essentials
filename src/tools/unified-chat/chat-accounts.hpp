@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "ws-client.hpp"
 
 #include <QHash>
+#include <QSet>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
@@ -73,6 +74,11 @@ public:
 	void timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds);
 	void banUser(ChatPlatform p, const QString &channel, const QString &userId);
 	void deleteMessage(ChatPlatform p, const QString &channel, const QString &messageId);
+
+	/* Logins in the Twitch channel's chat right now (Helix chatters; needs
+	 * the account to be the broadcaster or a moderator there). */
+	void twitchChatters(const QString &channel,
+			    std::function<void(const QSet<QString> &logins, int status, const QString &error)> done);
 
 	/* Twitch follows need a moderator token: subscribe over EventSub. */
 	void watchTwitchFollows(const QString &channel);

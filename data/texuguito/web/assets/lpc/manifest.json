@@ -1,0 +1,55 @@
+{
+  "frame_width": 64,
+  "frame_height": 64,
+  "sheet_columns": 9,
+  "sheet_rows": 4,
+  "direction_row": {
+    "up": 0,
+    "left": 1,
+    "down": 2,
+    "right": 3
+  },
+  "walk_frame_columns": [1, 2, 3, 4, 5, 6, 7, 8],
+  "idle_frame_column": 0,
+  "base_layers": ["body_walk.png", "head_walk.png"],
+  "hats": {
+    "boné": "hat_bone_walk.png",
+    "coroa": "hat_coroa_walk.png",
+    "chifres": "chifres_walk.png",
+    "tricornio": "hat_tricornio.png",
+    "bicorne": "hat_bicorne.png",
+    "cartola": "hat_cartola.png",
+    "tiara": "hat_tiara.png",
+    "coco": "hat_coco.png",
+    "natalino": "hat_natalino.png",
+    "mago": "hat_mago.png",
+    "viking": "hat_viking.png",
+    "elmo": "hat_elmo.png",
+    "legionario": "hat_legionario.png",
+    "bandana": "hat_bandana.png",
+    "capuz": "hat_capuz.png",
+    "faixa": "hat_faixa.png"
+  },
+  "accessories": {
+    "óculos": "oculos_walk.png",
+    "capa": "capa_walk.png",
+    "colar": "acc_colar.png",
+    "cachecol": "acc_cachecol.png",
+    "laco": "acc_laco.png",
+    "tapaolho": "acc_tapaolho.png",
+    "oculosescuros": "acc_oculosescuros.png",
+    "monoculo": "acc_monoculo.png"
+  },
+  "wings": {
+    "asas": {"bg": "asas_bg_walk.png", "fg": "asas_fg_walk.png"},
+    "asasmorcego": {"bg": "asas_morcego_bg.png", "fg": "asas_morcego_fg.png"},
+    "asasborboleta": {"bg": "asas_borboleta_bg.png", "fg": "asas_borboleta_fg.png"},
+    "asaslibelula": {"bg": "asas_libelula_bg.png", "fg": "asas_libelula_fg.png"}
+  },
+  "content_box": {
+    "x": 14,
+    "y": 12,
+    "w": 36,
+    "h": 52
+  }
+}

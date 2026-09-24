@@ -76,8 +76,16 @@ public:
 	/* Translated one-line summary of an event ("x gifted 5 subs"). */
 	static QString describeEvent(const ChatMessage &msg);
 
+	/* Sends from the logged-in account; false when that platform has no
+	 * login or no channel set. */
+	bool sendAs(ChatPlatform platform, const QString &text);
+	ChatAccounts *accounts() const { return m_accounts; }
+	QString target(ChatPlatform platform) const;
+
 signals:
 	void activity(const ChatMessage &msg, const QString &description);
+	/* Every message and event from every platform, before any filtering. */
+	void incoming(const ChatMessage &msg);
 
 private:
 	static constexpr size_t kPlatforms = 4;
@@ -114,3 +122,6 @@ private:
 	bool m_eventsInChat = true;
 	bool m_activityLikes = false;
 };
+
+/* The dock created at load, or null. */
+UnifiedChatDock *unifiedChatDock();

@@ -137,6 +137,15 @@ QString readableColor(const QString &requested, const QString &author, const QCo
 
 QPointer<UnifiedChatDock> g_dock;
 
+} // namespace
+
+UnifiedChatDock *unifiedChatDock()
+{
+	return g_dock;
+}
+
+namespace {
+
 void onFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_EXIT && g_dock)
@@ -207,6 +216,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 		appendSystemLine(p, T("UnifiedChat.ActionFailed").arg(error));
 	});
 	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::appendMessage);
+	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::incoming);
 	connect(m_accounts, &ChatAccounts::openBrowser, this, [](const QUrl &url) { QDesktopServices::openUrl(url); });
 
 	m_connectors[indexOf(ChatPlatform::Twitch)] = new TwitchChat(&m_net, this);
@@ -216,6 +226,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 
 	for (ChatConnector *c : m_connectors) {
 		connect(c, &ChatConnector::messageReceived, this, &UnifiedChatDock::appendMessage);
+		connect(c, &ChatConnector::messageReceived, this, &UnifiedChatDock::incoming);
 		const ChatPlatform platform = c->platform();
 		connect(c, &ChatConnector::stateChanged, this,
 			[this, platform](ConnectorState state, const QString &detail) {
@@ -432,8 +443,23 @@ QString UnifiedChatDock::describeEvent(const ChatMessage &msg)
 	return line;
 }
 
+bool UnifiedChatDock::sendAs(ChatPlatform platform, const QString &text)
+{
+	if (!ChatAccounts::supports(platform) || !m_accounts->account(platform).loggedIn() ||
+	    m_targets[indexOf(platform)].trimmed().isEmpty())
+		return false;
+	m_accounts->sendMessage(platform, m_targets[indexOf(platform)], text);
+	return true;
+}
+
+QString UnifiedChatDock::target(ChatPlatform platform) const
+{
+	return m_targets[indexOf(platform)];
+}
+
 void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 {
+
 	if (msg.event != ChatEvent::None) {
 		if (msg.event == ChatEvent::Like && !m_activityLikes)
 			return;

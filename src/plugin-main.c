@@ -26,6 +26,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/config/config-share.h"
 #include "tools/outputs/outputs.h"
 #include "tools/vertical/vertical.h"
+#include "tools/texuguito/texuguito.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -53,6 +54,7 @@ bool obs_module_load(void)
 	voice_fx_register();
 	unified_chat_register();
 	outputs_register();
+	texuguito_register();
 
 	canvas_tools = obs_supports_canvas_tools();
 	if (canvas_tools)

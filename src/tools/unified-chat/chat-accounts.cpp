@@ -38,7 +38,7 @@ namespace {
 
 const char *const kTwitchScopes =
 	"user:read:chat user:write:chat moderator:manage:banned_users moderator:manage:chat_messages "
-	"moderator:read:followers";
+	"moderator:read:followers moderator:read:chatters";
 const char *const kKickScopes = "user:read channel:read chat:write moderation:ban moderation:chat_message:manage";
 
 size_t slot(ChatPlatform p)
@@ -597,6 +597,30 @@ void ChatAccounts::deleteMessage(ChatPlatform p, const QString &channel, const Q
 				       {QStringLiteral("moderator_id"), account(p).userId},
 				       {QStringLiteral("message_id"), messageId}});
 		api(p, "DELETE", url, QJsonObject(), report);
+	});
+}
+
+void ChatAccounts::twitchChatters(const QString &channel,
+				  std::function<void(const QSet<QString> &, int, const QString &)> done)
+{
+	if (!account(ChatPlatform::Twitch).loggedIn()) {
+		done({}, 0, QStringLiteral("not logged in"));
+		return;
+	}
+	withBroadcaster(ChatPlatform::Twitch, channel, [this, done](const QString &broadcaster) {
+		/* One page (up to 1000) is plenty for a parade on screen. */
+		QUrl url(QStringLiteral("https://api.twitch.tv/helix/chat/chatters"));
+		url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), broadcaster},
+				       {QStringLiteral("moderator_id"), account(ChatPlatform::Twitch).userId},
+				       {QStringLiteral("first"), QStringLiteral("1000")}});
+		api(ChatPlatform::Twitch, "GET", url, QJsonObject(),
+		    [done](int status, const QJsonObject &body, const QString &error) {
+			    QSet<QString> logins;
+			    for (const QJsonValue v : body.value(QStringLiteral("data")).toArray())
+				    logins.insert(
+					    v.toObject().value(QStringLiteral("user_login")).toString().toLower());
+			    done(logins, status, error);
+		    });
 	});
 }
 

@@ -102,6 +102,19 @@ target_sources(
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp
     src/tools/tabs/tab-bar.hpp
+    src/tools/texuguito/bot-colors.cpp
+    src/tools/texuguito/bot-colors.hpp
+    src/tools/texuguito/bot-data.cpp
+    src/tools/texuguito/bot-data.hpp
+    src/tools/texuguito/bot-engine.cpp
+    src/tools/texuguito/bot-engine.hpp
+    src/tools/texuguito/overlay-server.cpp
+    src/tools/texuguito/overlay-server.hpp
+    src/tools/texuguito/texuguito-dock.cpp
+    src/tools/texuguito/texuguito-dock.hpp
+    src/tools/texuguito/texuguito.h
+    src/tools/texuguito/tts-client.cpp
+    src/tools/texuguito/tts-client.hpp
     src/tools/unified-chat/chat-accounts.cpp
     src/tools/unified-chat/chat-accounts.hpp
     src/tools/unified-chat/chat-connector.cpp

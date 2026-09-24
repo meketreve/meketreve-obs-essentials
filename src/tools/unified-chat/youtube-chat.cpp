@@ -328,6 +328,15 @@ void YouTubeChat::handleAction(const QJsonObject &action)
 		ChatMessage msg{ChatPlatform::YouTube, author(r), QString(), QString(), QString()};
 		msg.id = r.value(QStringLiteral("id")).toString();
 		msg.userId = r.value(QStringLiteral("authorExternalChannelId")).toString();
+		for (const QJsonValue badge : r.value(QStringLiteral("authorBadges")).toArray()) {
+			const QJsonObject b =
+				badge.toObject().value(QStringLiteral("liveChatAuthorBadgeRenderer")).toObject();
+			const QString icon = path(b, {"icon", "iconType"}).toString();
+			msg.isBroadcaster |= icon == QLatin1String("OWNER");
+			msg.isMod |= icon == QLatin1String("MODERATOR");
+			/* Member badges are channel-made pictures instead of icons. */
+			msg.isSub |= b.contains(QStringLiteral("customThumbnail"));
+		}
 		return msg;
 	};
 

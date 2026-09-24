@@ -102,6 +102,12 @@ void TwitchChat::handleLine(const QByteArray &line)
 				QString()};
 		msg.id = irc.tag("id");
 		msg.userId = irc.tag("user-id");
+		const QString badges = irc.tag("badges");
+		msg.isBroadcaster = badges.contains(QLatin1String("broadcaster/"));
+		msg.isMod = irc.tag("mod") == QLatin1String("1") || badges.contains(QLatin1String("moderator/"));
+		msg.isSub = irc.tag("subscriber") == QLatin1String("1") ||
+			    badges.contains(QLatin1String("subscriber/")) || badges.contains(QLatin1String("founder/"));
+		msg.isReply = irc.tags.contains("reply-parent-msg-id");
 		const int bits = irc.tag("bits").toInt();
 		if (bits > 0) {
 			msg.event = ChatEvent::Bits;

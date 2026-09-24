@@ -171,6 +171,13 @@ void KickChat::handleEvent(const QByteArray &data)
 			stripEmotes(str("content")), QString()};
 		chat.id = str("id");
 		chat.userId = QString::number(sender.value(QStringLiteral("id")).toInteger());
+		for (const QJsonValue badge :
+		     sender.value(QStringLiteral("identity")).toObject().value(QStringLiteral("badges")).toArray()) {
+			const QString type = badge.toObject().value(QStringLiteral("type")).toString();
+			chat.isBroadcaster |= type == QLatin1String("broadcaster");
+			chat.isMod |= type == QLatin1String("moderator");
+			chat.isSub |= type == QLatin1String("subscriber") || type == QLatin1String("founder");
+		}
 		emitFull(chat);
 	} else if (event == QLatin1String("App\\Events\\SubscriptionEvent")) {
 		emitEvent(ChatEvent::Sub, str("username"), std::max(1, num("months")));
