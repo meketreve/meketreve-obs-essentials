@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "tiktok-proto.hpp"
 
+#include <algorithm>
+
 FetchResult parseFetchResult(const QByteArray &data)
 {
 	FetchResult r;
@@ -97,6 +99,92 @@ bool parseTikTokChat(const QByteArray &data, TikTokChatMessage &out)
 			any = true;
 		} else if (f.number == 3) {
 			out.text = QString::fromUtf8(f.bytes);
+			any = true;
+		}
+	}
+	return any;
+}
+
+bool parseTikTokGift(const QByteArray &data, TikTokGift &out)
+{
+	out = TikTokGift();
+	bool any = false;
+	PbReader reader(data);
+	PbField f;
+	while (reader.next(f)) {
+		switch (f.number) {
+		case 5:
+			out.repeatCount = static_cast<int>(f.varint);
+			break;
+		case 7:
+			out.user = parseTikTokUser(f.bytes);
+			any = true;
+			break;
+		case 9:
+			out.streakEnded = f.varint != 0;
+			break;
+		case 15: {
+			PbReader gift(f.bytes);
+			PbField g;
+			while (gift.next(g)) {
+				if (g.number == 11)
+					out.streakable = g.varint == 1;
+				else if (g.number == 12)
+					out.diamonds = static_cast<int>(g.varint);
+				else if (g.number == 16)
+					out.name = QString::fromUtf8(g.bytes);
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+	out.repeatCount = std::max(out.repeatCount, 1);
+	return any;
+}
+
+bool parseTikTokSocial(const QByteArray &data, TikTokSocial &out)
+{
+	out = TikTokSocial();
+	bool any = false;
+	PbReader reader(data);
+	PbField f;
+	while (reader.next(f)) {
+		if (f.number == 2) {
+			out.user = parseTikTokUser(f.bytes);
+			any = true;
+		} else if (f.number == 1) {
+			PbReader common(f.bytes);
+			PbField c;
+			while (common.next(c)) {
+				if (c.number != 8)
+					continue;
+				PbReader text(c.bytes);
+				PbField t;
+				while (text.next(t)) {
+					if (t.number == 1)
+						out.displayKey = QString::fromUtf8(t.bytes);
+				}
+			}
+		}
+	}
+	return any;
+}
+
+bool parseTikTokLike(const QByteArray &data, TikTokLike &out)
+{
+	out = TikTokLike();
+	bool any = false;
+	PbReader reader(data);
+	PbField f;
+	while (reader.next(f)) {
+		if (f.number == 2)
+			out.count = static_cast<int>(f.varint);
+		else if (f.number == 3)
+			out.total = static_cast<qint64>(f.varint);
+		else if (f.number == 5) {
+			out.user = parseTikTokUser(f.bytes);
 			any = true;
 		}
 	}

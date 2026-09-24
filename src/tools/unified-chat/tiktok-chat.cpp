@@ -250,11 +250,36 @@ void TikTokChat::onFrame(const QByteArray &data)
 		m_ws.sendBinary(pushFrame("ack", result.internalExt, logId));
 
 	for (const auto &msg : result.messages) {
-		if (msg.first != "WebcastChatMessage")
-			continue;
-
-		TikTokChatMessage chat;
-		if (parseTikTokChat(msg.second, chat))
-			emitMessage(chat.user.displayName(), QString(), chat.text);
+		const QByteArray &method = msg.first;
+		if (method == "WebcastChatMessage") {
+			TikTokChatMessage chat;
+			if (parseTikTokChat(msg.second, chat))
+				emitMessage(chat.user.displayName(), QString(), chat.text);
+		} else if (method == "WebcastGiftMessage") {
+			TikTokGift gift;
+			if (parseTikTokGift(msg.second, gift) && gift.isFinal()) {
+				ChatMessage ev{ChatPlatform::TikTok, gift.user.displayName(), QString(), QString(),
+					       QString()};
+				ev.event = ChatEvent::Gift;
+				ev.amount = gift.repeatCount;
+				ev.detail = gift.diamonds > 0 ? QStringLiteral("%1 (%2 \u2666)")
+									.arg(gift.name)
+									.arg(gift.diamonds * gift.repeatCount)
+							      : gift.name;
+				emitFull(ev);
+			}
+		} else if (method == "WebcastSocialMessage") {
+			TikTokSocial social;
+			if (!parseTikTokSocial(msg.second, social))
+				continue;
+			if (social.displayKey.contains(QLatin1String("follow")))
+				emitEvent(ChatEvent::Follow, social.user.displayName());
+			else if (social.displayKey.contains(QLatin1String("share")))
+				emitEvent(ChatEvent::Share, social.user.displayName());
+		} else if (method == "WebcastLikeMessage") {
+			TikTokLike like;
+			if (parseTikTokLike(msg.second, like))
+				emitEvent(ChatEvent::Like, like.user.displayName(), like.count);
+		}
 	}
 }

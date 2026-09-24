@@ -18,11 +18,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "kick-chat.hpp"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+
+#include <algorithm>
 
 namespace {
 
@@ -68,6 +71,7 @@ void KickChat::connectNow()
 	channel.toLongLong(&numeric);
 	if (numeric) {
 		m_chatroomId = channel;
+		m_channelId.clear();
 		m_ws.open(QUrl(QString::fromLatin1(kPusherUrl)));
 		return;
 	}
@@ -117,21 +121,38 @@ void KickChat::onChannelInfo(QNetworkReply *reply)
 	}
 
 	m_chatroomId = QString::number(id.toInteger());
+	/* Follows and some channel events come on channel.<id>, not the chatroom. */
+	const QJsonValue channelId = root.value(QStringLiteral("id"));
+	m_channelId = channelId.isUndefined() ? QString() : QString::number(channelId.toInteger());
 	m_ws.open(QUrl(QString::fromLatin1(kPusherUrl)));
+}
+
+void KickChat::subscribe(const QString &channel)
+{
+	const QJsonObject sub{{QStringLiteral("event"), QStringLiteral("pusher:subscribe")},
+			      {QStringLiteral("data"),
+			       QJsonObject{{QStringLiteral("auth"), QString()}, {QStringLiteral("channel"), channel}}}};
+	m_ws.sendText(QJsonDocument(sub).toJson(QJsonDocument::Compact));
 }
 
 void KickChat::handleEvent(const QByteArray &data)
 {
 	const QJsonObject msg = QJsonDocument::fromJson(data).object();
 	const QString event = msg.value(QStringLiteral("event")).toString();
+	/* Pusher double-encodes: "data" is a JSON string. */
+	const QJsonObject payload =
+		QJsonDocument::fromJson(msg.value(QStringLiteral("data")).toString().toUtf8()).object();
+	const auto str = [&payload](const char *key) {
+		return payload.value(QLatin1String(key)).toString();
+	};
+	const auto num = [&payload](const char *key) {
+		return payload.value(QLatin1String(key)).toInt();
+	};
 
 	if (event == QLatin1String("pusher:connection_established")) {
-		const QJsonObject sub{{QStringLiteral("event"), QStringLiteral("pusher:subscribe")},
-				      {QStringLiteral("data"),
-				       QJsonObject{{QStringLiteral("auth"), QString()},
-						   {QStringLiteral("channel"),
-						    QStringLiteral("chatrooms.%1.v2").arg(m_chatroomId)}}}};
-		m_ws.sendText(QJsonDocument(sub).toJson(QJsonDocument::Compact));
+		subscribe(QStringLiteral("chatrooms.%1.v2").arg(m_chatroomId));
+		if (!m_channelId.isEmpty())
+			subscribe(QStringLiteral("channel.%1").arg(m_channelId));
 	} else if (event == QLatin1String("pusher_internal:subscription_succeeded")) {
 		markHealthy();
 	} else if (event == QLatin1String("pusher:ping")) {
@@ -140,13 +161,33 @@ void KickChat::handleEvent(const QByteArray &data)
 		setState(ConnectorState::Error,
 			 msg.value(QStringLiteral("data")).toObject().value(QStringLiteral("message")).toString());
 	} else if (event == QLatin1String("App\\Events\\ChatMessageEvent")) {
-		/* Pusher double-encodes: "data" is a JSON string. */
-		const QJsonObject chat =
-			QJsonDocument::fromJson(msg.value(QStringLiteral("data")).toString().toUtf8()).object();
-		const QJsonObject sender = chat.value(QStringLiteral("sender")).toObject();
-		emitMessage(
-			sender.value(QStringLiteral("username")).toString(),
+		const QJsonObject sender = payload.value(QStringLiteral("sender")).toObject();
+		ChatMessage chat{
+			ChatPlatform::Kick, sender.value(QStringLiteral("username")).toString(),
 			sender.value(QStringLiteral("identity")).toObject().value(QStringLiteral("color")).toString(),
-			stripEmotes(chat.value(QStringLiteral("content")).toString()));
+			stripEmotes(str("content")), QString()};
+		chat.id = str("id");
+		chat.userId = QString::number(sender.value(QStringLiteral("id")).toInteger());
+		emitFull(chat);
+	} else if (event == QLatin1String("App\\Events\\SubscriptionEvent")) {
+		emitEvent(ChatEvent::Sub, str("username"), std::max(1, num("months")));
+	} else if (event == QLatin1String("App\\Events\\GiftedSubscriptionsEvent")) {
+		const QJsonArray to = payload.value(QStringLiteral("gifted_usernames")).toArray();
+		emitEvent(ChatEvent::GiftSub, str("gifter_username"), std::max(1, static_cast<int>(to.size())),
+			  to.size() == 1 ? to.at(0).toString() : QString());
+	} else if (event == QLatin1String("App\\Events\\StreamHostEvent")) {
+		emitEvent(ChatEvent::Raid, str("host_username"), num("number_viewers"), QString(),
+			  str("optional_message"));
+	} else if (event == QLatin1String("App\\Events\\FollowersUpdated")) {
+		/* Also sent on unfollow, and without a name for anonymous updates. */
+		if (payload.value(QStringLiteral("followed")).toBool() && !str("username").isEmpty())
+			emitEvent(ChatEvent::Follow, str("username"));
+	} else if (event.endsWith(QLatin1String("KicksGifted"))) {
+		/* Kick's paid "Kicks": not seen live yet, parsed defensively. */
+		const QJsonObject sender = payload.value(QStringLiteral("sender")).toObject();
+		const QJsonObject gift = payload.value(QStringLiteral("gift")).toObject();
+		emitEvent(ChatEvent::Gift, sender.value(QStringLiteral("username")).toString(),
+			  gift.value(QStringLiteral("amount")).toInt(), gift.value(QStringLiteral("name")).toString(),
+			  str("message"));
 	}
 }

@@ -25,12 +25,21 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 enum class ChatPlatform { Twitch, YouTube, Kick, TikTok };
 
+/* Things that happen in a live besides chat. Connectors only fill in the
+ * data; the dock turns it into translated text. */
+enum class ChatEvent { None, Sub, GiftSub, Raid, Bits, Follow, Donation, Membership, Gift, Like, Share };
+
 struct ChatMessage {
 	ChatPlatform platform;
 	QString author;
 	QString authorColor;
-	QString text;
+	QString text; /* what the user typed, if anything */
 	QString highlight;
+	ChatEvent event = ChatEvent::None;
+	int amount = 0; /* months, gifts, viewers, bits, likes */
+	QString detail; /* tier, recipient, gift name, paid amount */
+	QString id;     /* platform message id */
+	QString userId; /* platform user id */
 };
 
 enum class ConnectorState { Idle, Connecting, Connected, Offline, Error };
@@ -59,6 +68,9 @@ protected:
 	void setState(ConnectorState state, const QString &detail = QString());
 	void emitMessage(const QString &author, const QString &color, const QString &text,
 			 const QString &highlight = QString());
+	void emitEvent(ChatEvent event, const QString &author, int amount = 0, const QString &detail = QString(),
+		       const QString &text = QString());
+	void emitFull(ChatMessage msg);
 	void scheduleRetry(int seconds);
 	void scheduleReconnect();
 	void markHealthy();

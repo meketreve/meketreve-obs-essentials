@@ -34,15 +34,19 @@ public:
 
 	static QString normalizeChannel(const QString &input);
 
+	/* One Pusher frame; public so tests can feed it. */
+	void handleEvent(const QByteArray &data);
+
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
 
 private:
 	void onChannelInfo(QNetworkReply *reply);
-	void handleEvent(const QByteArray &data);
+	void subscribe(const QString &channel);
 
 	WsClient m_ws;
 	QPointer<QNetworkReply> m_pending;
 	QString m_chatroomId;
+	QString m_channelId;
 };

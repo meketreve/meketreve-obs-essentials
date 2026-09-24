@@ -21,6 +21,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-connector.hpp"
 #include "ws-client.hpp"
 
+struct IrcMessage;
+
 /* Anonymous (read-only) Twitch IRC over WebSocket. */
 class TwitchChat : public ChatConnector {
 	Q_OBJECT
@@ -30,12 +32,15 @@ public:
 
 	static QString normalizeChannel(const QString &input);
 
+	/* One IRC line from the server; public so tests can feed it. */
+	void handleLine(const QByteArray &line);
+
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
 
 private:
-	void handleLine(const QByteArray &line);
+	void handleUserNotice(const IrcMessage &irc);
 
 	WsClient m_ws;
 	QString m_channel;

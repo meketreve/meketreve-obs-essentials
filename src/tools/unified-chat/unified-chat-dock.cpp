@@ -31,7 +31,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/platform.h>
 
+#include <QCheckBox>
+#include <QDateTime>
 #include <QDialog>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -50,6 +54,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace {
 
 constexpr const char *kDockId = "meketreve-unified-chat";
+constexpr const char *kActivityDockId = "meketreve-activity";
 constexpr const char *kConfigFile = "unified-chat.json";
 constexpr int kMaxLines = 500;
 
@@ -231,6 +236,9 @@ void UnifiedChatDock::loadSettings()
 		return;
 	for (size_t i = 0; i < kPlatforms; i++)
 		m_targets[i] = QString::fromUtf8(obs_data_get_string(data, kPlatformInfo[i].configKey));
+	obs_data_set_default_bool(data, "eventsInChat", true);
+	m_eventsInChat = obs_data_get_bool(data, "eventsInChat");
+	m_activityLikes = obs_data_get_bool(data, "activityLikes");
 	obs_data_release(data);
 }
 
@@ -239,6 +247,8 @@ void UnifiedChatDock::saveSettings()
 	obs_data_t *data = obs_data_create();
 	for (size_t i = 0; i < kPlatforms; i++)
 		obs_data_set_string(data, kPlatformInfo[i].configKey, m_targets[i].toUtf8().constData());
+	obs_data_set_bool(data, "eventsInChat", m_eventsInChat);
+	obs_data_set_bool(data, "activityLikes", m_activityLikes);
 	if (!obs_data_save_json_safe(data, configPath().toUtf8().constData(), "tmp", "bak"))
 		obs_log(LOG_WARNING, "[unified-chat] could not save %s", kConfigFile);
 	obs_data_release(data);
@@ -271,6 +281,13 @@ void UnifiedChatDock::openSettings()
 	}
 	layout->addLayout(form);
 
+	auto *eventsInChat = new QCheckBox(T("UnifiedChat.EventsInChat"), &dialog);
+	eventsInChat->setChecked(m_eventsInChat);
+	layout->addWidget(eventsInChat);
+	auto *likes = new QCheckBox(T("UnifiedChat.ActivityLikes"), &dialog);
+	likes->setChecked(m_activityLikes);
+	layout->addWidget(likes);
+
 	auto *hint = new QLabel(T("UnifiedChat.Hint"), &dialog);
 	hint->setWordWrap(true);
 	layout->addWidget(hint);
@@ -290,7 +307,9 @@ void UnifiedChatDock::openSettings()
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
-	bool changed = false;
+	bool changed = eventsInChat->isChecked() != m_eventsInChat || likes->isChecked() != m_activityLikes;
+	m_eventsInChat = eventsInChat->isChecked();
+	m_activityLikes = likes->isChecked();
 	for (size_t i = 0; i < kPlatforms; i++) {
 		const QString value = edits[i]->text().trimmed();
 		if (value != m_targets[i]) {
@@ -315,8 +334,70 @@ void UnifiedChatDock::showPlaceholder()
 				.arg(T(anyConfigured ? "UnifiedChat.Waiting" : "UnifiedChat.Empty").toHtmlEscaped()));
 }
 
+QString UnifiedChatDock::describeEvent(const ChatMessage &msg)
+{
+	const QString who = msg.author.isEmpty() ? T("Activity.Someone") : msg.author;
+	QString line;
+	switch (msg.event) {
+	case ChatEvent::None:
+		return QString();
+	case ChatEvent::Sub:
+		line = msg.amount > 1 ? T("Activity.Resub").arg(who).arg(msg.amount) : T("Activity.Sub").arg(who);
+		break;
+	case ChatEvent::GiftSub:
+		line = msg.amount <= 1 && !msg.detail.isEmpty() && !msg.detail.startsWith(QLatin1String("Tier")) &&
+				       msg.detail != QLatin1String("Prime")
+			       ? T("Activity.GiftSubOne").arg(who, msg.detail)
+			       : T("Activity.GiftSubMany").arg(who).arg(std::max(1, msg.amount));
+		return line;
+	case ChatEvent::Raid:
+		line = msg.amount > 0 ? T("Activity.Raid").arg(who).arg(msg.amount) : T("Activity.Host").arg(who);
+		return line;
+	case ChatEvent::Bits:
+		return T("Activity.Bits").arg(who).arg(msg.amount);
+	case ChatEvent::Follow:
+		return T("Activity.Follow").arg(who);
+	case ChatEvent::Donation:
+		return T("Activity.Donation").arg(who, msg.detail);
+	case ChatEvent::Membership:
+		line = T("Activity.Membership").arg(who);
+		break;
+	case ChatEvent::Gift:
+		return T("Activity.Gift").arg(who).arg(std::max(1, msg.amount)).arg(msg.detail);
+	case ChatEvent::Like:
+		return T("Activity.Like").arg(who).arg(std::max(1, msg.amount));
+	case ChatEvent::Share:
+		return T("Activity.Share").arg(who);
+	}
+	if (!msg.detail.isEmpty())
+		line += QStringLiteral(" · ") + msg.detail;
+	return line;
+}
+
 void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 {
+	if (msg.event != ChatEvent::None) {
+		if (msg.event == ChatEvent::Like && !m_activityLikes)
+			return;
+		const QString description = describeEvent(msg);
+		emit activity(msg, description);
+		/* Likes, follows and shares are too frequent for the chat. */
+		const bool quiet = msg.event == ChatEvent::Like || msg.event == ChatEvent::Follow ||
+				   msg.event == ChatEvent::Share;
+		if (!m_eventsInChat || quiet) {
+			if (msg.event != ChatEvent::Bits)
+				return;
+			/* Bits come with a chat message: show it as a plain line. */
+			ChatMessage plain = msg;
+			plain.event = ChatEvent::None;
+			plain.highlight = QStringLiteral("%1 bits").arg(msg.amount);
+			appendMessage(plain);
+			return;
+		}
+		appendEventLine(msg, description);
+		return;
+	}
+
 	if (!m_hasMessages) {
 		m_view->clear();
 		m_hasMessages = true;
@@ -340,6 +421,29 @@ void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 			.arg(readableColor(msg.authorColor, msg.author, background), msg.author.toHtmlEscaped(),
 			     msg.text.toHtmlEscaped());
 
+	m_view->append(html);
+	if (atBottom)
+		scroll->setValue(scroll->maximum());
+}
+
+void UnifiedChatDock::appendEventLine(const ChatMessage &msg, const QString &description)
+{
+	if (!m_hasMessages) {
+		m_view->clear();
+		m_hasMessages = true;
+	}
+	QScrollBar *scroll = m_view->verticalScrollBar();
+	const bool atBottom = scroll->value() >= scroll->maximum() - 4;
+	const PlatformInfo &info = kPlatformInfo[indexOf(msg.platform)];
+
+	QString html =
+		QStringLiteral("<span style=\"color:gray\">%1</span> "
+			       "<span style=\"background-color:%2;color:%3;font-weight:bold\">&nbsp;%4&nbsp;</span> "
+			       "<span style=\"color:#FFB300;font-weight:bold\">&#9733; %5</span>")
+			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
+			     QLatin1String(info.tagForeground), QLatin1String(info.tag), description.toHtmlEscaped());
+	if (!msg.text.isEmpty())
+		html += QStringLiteral(": %1").arg(msg.text.toHtmlEscaped());
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());
@@ -381,6 +485,81 @@ void UnifiedChatDock::updateStatus(ChatPlatform platform, ConnectorState state, 
 	label->setVisible(state != ConnectorState::Idle);
 }
 
+ActivityDock::ActivityDock(QWidget *parent) : QWidget(parent)
+{
+	auto *layout = new QVBoxLayout(this);
+	layout->setContentsMargins(4, 4, 4, 4);
+	layout->setSpacing(4);
+	auto *bar = new QHBoxLayout();
+	bar->addStretch();
+	auto *clear = new QToolButton(this);
+	clear->setText(T("UnifiedChat.Clear"));
+	connect(clear, &QToolButton::clicked, this, [this]() {
+		m_view->clear();
+		m_hasEvents = false;
+		m_lastLikeKey.clear();
+		showPlaceholder();
+	});
+	bar->addWidget(clear);
+	layout->addLayout(bar);
+
+	m_view = new QTextBrowser(this);
+	m_view->setOpenLinks(false);
+	m_view->document()->setMaximumBlockCount(kMaxLines);
+	layout->addWidget(m_view);
+	showPlaceholder();
+}
+
+void ActivityDock::showPlaceholder()
+{
+	m_view->setHtml(QStringLiteral("<p style=\"color:gray\">%1</p>").arg(T("Activity.Empty").toHtmlEscaped()));
+}
+
+void ActivityDock::addEvent(const ChatMessage &msg, const QString &description)
+{
+	if (!m_hasEvents) {
+		m_view->clear();
+		m_hasEvents = true;
+	}
+	QScrollBar *scroll = m_view->verticalScrollBar();
+	const bool atBottom = scroll->value() >= scroll->maximum() - 4;
+	const PlatformInfo &info = kPlatformInfo[indexOf(msg.platform)];
+
+	QString line = description;
+	if (msg.event == ChatEvent::Like) {
+		const QString key = QString::number(static_cast<int>(msg.platform)) + QLatin1Char('/') + msg.author;
+		const qint64 now = QDateTime::currentMSecsSinceEpoch();
+		if (key == m_lastLikeKey && now - m_lastLikeAt < 15000) {
+			m_lastLikeCount += std::max(1, msg.amount);
+			QTextCursor cursor(m_view->document()->lastBlock());
+			cursor.select(QTextCursor::BlockUnderCursor);
+			cursor.removeSelectedText();
+			ChatMessage merged = msg;
+			merged.amount = m_lastLikeCount;
+			line = UnifiedChatDock::describeEvent(merged);
+		} else {
+			m_lastLikeKey = key;
+			m_lastLikeCount = std::max(1, msg.amount);
+		}
+		m_lastLikeAt = now;
+	} else {
+		m_lastLikeKey.clear();
+	}
+
+	QString html =
+		QStringLiteral("<span style=\"color:gray\">%1</span> "
+			       "<span style=\"background-color:%2;color:%3;font-weight:bold\">&nbsp;%4&nbsp;</span> "
+			       "<b>%5</b>")
+			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
+			     QLatin1String(info.tagForeground), QLatin1String(info.tag), line.toHtmlEscaped());
+	if (!msg.text.isEmpty())
+		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>")
+				.arg(msg.text.toHtmlEscaped());
+	m_view->append(html);
+	if (atBottom)
+		scroll->setValue(scroll->maximum());
+}
+
 void unified_chat_register(void)
 {
 	auto *main = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -392,6 +571,12 @@ void unified_chat_register(void)
 	}
 	g_dock = dock;
 	obs_frontend_add_event_callback(onFrontendEvent, nullptr);
+
+	auto *activity = new ActivityDock(main);
+	if (obs_frontend_add_dock_by_id(kActivityDockId, obs_module_text("Activity.Title"), activity))
+		QObject::connect(dock, &UnifiedChatDock::activity, activity, &ActivityDock::addEvent);
+	else
+		delete activity;
 
 	configShareAddSection({QStringLiteral("chat"), "Config.Section.Chat",
 			       []() { return g_dock ? QJsonValue(g_dock->exportChannels()) : QJsonValue(); },

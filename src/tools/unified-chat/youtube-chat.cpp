@@ -321,25 +321,68 @@ void YouTubeChat::onPoll(QNetworkReply *reply)
 void YouTubeChat::handleAction(const QJsonObject &action)
 {
 	const QJsonObject item = path(action, {"addChatItemAction", "item"}).toObject();
+	const auto author = [](const QJsonObject &r) {
+		return path(r, {"authorName", "simpleText"}).toString();
+	};
+	const auto base = [&author](const QJsonObject &r) {
+		ChatMessage msg{ChatPlatform::YouTube, author(r), QString(), QString(), QString()};
+		msg.id = r.value(QStringLiteral("id")).toString();
+		msg.userId = r.value(QStringLiteral("authorExternalChannelId")).toString();
+		return msg;
+	};
 
 	const QJsonObject text = item.value(QStringLiteral("liveChatTextMessageRenderer")).toObject();
 	if (!text.isEmpty()) {
-		emitMessage(path(text, {"authorName", "simpleText"}).toString(), QString(),
-			    runsToText(path(text, {"message", "runs"}).toArray()));
+		ChatMessage msg = base(text);
+		msg.text = runsToText(path(text, {"message", "runs"}).toArray());
+		emitFull(msg);
 		return;
 	}
 
 	const QJsonObject paid = item.value(QStringLiteral("liveChatPaidMessageRenderer")).toObject();
 	if (!paid.isEmpty()) {
-		emitMessage(path(paid, {"authorName", "simpleText"}).toString(), QString(),
-			    runsToText(path(paid, {"message", "runs"}).toArray()),
-			    path(paid, {"purchaseAmountText", "simpleText"}).toString());
+		ChatMessage msg = base(paid);
+		msg.event = ChatEvent::Donation;
+		msg.text = runsToText(path(paid, {"message", "runs"}).toArray());
+		msg.detail = path(paid, {"purchaseAmountText", "simpleText"}).toString();
+		emitFull(msg);
+		return;
+	}
+
+	const QJsonObject sticker = item.value(QStringLiteral("liveChatPaidStickerRenderer")).toObject();
+	if (!sticker.isEmpty()) {
+		ChatMessage msg = base(sticker);
+		msg.event = ChatEvent::Donation;
+		msg.detail = path(sticker, {"purchaseAmountText", "simpleText"}).toString();
+		msg.text = path(sticker, {"sticker", "accessibility", "accessibilityData", "label"}).toString();
+		emitFull(msg);
 		return;
 	}
 
 	const QJsonObject member = item.value(QStringLiteral("liveChatMembershipItemRenderer")).toObject();
 	if (!member.isEmpty()) {
-		emitMessage(path(member, {"authorName", "simpleText"}).toString(), QString(),
-			    runsToText(path(member, {"headerSubtext", "runs"}).toArray()), QString(QChar(0x2605)));
+		ChatMessage msg = base(member);
+		msg.event = ChatEvent::Membership;
+		msg.detail = runsToText(path(member, {"headerSubtext", "runs"}).toArray());
+		if (msg.detail.isEmpty())
+			msg.detail = path(member, {"headerSubtext", "simpleText"}).toString();
+		msg.text = runsToText(path(member, {"message", "runs"}).toArray());
+		emitFull(msg);
+		return;
+	}
+
+	const QJsonObject gift =
+		item.value(QStringLiteral("liveChatSponsorshipsGiftPurchaseAnnouncementRenderer")).toObject();
+	if (!gift.isEmpty()) {
+		const QJsonObject header = path(gift, {"header", "liveChatSponsorshipsHeaderRenderer"}).toObject();
+		ChatMessage msg = base(header);
+		msg.id = gift.value(QStringLiteral("id")).toString();
+		msg.userId = gift.value(QStringLiteral("authorExternalChannelId")).toString();
+		msg.event = ChatEvent::GiftSub;
+		/* "Gifted 5 <channel> memberships": the count is the only number. */
+		static const QRegularExpression countRe(QStringLiteral("(\\d+)"));
+		const auto m = countRe.match(runsToText(path(header, {"primaryText", "runs"}).toArray()));
+		msg.amount = m.hasMatch() ? m.captured(1).toInt() : 1;
+		emitFull(msg);
 	}
 }

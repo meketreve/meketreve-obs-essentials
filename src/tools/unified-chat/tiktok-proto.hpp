@@ -152,5 +152,35 @@ struct TikTokChatMessage {
 	QString text;
 };
 
+/* WebcastGiftMessage: user=7, repeatCount=5, repeatEnd=9, gift=15
+ * (Gift: type=11, diamondCount=12, name=16). */
+struct TikTokGift {
+	TikTokUser user;
+	QString name;
+	int repeatCount = 0;
+	int diamonds = 0;
+	bool streakable = false; /* gift type 1: sent as a combo */
+	bool streakEnded = false;
+
+	/* Streakable gifts arrive once per tap; only the last one counts. */
+	bool isFinal() const { return !streakable || streakEnded; }
+};
+
+/* WebcastSocialMessage: user=2, common=1 (displayText=8 -> key=1). */
+struct TikTokSocial {
+	TikTokUser user;
+	QString displayKey; /* contains "follow" or "share" */
+};
+
+/* WebcastLikeMessage: count=2, total=3, user=5. */
+struct TikTokLike {
+	TikTokUser user;
+	int count = 0;
+	qint64 total = 0;
+};
+
 TikTokUser parseTikTokUser(const QByteArray &data);
 bool parseTikTokChat(const QByteArray &data, TikTokChatMessage &out);
+bool parseTikTokGift(const QByteArray &data, TikTokGift &out);
+bool parseTikTokSocial(const QByteArray &data, TikTokSocial &out);
+bool parseTikTokLike(const QByteArray &data, TikTokLike &out);

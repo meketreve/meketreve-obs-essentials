@@ -85,6 +85,11 @@ int main(int argc, char **argv)
 	});
 	QObject::connect(c, &ChatConnector::messageReceived, [&out, &messages](const ChatMessage &m) {
 		messages++;
+		if (m.event != ChatEvent::None) {
+			out << "[event " << static_cast<int>(m.event) << "] " << m.author << " amount=" << m.amount
+			    << " detail=" << m.detail << " text=" << m.text << Qt::endl;
+			return;
+		}
 		out << "[msg] ";
 		if (!m.highlight.isEmpty())
 			out << '[' << m.highlight << "] ";

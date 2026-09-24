@@ -37,6 +37,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <util/text-lookup.h>
 
 #include <QApplication>
+#include <QHBoxLayout>
 #include <QDir>
 #include <QPixmap>
 #include <QTimer>
@@ -97,7 +98,7 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|activity|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -142,6 +143,39 @@ int main(int argc, char **argv)
 	if (args[1] == QLatin1String("chat")) {
 		chat = new UnifiedChatDock();
 		widget = chat;
+	} else if (args[1] == QLatin1String("activity")) {
+		/* Chat and Activity side by side, fed with one event of each kind. */
+		auto *box = new QWidget();
+		auto *h = new QHBoxLayout(box);
+		chat = new UnifiedChatDock(box);
+		auto *activity = new ActivityDock(box);
+		QObject::connect(chat, &UnifiedChatDock::activity, activity, &ActivityDock::addEvent);
+		h->addWidget(chat);
+		h->addWidget(activity);
+		const auto ev = [chat](ChatPlatform p, ChatEvent e, const char *who, int amount, const char *detail,
+				       const char *text) {
+			ChatMessage m{p, QString::fromUtf8(who), QString(), QString::fromUtf8(text), QString()};
+			m.event = e;
+			m.amount = amount;
+			m.detail = QString::fromUtf8(detail);
+			chat->appendMessage(m);
+		};
+		chat->appendMessage({ChatPlatform::Twitch, QStringLiteral("viewer1"), QStringLiteral("#1E90FF"),
+				     QStringLiteral("boa noite!"), QString()});
+		ev(ChatPlatform::Twitch, ChatEvent::Sub, "Resubber", 5, "Tier 1", "five months!");
+		ev(ChatPlatform::Twitch, ChatEvent::GiftSub, "Santa", 20, "Tier 1", "");
+		ev(ChatPlatform::Twitch, ChatEvent::Bits, "Cheerer", 100, "", "Cheer100 gg");
+		ev(ChatPlatform::Kick, ChatEvent::Raid, "Raider", 1234, "", "");
+		ev(ChatPlatform::YouTube, ChatEvent::Donation, "Rich", 0, "R$ 10,00", "valeu pela live");
+		ev(ChatPlatform::YouTube, ChatEvent::Membership, "Member", 0, "Welcome to Members!", "");
+		ev(ChatPlatform::TikTok, ChatEvent::Gift, "Fan", 7, "Rose (7 \u2666)", "");
+		ev(ChatPlatform::TikTok, ChatEvent::Follow, "newfan", 0, "", "");
+		ev(ChatPlatform::TikTok, ChatEvent::Share, "sharer", 0, "", "");
+		ev(ChatPlatform::Kick, ChatEvent::Follow, "kickfan", 0, "", "");
+		chat->appendMessage(
+			{ChatPlatform::Kick, QStringLiteral("kicker"), QString(), QStringLiteral("salve"), QString()});
+		widget = box;
+		box->resize(900, 560);
 	} else if (args[1] == QLatin1String("outputs")) {
 		auto *outputs = new OutputsDock();
 		outputs->importOutputs(QJsonDocument::fromJson(R"json([
@@ -156,7 +190,8 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	widget->resize(420, 560);
+	if (widget->size().width() < 600)
+		widget->resize(420, 560);
 	widget->show();
 
 	QTimer::singleShot(seconds * 1000, &app, [&]() {

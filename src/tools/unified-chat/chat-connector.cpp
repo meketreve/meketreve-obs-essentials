@@ -68,6 +68,22 @@ void ChatConnector::emitMessage(const QString &author, const QString &color, con
 	emit messageReceived(ChatMessage{m_platform, author, color, text, highlight});
 }
 
+void ChatConnector::emitEvent(ChatEvent event, const QString &author, int amount, const QString &detail,
+			      const QString &text)
+{
+	ChatMessage msg{m_platform, author, QString(), text, QString()};
+	msg.event = event;
+	msg.amount = amount;
+	msg.detail = detail;
+	emit messageReceived(msg);
+}
+
+void ChatConnector::emitFull(ChatMessage msg)
+{
+	msg.platform = m_platform;
+	emit messageReceived(msg);
+}
+
 void ChatConnector::scheduleRetry(int seconds)
 {
 	if (!m_running)

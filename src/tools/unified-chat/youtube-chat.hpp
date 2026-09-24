@@ -38,6 +38,9 @@ public:
 	static QString videoIdFromInput(const QString &input);
 	static QString liveUrlFromInput(const QString &input);
 
+	/* One entry of get_live_chat's "actions"; public so tests can feed it. */
+	void handleAction(const QJsonObject &action);
+
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
@@ -49,7 +52,6 @@ private:
 	void onChatPage(QNetworkReply *reply);
 	void poll();
 	void onPoll(QNetworkReply *reply);
-	void handleAction(const QJsonObject &action);
 
 	QPointer<QNetworkReply> m_pending;
 	QTimer m_pollTimer;

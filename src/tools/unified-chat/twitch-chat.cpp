@@ -23,6 +23,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 
+#include <algorithm>
+
 TwitchChat::TwitchChat(QNetworkAccessManager *net, QObject *parent) : ChatConnector(ChatPlatform::Twitch, net, parent)
 {
 	connect(&m_ws, &WsClient::opened, this, [this]() {
@@ -96,6 +98,56 @@ void TwitchChat::handleLine(const QByteArray &line)
 		if (author.isEmpty())
 			author = QString::fromUtf8(irc.nick());
 
-		emitMessage(author, QString::fromUtf8(irc.tags.value("color")), text);
+		ChatMessage msg{ChatPlatform::Twitch, author, QString::fromUtf8(irc.tags.value("color")), text,
+				QString()};
+		msg.id = irc.tag("id");
+		msg.userId = irc.tag("user-id");
+		const int bits = irc.tag("bits").toInt();
+		if (bits > 0) {
+			msg.event = ChatEvent::Bits;
+			msg.amount = bits;
+		}
+		emitFull(msg);
+	} else if (command == "USERNOTICE") {
+		handleUserNotice(irc);
 	}
+}
+
+void TwitchChat::handleUserNotice(const IrcMessage &irc)
+{
+	const QString kind = irc.tag("msg-id");
+	QString author = irc.tag("display-name");
+	if (author.isEmpty())
+		author = irc.tag("login");
+
+	ChatMessage msg{ChatPlatform::Twitch, author, QString::fromUtf8(irc.tags.value("color")),
+			QString::fromUtf8(irc.trailing()), QString()};
+	msg.id = irc.tag("id");
+	msg.userId = irc.tag("user-id");
+
+	const QString plan = irc.tag("msg-param-sub-plan");
+	const QString tier = plan == QLatin1String("Prime") ? QStringLiteral("Prime")
+			     : plan.size() == 4             ? QStringLiteral("Tier %1").arg(plan.left(1))
+							    : QString();
+
+	if (kind == QLatin1String("sub") || kind == QLatin1String("resub")) {
+		msg.event = ChatEvent::Sub;
+		msg.amount = std::max(1, irc.tag("msg-param-cumulative-months").toInt());
+		msg.detail = tier;
+	} else if (kind == QLatin1String("subgift")) {
+		msg.event = ChatEvent::GiftSub;
+		msg.amount = 1;
+		msg.detail = irc.tag("msg-param-recipient-display-name");
+	} else if (kind == QLatin1String("submysterygift")) {
+		msg.event = ChatEvent::GiftSub;
+		msg.amount = std::max(1, irc.tag("msg-param-mass-gift-count").toInt());
+		msg.detail = tier;
+	} else if (kind == QLatin1String("raid")) {
+		msg.event = ChatEvent::Raid;
+		msg.author = irc.tag("msg-param-displayName");
+		msg.amount = irc.tag("msg-param-viewerCount").toInt();
+	} else {
+		return;
+	}
+	emitFull(msg);
 }

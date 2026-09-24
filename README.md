@@ -88,7 +88,13 @@ checked again every minute, so the chat connects on its own when the stream
 starts, and dropped connections retry with backoff. Hover the colored dots at
 the top to see each platform's status.
 
-The chat is read-only: nothing is sent to any platform and no login is needed.
+**Activity** (Docks → Activity) lists subs, gifted subs, raids, bits,
+follows, Super Chats/stickers, memberships and TikTok gifts, follows and
+shares from every platform; they are also highlighted in the chat (turn that
+off in Settings). TikTok likes are off by default. Twitch follows need a login
+(see below); Kick follows arrive on their own.
+
+Without logging in the chat is read-only and nothing is sent to any platform.
 YouTube and TikTok use unofficial endpoints, so a change on their side can
 break those two until the plugin is updated.
 

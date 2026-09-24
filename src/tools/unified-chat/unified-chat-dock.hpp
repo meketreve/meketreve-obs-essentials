@@ -25,8 +25,29 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <array>
 
+class QCheckBox;
 class QLabel;
 class QTextBrowser;
+
+/* Subs, gifts, raids, follows... from every platform, one line each. */
+class ActivityDock : public QWidget {
+	Q_OBJECT
+
+public:
+	explicit ActivityDock(QWidget *parent = nullptr);
+
+	void addEvent(const ChatMessage &msg, const QString &description);
+
+private:
+	void showPlaceholder();
+
+	QTextBrowser *m_view = nullptr;
+	bool m_hasEvents = false;
+	/* TikTok sends a like event per tap burst; merge a user's bursts. */
+	QString m_lastLikeKey;
+	int m_lastLikeCount = 0;
+	qint64 m_lastLikeAt = 0;
+};
 
 class UnifiedChatDock : public QWidget {
 	Q_OBJECT
@@ -42,6 +63,15 @@ public:
 	void importChannels(const QJsonObject &channels);
 	static QString describeChannels(const QJsonObject &channels);
 
+	/* Entry point for every connector message (public for the harness). */
+	void appendMessage(const ChatMessage &msg);
+
+	/* Translated one-line summary of an event ("x gifted 5 subs"). */
+	static QString describeEvent(const ChatMessage &msg);
+
+signals:
+	void activity(const ChatMessage &msg, const QString &description);
+
 private:
 	static constexpr size_t kPlatforms = 4;
 
@@ -49,7 +79,7 @@ private:
 	void saveSettings();
 	void applySettings();
 	void openSettings();
-	void appendMessage(const ChatMessage &msg);
+	void appendEventLine(const ChatMessage &msg, const QString &description);
 	void showPlaceholder();
 	void updateStatus(ChatPlatform platform, ConnectorState state, const QString &detail);
 
@@ -59,4 +89,6 @@ private:
 	std::array<QString, kPlatforms> m_targets;
 	QTextBrowser *m_view = nullptr;
 	bool m_hasMessages = false;
+	bool m_eventsInChat = true;
+	bool m_activityLikes = false;
 };
