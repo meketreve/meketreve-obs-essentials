@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "tiktok-chat.hpp"
 
+#include "tiktok-proto.hpp"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -29,174 +31,6 @@ namespace {
 
 constexpr int kOfflineRecheckSeconds = 60;
 constexpr int kLiveStatus = 2;
-
-/* Just enough protobuf to walk TikTok's webcast messages. Field numbers come
- * from the tiktok-live-proto schema (WebcastPushFrame, ProtoMessageFetchResult,
- * WebcastChatMessage, User). */
-struct PbField {
-	quint32 number = 0;
-	quint8 wire = 0;
-	quint64 varint = 0;
-	QByteArray bytes;
-};
-
-class PbReader {
-public:
-	explicit PbReader(const QByteArray &data) : m_data(data) {}
-
-	bool next(PbField &f)
-	{
-		if (m_pos >= m_data.size())
-			return false;
-		quint64 key = 0;
-		if (!readVarint(key))
-			return false;
-		f.number = static_cast<quint32>(key >> 3);
-		f.wire = static_cast<quint8>(key & 7);
-		f.bytes.clear();
-		f.varint = 0;
-
-		switch (f.wire) {
-		case 0:
-			return readVarint(f.varint);
-		case 1:
-			return skip(8);
-		case 2: {
-			quint64 len = 0;
-			if (!readVarint(len) || len > static_cast<quint64>(m_data.size() - m_pos))
-				return false;
-			f.bytes = m_data.mid(m_pos, static_cast<qsizetype>(len));
-			m_pos += static_cast<qsizetype>(len);
-			return true;
-		}
-		case 5:
-			return skip(4);
-		default:
-			return false;
-		}
-	}
-
-private:
-	bool readVarint(quint64 &out)
-	{
-		out = 0;
-		for (int shift = 0; shift < 64; shift += 7) {
-			if (m_pos >= m_data.size())
-				return false;
-			const auto c = static_cast<quint8>(m_data[m_pos++]);
-			out |= static_cast<quint64>(c & 0x7F) << shift;
-			if (!(c & 0x80))
-				return true;
-		}
-		return false;
-	}
-
-	bool skip(qsizetype n)
-	{
-		if (m_pos + n > m_data.size())
-			return false;
-		m_pos += n;
-		return true;
-	}
-
-	const QByteArray &m_data;
-	qsizetype m_pos = 0;
-};
-
-void putVarint(QByteArray &out, quint64 v)
-{
-	while (v >= 0x80) {
-		out.append(static_cast<char>((v & 0x7F) | 0x80));
-		v >>= 7;
-	}
-	out.append(static_cast<char>(v));
-}
-
-void putVarintField(QByteArray &out, quint32 field, quint64 v)
-{
-	putVarint(out, static_cast<quint64>(field) << 3);
-	putVarint(out, v);
-}
-
-void putBytesField(QByteArray &out, quint32 field, const QByteArray &v)
-{
-	putVarint(out, (static_cast<quint64>(field) << 3) | 2);
-	putVarint(out, static_cast<quint64>(v.size()));
-	out += v;
-}
-
-QByteArray pushFrame(const QByteArray &type, const QByteArray &payload, quint64 logId = 0)
-{
-	QByteArray out;
-	if (logId)
-		putVarintField(out, 2, logId);
-	putBytesField(out, 6, "pb");
-	putBytesField(out, 7, type);
-	putBytesField(out, 8, payload);
-	return out;
-}
-
-struct FetchResult {
-	QList<QPair<QByteArray, QByteArray>> messages;
-	QList<QPair<QByteArray, QByteArray>> routeParams;
-	QByteArray cursor;
-	QByteArray internalExt;
-	QByteArray pushServer;
-	bool needAck = false;
-};
-
-FetchResult parseFetchResult(const QByteArray &data)
-{
-	FetchResult r;
-	PbReader reader(data);
-	PbField f;
-	while (reader.next(f)) {
-		switch (f.number) {
-		case 1: {
-			QByteArray method, payload;
-			PbReader msg(f.bytes);
-			PbField m;
-			while (msg.next(m)) {
-				if (m.number == 1)
-					method = m.bytes;
-				else if (m.number == 2)
-					payload = m.bytes;
-			}
-			r.messages.append({method, payload});
-			break;
-		}
-		case 2:
-			r.cursor = f.bytes;
-			break;
-		case 5:
-			r.internalExt = f.bytes;
-			break;
-		case 7: {
-			QByteArray key, value;
-			PbReader entry(f.bytes);
-			PbField e;
-			while (entry.next(e)) {
-				if (e.number == 1)
-					key = e.bytes;
-				else if (e.number == 2)
-					value = e.bytes;
-			}
-			if (!value.isEmpty())
-				r.routeParams.append({key, value});
-			break;
-		}
-		case 9:
-			r.needAck = f.varint != 0;
-			break;
-		case 10:
-			r.pushServer = f.bytes;
-			break;
-		default:
-			break;
-		}
-	}
-	return r;
-}
 
 QByteArray encodeQuery(const QList<QPair<QByteArray, QByteArray>> &params)
 {
@@ -419,23 +253,8 @@ void TikTokChat::onFrame(const QByteArray &data)
 		if (msg.first != "WebcastChatMessage")
 			continue;
 
-		QString nickname, uniqueId, text;
-		PbReader chat(msg.second);
-		PbField c;
-		while (chat.next(c)) {
-			if (c.number == 2) {
-				PbReader user(c.bytes);
-				PbField u;
-				while (user.next(u)) {
-					if (u.number == 3)
-						nickname = QString::fromUtf8(u.bytes);
-					else if (u.number == 38)
-						uniqueId = QString::fromUtf8(u.bytes);
-				}
-			} else if (c.number == 3) {
-				text = QString::fromUtf8(c.bytes);
-			}
-		}
-		emitMessage(nickname.isEmpty() ? uniqueId : nickname, QString(), text);
+		TikTokChatMessage chat;
+		if (parseTikTokChat(msg.second, chat))
+			emitMessage(chat.user.displayName(), QString(), chat.text);
 	}
 }

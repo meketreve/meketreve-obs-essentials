@@ -6,6 +6,7 @@ project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
+option(ENABLE_DEV_TOOLS "Build local test harnesses and unit tests (not shipped)" OFF)
 
 include(compilerconfig)
 include(defaults)
@@ -42,10 +43,14 @@ target_sources(
     src/tools/voice-fx.c
     src/tools/unified-chat/chat-connector.cpp
     src/tools/unified-chat/chat-connector.hpp
+    src/tools/unified-chat/irc-message.cpp
+    src/tools/unified-chat/irc-message.hpp
     src/tools/unified-chat/kick-chat.cpp
     src/tools/unified-chat/kick-chat.hpp
     src/tools/unified-chat/tiktok-chat.cpp
     src/tools/unified-chat/tiktok-chat.hpp
+    src/tools/unified-chat/tiktok-proto.cpp
+    src/tools/unified-chat/tiktok-proto.hpp
     src/tools/unified-chat/twitch-chat.cpp
     src/tools/unified-chat/twitch-chat.hpp
     src/tools/unified-chat/unified-chat-dock.cpp
@@ -57,3 +62,8 @@ target_sources(
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
+
+if(ENABLE_DEV_TOOLS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()

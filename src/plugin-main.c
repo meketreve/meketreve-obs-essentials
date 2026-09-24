@@ -26,12 +26,30 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
+/* Tabs and the vertical canvas use the canvas API that OBS 32 introduced
+ * at runtime; everything else works on older versions. */
+#define MIN_CANVAS_OBS_MAJOR 32
+
+static bool obs_supports_canvas_tools(void)
+{
+	const uint32_t major = obs_get_version() >> 24;
+	if (major >= MIN_CANVAS_OBS_MAJOR)
+		return true;
+	obs_log(LOG_WARNING, "OBS %s is older than %d.0: tabs and vertical canvas are disabled",
+		obs_get_version_string(), MIN_CANVAS_OBS_MAJOR);
+	return false;
+}
+
 bool obs_module_load(void)
 {
 	/* Register every tool in the toolkit here. */
 	bass_shake_register();
 	voice_fx_register();
 	unified_chat_register();
+
+	if (obs_supports_canvas_tools()) {
+		/* Canvas-dependent tools are registered here. */
+	}
 
 	obs_log(LOG_INFO, "Meketreve OBS Essentials loaded (version %s)", PLUGIN_VERSION);
 	return true;

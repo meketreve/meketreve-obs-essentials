@@ -18,35 +18,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "twitch-chat.hpp"
 
-#include <QHash>
+#include "irc-message.hpp"
+
 #include <QRandomGenerator>
 #include <QRegularExpression>
-
-namespace {
-
-QString unescapeTag(const QByteArray &raw)
-{
-	QString out;
-	const QString in = QString::fromUtf8(raw);
-	for (qsizetype i = 0; i < in.size(); i++) {
-		if (in[i] != QLatin1Char('\\') || i + 1 >= in.size()) {
-			out += in[i];
-			continue;
-		}
-		const QChar next = in[++i];
-		if (next == QLatin1Char('s'))
-			out += QLatin1Char(' ');
-		else if (next == QLatin1Char(':'))
-			out += QLatin1Char(';');
-		else if (next == QLatin1Char('r') || next == QLatin1Char('n'))
-			continue;
-		else
-			out += next;
-	}
-	return out;
-}
-
-} // namespace
 
 TwitchChat::TwitchChat(QNetworkAccessManager *net, QObject *parent) : ChatConnector(ChatPlatform::Twitch, net, parent)
 {
@@ -97,56 +72,30 @@ void TwitchChat::disconnectNow()
 
 void TwitchChat::handleLine(const QByteArray &line)
 {
-	QByteArray rest = line;
-	QHash<QByteArray, QByteArray> tags;
-
-	if (rest.startsWith('@')) {
-		const qsizetype sp = rest.indexOf(' ');
-		if (sp < 0)
-			return;
-		for (const QByteArray &kv : rest.mid(1, sp - 1).split(';')) {
-			const qsizetype eq = kv.indexOf('=');
-			if (eq > 0)
-				tags.insert(kv.left(eq), kv.mid(eq + 1));
-		}
-		rest = rest.mid(sp + 1);
-	}
-
-	QByteArray prefix;
-	if (rest.startsWith(':')) {
-		const qsizetype sp = rest.indexOf(' ');
-		if (sp < 0)
-			return;
-		prefix = rest.mid(1, sp - 1);
-		rest = rest.mid(sp + 1);
-	}
-
-	const qsizetype sp = rest.indexOf(' ');
-	const QByteArray command = sp < 0 ? rest : rest.left(sp);
-	const QByteArray params = sp < 0 ? QByteArray() : rest.mid(sp + 1);
+	IrcMessage irc;
+	if (!parseIrcLine(line, irc))
+		return;
+	const QByteArray &command = irc.command;
 
 	if (command == "PING") {
-		m_ws.sendText("PONG " + params);
+		m_ws.sendText("PONG " + irc.params);
 	} else if (command == "366" || command == "ROOMSTATE") {
 		markHealthy();
 	} else if (command == "RECONNECT") {
 		scheduleRetry(1);
-	} else if (command == "NOTICE" && params.contains("Login")) {
-		setState(ConnectorState::Error, QString::fromUtf8(params.mid(params.indexOf(':') + 1)));
+	} else if (command == "NOTICE" && irc.params.contains("Login")) {
+		setState(ConnectorState::Error, QString::fromUtf8(irc.trailing()));
 	} else if (command == "PRIVMSG") {
-		const qsizetype colon = params.indexOf(" :");
-		if (colon < 0)
-			return;
-		QString text = QString::fromUtf8(params.mid(colon + 2));
+		QString text = QString::fromUtf8(irc.trailing());
 		if (text.startsWith(QStringLiteral("\x01"
 						   "ACTION ")) &&
 		    text.endsWith(QLatin1Char('\x01')))
 			text = text.mid(8, text.size() - 9);
 
-		QString author = unescapeTag(tags.value("display-name"));
+		QString author = irc.tag("display-name");
 		if (author.isEmpty())
-			author = QString::fromUtf8(prefix.left(prefix.indexOf('!')));
+			author = QString::fromUtf8(irc.nick());
 
-		emitMessage(author, QString::fromUtf8(tags.value("color")), text);
+		emitMessage(author, QString::fromUtf8(irc.tags.value("color")), text);
 	}
 }
