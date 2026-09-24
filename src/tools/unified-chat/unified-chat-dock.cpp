@@ -320,6 +320,7 @@ void UnifiedChatDock::applySettings()
 		else
 			m_connectors[i]->start(m_targets[i]);
 	}
+	emit targetsChanged();
 }
 
 void UnifiedChatDock::openSettings()
@@ -455,6 +456,15 @@ bool UnifiedChatDock::sendAs(ChatPlatform platform, const QString &text)
 QString UnifiedChatDock::target(ChatPlatform platform) const
 {
 	return m_targets[indexOf(platform)];
+}
+
+void UnifiedChatDock::setTarget(ChatPlatform platform, const QString &value)
+{
+	m_targets[indexOf(platform)] = value.trimmed();
+	saveSettings();
+	applySettings();
+	if (!m_hasMessages)
+		showPlaceholder();
 }
 
 void UnifiedChatDock::appendMessage(const ChatMessage &msg)

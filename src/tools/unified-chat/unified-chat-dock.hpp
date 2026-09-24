@@ -81,11 +81,15 @@ public:
 	bool sendAs(ChatPlatform platform, const QString &text);
 	ChatAccounts *accounts() const { return m_accounts; }
 	QString target(ChatPlatform platform) const;
+	/* Changes one platform's channel as if typed in Settings. */
+	void setTarget(ChatPlatform platform, const QString &value);
 
 signals:
 	void activity(const ChatMessage &msg, const QString &description);
 	/* Every message and event from every platform, before any filtering. */
 	void incoming(const ChatMessage &msg);
+	/* The channels changed (Settings, import or setTarget). */
+	void targetsChanged();
 
 private:
 	static constexpr size_t kPlatforms = 4;

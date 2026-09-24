@@ -136,6 +136,10 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 		refreshStatus();
 	});
 	connect(m_chat, &UnifiedChatDock::incoming, this, &TexuguitoDock::onChat);
+	connect(m_chat, &UnifiedChatDock::targetsChanged, this, [this]() {
+		refreshStatus();
+		pollChatters();
+	});
 	connect(m_chat->accounts(), &ChatAccounts::accountChanged, this, [this]() {
 		m_chattersDenied = false;
 		refreshStatus();
@@ -201,6 +205,11 @@ TexuguitoDock::~TexuguitoDock()
 	m_server->close();
 }
 
+QString TexuguitoDock::statusText() const
+{
+	return m_status->text() + QStringLiteral(" | ") + m_replies->text();
+}
+
 QString TexuguitoDock::overlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/overlay").arg(m_port);
@@ -264,6 +273,13 @@ void TexuguitoDock::refreshStatus()
 					  .arg(m_server->clientCount())
 					  .arg(m_engine->clips().size()));
 	}
+
+	bool anyChannel = false;
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::TikTok})
+		anyChannel |= !m_chat->target(p).trimmed().isEmpty();
+	if (m_enabled && !anyChannel)
+		m_status->setText(m_status->text() + QStringLiteral("<br><span style=\"color:#E0A000\">%1</span>")
+							     .arg(T("Texuguito.NoChannels").toHtmlEscaped()));
 
 	QStringList parts;
 	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
@@ -380,6 +396,11 @@ void TexuguitoDock::importOldBot()
 	const QString dir = QFileDialog::getExistingDirectory(this, T("Texuguito.ImportTitle"));
 	if (dir.isEmpty())
 		return;
+	QMessageBox::information(this, T("Texuguito.ImportTitle"), importFrom(dir));
+}
+
+QString TexuguitoDock::importFrom(const QString &dir)
+{
 	const QDir root(dir);
 	int files = 0;
 	for (const char *name : {"viewers.json", "points.json", "custom_commands.json"}) {
@@ -394,6 +415,24 @@ void TexuguitoDock::importOldBot()
 		if (QFile::copy(src, dst))
 			files++;
 	}
+	/* The old bot knew its Twitch channel from .env; only that line is read,
+	 * never the tokens. */
+	QString channel;
+	QFile env(root.filePath(QStringLiteral(".env")));
+	if (env.open(QIODevice::ReadOnly | QIODevice::Text)) {
+		while (!env.atEnd()) {
+			const QString line = QString::fromUtf8(env.readLine()).trimmed();
+			if (line.startsWith(QLatin1String("CHANNEL="))) {
+				channel = line.mid(8).trimmed();
+				channel.remove(QLatin1Char('"'));
+				channel.remove(QLatin1Char('\''));
+			}
+		}
+	}
+	const bool setChannel = !channel.isEmpty() && m_chat->target(ChatPlatform::Twitch).trimmed().isEmpty();
+	if (setChannel)
+		m_chat->setTarget(ChatPlatform::Twitch, channel);
+
 	const int audios = root.exists(QStringLiteral("audios"))
 				   ? copyTree(root.filePath(QStringLiteral("audios")), m_engine->audioDir())
 				   : 0;
@@ -401,9 +440,11 @@ void TexuguitoDock::importOldBot()
 	refreshStatus();
 	obs_log(LOG_INFO, "[texuguito] imported %d data file(s) and %d audio file(s) from %s", files, audios,
 		dir.toUtf8().constData());
-	QMessageBox::information(this, T("Texuguito.ImportTitle"),
-				 files + audios > 0 ? T("Texuguito.Imported").arg(files).arg(audios)
-						    : T("Texuguito.ImportNothing"));
+	QString result = files + audios > 0 ? T("Texuguito.Imported").arg(files).arg(audios)
+					    : T("Texuguito.ImportNothing");
+	if (setChannel)
+		result += QStringLiteral("\n\n") + T("Texuguito.ImportedChannel").arg(channel);
+	return result;
 }
 
 void TexuguitoDock::openSettings()
@@ -472,6 +513,20 @@ void texuguito_register(void)
 		return;
 	}
 	g_dock = dock;
+
+	/* Developer smoke test, inert unless the variable is set: imports the
+	 * old bot folder it names, then logs what the dock shows. */
+	const QString selftest = qEnvironmentVariable("MEKETREVE_SELFTEST_TEXUGUITO_IMPORT");
+	if (!selftest.isEmpty()) {
+		QTimer::singleShot(3000, dock, [dock, selftest]() {
+			obs_log(LOG_INFO, "[selftest] texuguito status before: %s",
+				dock->statusText().toUtf8().constData());
+			obs_log(LOG_INFO, "[selftest] texuguito import: %s",
+				dock->importFrom(selftest).toUtf8().constData());
+			obs_log(LOG_INFO, "[selftest] texuguito status after: %s",
+				dock->statusText().toUtf8().constData());
+		});
+	}
 }
 
 void texuguito_unregister(void) {}

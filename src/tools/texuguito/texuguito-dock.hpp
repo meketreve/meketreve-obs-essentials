@@ -36,6 +36,9 @@ public:
 	~TexuguitoDock() override;
 
 	QString overlayUrl() const;
+	QString statusText() const;
+	/* Copies an old texuguito-seu-bot-amigo folder in; returns a summary. */
+	QString importFrom(const QString &dir);
 	BotEngine *engine() const { return m_engine; }
 
 private:
