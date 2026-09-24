@@ -41,6 +41,10 @@ target_sources(
     src/plugin-main.c
     src/tools/bass-shake.c
     src/tools/voice-fx.c
+    src/tools/config/config-codec.cpp
+    src/tools/config/config-codec.hpp
+    src/tools/config/config-share.cpp
+    src/tools/config/config-share.hpp
     src/tools/tabs/layout-store.cpp
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp

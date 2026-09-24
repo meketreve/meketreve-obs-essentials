@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": { "en-US": "Chat only", "pt-BR": "Só chat" },
+  "description": {
+    "en-US": "Adds a tab with just the preview and the Unified Chat, handy on a small second screen.",
+    "pt-BR": "Adiciona uma aba só com a prévia e o Chat Unificado, boa para uma segunda tela pequena."
+  },
+  "tabs": {
+    "format": 1,
+    "tabs": [
+      {
+        "id": "chat-only",
+        "name": "Chat",
+        "docks": [
+          { "dock": "meketreve-main-canvas", "area": "top" },
+          { "dock": "meketreve-unified-chat", "area": "right" }
+        ]
+      }
+    ]
+  }
+}

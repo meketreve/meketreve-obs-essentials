@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/voice-fx.h"
 #include "tools/unified-chat.h"
 #include "tools/tabs/tabs.h"
+#include "tools/config/config-share.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -53,6 +54,7 @@ bool obs_module_load(void)
 	canvas_tools = obs_supports_canvas_tools();
 	if (canvas_tools)
 		tabs_register();
+	config_share_register();
 
 	obs_log(LOG_INFO, "Meketreve OBS Essentials loaded (version %s)", PLUGIN_VERSION);
 	return true;

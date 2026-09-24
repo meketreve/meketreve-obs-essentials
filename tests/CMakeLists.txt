@@ -26,14 +26,23 @@ target_sources(
     ${_chat}/youtube-chat.cpp
     ${_chat}/youtube-chat.hpp
 )
-target_include_directories(chat-core PUBLIC ${_chat})
+target_include_directories(chat-core PUBLIC ${_chat} ${CMAKE_SOURCE_DIR}/src/tools/config)
 target_link_libraries(chat-core PUBLIC Qt6::Core Qt6::Network)
 set_target_properties(chat-core PROPERTIES AUTOMOC ON POSITION_INDEPENDENT_CODE ON)
 
 add_executable(chat-probe chat-probe.cpp)
 target_link_libraries(chat-probe PRIVATE chat-core)
 
-add_executable(dock-harness dock-harness.cpp ${_chat}/unified-chat-dock.cpp ${_chat}/unified-chat-dock.hpp)
+set(_config "${CMAKE_SOURCE_DIR}/src/tools/config")
+
+add_executable(
+  dock-harness
+  dock-harness.cpp
+  ${_chat}/unified-chat-dock.cpp
+  ${_chat}/unified-chat-dock.hpp
+  ${_config}/config-codec.cpp
+  ${_config}/config-share.cpp
+)
 target_link_libraries(
   dock-harness
   PRIVATE chat-core Qt6::Widgets OBS::libobs OBS::obs-frontend-api plugin-support
@@ -56,3 +65,10 @@ target_include_directories(test-layout-store PRIVATE ${CMAKE_SOURCE_DIR}/src/too
 target_link_libraries(test-layout-store PRIVATE Qt6::Core Qt6::Test)
 set_target_properties(test-layout-store PROPERTIES AUTOMOC ON)
 add_test(NAME layout-store COMMAND test-layout-store)
+
+add_executable(test-config-codec test-config-codec.cpp ${_config}/config-codec.cpp ${_config}/config-codec.hpp)
+target_include_directories(test-config-codec PRIVATE ${_config})
+target_compile_definitions(test-config-codec PRIVATE PRESETS_DIR="${CMAKE_SOURCE_DIR}/data/presets")
+target_link_libraries(test-config-codec PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-config-codec PROPERTIES AUTOMOC ON)
+add_test(NAME config-codec COMMAND test-config-codec)

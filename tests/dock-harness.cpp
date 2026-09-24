@@ -23,6 +23,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * channels. */
 
 #include "unified-chat-dock.hpp"
+#include "config-share.hpp"
+
+#include "../src/tools/unified-chat.h"
 
 #include <obs-module.h>
 #include <util/bmem.h>
@@ -88,7 +91,9 @@ int main(int argc, char **argv)
 		}
 	}
 	if (args.size() < 3) {
-		std::fprintf(stderr, "usage: dock-harness chat <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+		std::fprintf(
+			stderr,
+			"usage: dock-harness <chat|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -101,6 +106,35 @@ int main(int argc, char **argv)
 
 	QWidget *widget = nullptr;
 	UnifiedChatDock *chat = nullptr;
+	const QString out = args[2];
+	const int seconds = args.size() > 3 ? args[3].toInt() : 3;
+
+	if (args[1] == QLatin1String("export") || args[1] == QLatin1String("import")) {
+		/* The dialogs are modal: grab whatever window is active once they
+		 * are up, then close it. */
+		chat = new UnifiedChatDock();
+		configShareAddSection({QStringLiteral("chat"), "Config.Section.Chat",
+				       [chat]() { return QJsonValue(chat->exportChannels()); },
+				       [chat](const QJsonValue &v) { chat->importChannels(v.toObject()); },
+				       [](const QJsonValue &v) {
+					       return UnifiedChatDock::describeChannels(v.toObject());
+				       }});
+		QTimer::singleShot(seconds * 1000, &app, [&out]() {
+			QWidget *w = QApplication::activeModalWidget();
+			const bool ok = w && w->grab().save(out);
+			std::printf("%s %s\n", ok ? "saved" : "FAILED to save", qPrintable(out));
+			if (w)
+				w->close();
+		});
+		if (args[1] == QLatin1String("export"))
+			configShareOpenExport();
+		else
+			configShareOpenImport();
+		delete chat;
+		text_lookup_destroy(g_lookup);
+		return 0;
+	}
+
 	if (args[1] == QLatin1String("chat")) {
 		chat = new UnifiedChatDock();
 		widget = chat;
@@ -112,8 +146,6 @@ int main(int argc, char **argv)
 	widget->resize(420, 560);
 	widget->show();
 
-	const QString out = args[2];
-	const int seconds = args.size() > 3 ? args[3].toInt() : 3;
 	QTimer::singleShot(seconds * 1000, &app, [&]() {
 		const bool ok = widget->grab().save(out);
 		std::printf("%s %s\n", ok ? "saved" : "FAILED to save", qPrintable(out));

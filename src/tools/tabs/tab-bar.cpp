@@ -18,6 +18,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tab-bar.hpp"
 #include "tabs.h"
 
+#include "../config/config-codec.hpp"
+#include "../config/config-share.hpp"
+
 #include <obs-module.h>
 #include <plugin-support.h>
 #include <util/config-file.h>
@@ -78,27 +81,16 @@ bool readEnabledFlag()
 	return enabled;
 }
 
-struct DefaultDock {
-	const char *name;
-	Qt::DockWidgetArea area;
-	Qt::Orientation orientation;
-};
-
-/* Live: what you watch while streaming. Build: what you use to set scenes up. */
-const std::array<DefaultDock, 4> kLiveDocks{{
-	{kPreviewDockId, Qt::TopDockWidgetArea, Qt::Vertical},
-	{kChatDockId, Qt::RightDockWidgetArea, Qt::Vertical},
-	{"mixerDock", Qt::BottomDockWidgetArea, Qt::Horizontal},
-	{"controlsDock", Qt::BottomDockWidgetArea, Qt::Horizontal},
-}};
-
-const std::array<DefaultDock, 5> kBuildDocks{{
-	{kPreviewDockId, Qt::TopDockWidgetArea, Qt::Vertical},
-	{"scenesDock", Qt::LeftDockWidgetArea, Qt::Vertical},
-	{"sourcesDock", Qt::LeftDockWidgetArea, Qt::Vertical},
-	{"transitionsDock", Qt::BottomDockWidgetArea, Qt::Horizontal},
-	{"mixerDock", Qt::BottomDockWidgetArea, Qt::Horizontal},
-}};
+Qt::DockWidgetArea areaFromName(const QString &area)
+{
+	if (area == QLatin1String("left"))
+		return Qt::LeftDockWidgetArea;
+	if (area == QLatin1String("right"))
+		return Qt::RightDockWidgetArea;
+	if (area == QLatin1String("top"))
+		return Qt::TopDockWidgetArea;
+	return Qt::BottomDockWidgetArea;
+}
 
 QList<QDockWidget *> topLevelDocks(QMainWindow *main)
 {
@@ -335,9 +327,10 @@ void TabsController::applyTab(int configIndex)
 {
 	TabLayout &tab = m_cfg.tabs[configIndex];
 	if (tab.state.isEmpty()) {
-		if (tab.isFixed())
-			applyDefaultLayout(tab.id);
-		/* A new custom tab starts as a copy of the layout it was made from. */
+		const QList<DockPlacement> docks = tab.docks.isEmpty() ? defaultDocks(tab.id) : tab.docks;
+		/* Without either, a tab keeps the layout it was made from. */
+		if (!docks.isEmpty())
+			applyDockList(tab.id, docks);
 		return;
 	}
 	if (!m_main->restoreState(tab.state))
@@ -362,15 +355,8 @@ void TabsController::ensurePreviewVisible(TabLayout &tab)
 	QTimer::singleShot(0, this, &TabsController::fillCentralSpace);
 }
 
-void TabsController::applyDefaultLayout(const QString &id)
+void TabsController::applyDockList(const QString &id, const QList<DockPlacement> &docks)
 {
-	const bool live = id == QLatin1String("live");
-	QList<DefaultDock> wanted;
-	if (live)
-		wanted = QList<DefaultDock>(kLiveDocks.begin(), kLiveDocks.end());
-	else
-		wanted = QList<DefaultDock>(kBuildDocks.begin(), kBuildDocks.end());
-
 	/* Side docks take the full height, so chat and scene lists get room. */
 	m_main->setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
 	m_main->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
@@ -382,25 +368,27 @@ void TabsController::applyDefaultLayout(const QString &id)
 
 	for (QDockWidget *dock : topLevelDocks(m_main)) {
 		const QString name = dock->objectName();
-		const bool keep = std::any_of(wanted.begin(), wanted.end(),
-					      [&name](const DefaultDock &d) { return name == QLatin1String(d.name); });
+		const bool keep = std::any_of(docks.begin(), docks.end(),
+					      [&name](const DockPlacement &d) { return name == d.dock; });
 		if (!keep)
 			dock->hide();
 	}
 
 	QList<QDockWidget *> side, bottom;
-	for (const DefaultDock &d : wanted) {
-		auto *dock = m_main->findChild<QDockWidget *>(QString::fromLatin1(d.name));
+	for (const DockPlacement &d : docks) {
+		auto *dock = m_main->findChild<QDockWidget *>(d.dock);
 		if (!dock) {
-			obs_log(LOG_INFO, "[tabs] default layout: dock \"%s\" not found", d.name);
+			obs_log(LOG_INFO, "[tabs] layout: dock \"%s\" not found", d.dock.toUtf8().constData());
 			continue;
 		}
+		const Qt::DockWidgetArea area = areaFromName(d.area);
+		const bool isSide = area == Qt::LeftDockWidgetArea || area == Qt::RightDockWidgetArea;
 		dock->setFloating(false);
-		m_main->addDockWidget(d.area, dock, d.orientation);
+		m_main->addDockWidget(area, dock, isSide ? Qt::Vertical : Qt::Horizontal);
 		dock->show();
-		if (d.area == Qt::LeftDockWidgetArea || d.area == Qt::RightDockWidgetArea)
+		if (isSide)
 			side.append(dock);
-		else if (d.area == Qt::BottomDockWidgetArea)
+		else if (area == Qt::BottomDockWidgetArea)
 			bottom.append(dock);
 	}
 
@@ -527,10 +515,11 @@ void TabsController::resetTab(int index)
 	if (ci < 0 || !m_cfg.tabs[ci].isFixed())
 		return;
 	m_cfg.tabs[ci].state.clear();
+	m_cfg.tabs[ci].docks.clear();
 	m_cfg.tabs[ci].name.clear();
 	m_tabBar->setTabText(index, displayName(m_cfg.tabs[ci]));
 	if (m_cfg.current == m_cfg.tabs[ci].id)
-		applyDefaultLayout(m_cfg.tabs[ci].id);
+		applyDockList(m_cfg.tabs[ci].id, defaultDocks(m_cfg.tabs[ci].id));
 	else
 		m_tabBar->setCurrentIndex(index);
 	saveProfile();
@@ -583,6 +572,69 @@ void TabsController::handleHotkey(obs_hotkey_id id)
 
 /* Developer smoke test, inert unless MEKETREVE_SELFTEST_DIR is set: visits
  * every tab, logs which docks are visible and saves a screenshot of each. */
+QJsonValue TabsController::exportTabs()
+{
+	captureCurrent();
+	return m_cfg.toJson();
+}
+
+QString TabsController::describeTabs(const QJsonValue &value) const
+{
+	TabsConfig cfg;
+	if (!TabsConfig::fromJson(value.toObject(), cfg, nullptr, false))
+		return T("Config.Invalid").arg(QString());
+	QStringList names;
+	for (const TabLayout &t : cfg.tabs)
+		names.append(displayName(t));
+	return names.join(QStringLiteral(", "));
+}
+
+void TabsController::importTabs(const QJsonValue &value)
+{
+	TabsConfig in;
+	QString error;
+	if (!TabsConfig::fromJson(value.toObject(), in, &error, false)) {
+		obs_log(LOG_WARNING, "[tabs] import skipped: %s", error.toUtf8().constData());
+		return;
+	}
+	if (!m_enabled || !m_loaded) {
+		obs_log(LOG_WARNING, "[tabs] import skipped: tabs are off");
+		return;
+	}
+
+	captureCurrent();
+	for (TabLayout t : in.tabs) {
+		if (t.isFixed()) {
+			/* Live/Build are replaced in place. */
+			TabLayout &mine = m_cfg.tabs[m_cfg.indexOf(t.id)];
+			mine.name = t.name;
+			mine.state = t.state;
+			mine.docks = t.docks;
+			mine.previewShown = t.previewShown;
+			continue;
+		}
+		/* Everything else, the sender's "My layout" included, is added as a
+		 * new tab so nothing of the user's own is overwritten. */
+		QString name = t.name.isEmpty() ? t.id : t.name;
+		const auto taken = [this](const QString &n) {
+			return std::any_of(m_cfg.tabs.begin(), m_cfg.tabs.end(),
+					   [this, &n](const TabLayout &x) { return displayName(x) == n; });
+		};
+		for (int n = 2; taken(name); n++)
+			name = QStringLiteral("%1 (%2)").arg(t.name.isEmpty() ? t.id : t.name).arg(n);
+		t.id = m_cfg.newCustomId();
+		t.name = name;
+		m_cfg.tabs.append(t);
+	}
+
+	rebuildTabBar();
+	const qsizetype ci = m_cfg.indexOf(m_cfg.current);
+	if (ci >= 0)
+		applyTab(static_cast<int>(ci));
+	saveProfile();
+	obs_log(LOG_INFO, "[tabs] imported %d tab(s)", static_cast<int>(in.tabs.size()));
+}
+
 void TabsController::runSelfTest(int step)
 {
 	const QString dir = qEnvironmentVariable("MEKETREVE_SELFTEST_DIR");
@@ -623,10 +675,42 @@ void TabsController::runSelfTest(int step)
 			QTimer::singleShot(1500, this, [this]() {
 				obs_log(LOG_INFO, "[selftest] back tabs=%d current=%s", m_tabBar->count(),
 					m_cfg.current.toUtf8().constData());
-				obs_log(LOG_INFO, "[selftest] done");
+				runImportSelfTest();
 			});
 		});
 	}
+}
+
+void TabsController::runImportSelfTest()
+{
+	/* Export -> string -> import must add copies of the custom tabs. */
+	const QString text = ConfigCodec::encode(QJsonObject{{QStringLiteral("tabs"), exportTabs()}});
+	QJsonObject back;
+	QString error;
+	const bool decoded = ConfigCodec::decode(text, back, &error);
+	const int before = m_tabBar->count();
+	importTabs(back.value(QStringLiteral("tabs")));
+	obs_log(LOG_INFO, "[selftest] export len=%d decoded=%d tabs %d -> %d", static_cast<int>(text.size()), decoded,
+		before, m_tabBar->count());
+
+	char *file = obs_module_file("presets/10-chat-only.json");
+	QFile preset(QString::fromUtf8(file ? file : ""));
+	bfree(file);
+	if (preset.open(QIODevice::ReadOnly))
+		importTabs(QJsonDocument::fromJson(preset.readAll()).object().value(QStringLiteral("tabs")));
+	const int last = m_tabBar->count() - 1;
+	m_tabBar->setCurrentIndex(last);
+	QTimer::singleShot(1500, this, [this, last]() {
+		QStringList visible;
+		for (QDockWidget *dock : topLevelDocks(m_main)) {
+			if (dock->isVisible())
+				visible.append(dock->objectName());
+		}
+		obs_log(LOG_INFO, "[selftest] preset tab=%s visible=%s", m_tabBar->tabText(last).toUtf8().constData(),
+			visible.join(QLatin1Char(' ')).toUtf8().constData());
+		m_main->grab().save(qEnvironmentVariable("MEKETREVE_SELFTEST_DIR") + QStringLiteral("/preset.png"));
+		obs_log(LOG_INFO, "[selftest] done");
+	});
 }
 
 void TabsController::registerHotkeys()
@@ -725,6 +809,16 @@ void tabs_register(void)
 		TabsController::movePreviewToDock(main);
 	g_tabs = new TabsController(main);
 	obs_frontend_add_event_callback(onFrontendEvent, nullptr);
+
+	configShareAddSection({QStringLiteral("tabs"), "Config.Section.Tabs",
+			       []() { return g_tabs ? g_tabs->exportTabs() : QJsonValue(); },
+			       [](const QJsonValue &v) {
+				       if (g_tabs)
+					       g_tabs->importTabs(v);
+			       },
+			       [](const QJsonValue &v) {
+				       return g_tabs ? g_tabs->describeTabs(v) : QString();
+			       }});
 }
 
 void tabs_unregister(void)

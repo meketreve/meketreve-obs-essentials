@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "name": { "en-US": "Multistream", "pt-BR": "Multistream" },
+  "description": {
+    "en-US": "Live tab with the Outputs dock next to the chat, plus extra outputs for Twitch, YouTube and Kick. Type each stream key in the Outputs dock.",
+    "pt-BR": "Aba Ao vivo com a doca Saídas ao lado do chat, mais saídas extras para Twitch, YouTube e Kick. Digite cada chave de transmissão na doca Saídas."
+  },
+  "tabs": {
+    "format": 1,
+    "tabs": [
+      {
+        "id": "live",
+        "docks": [
+          { "dock": "meketreve-main-canvas", "area": "top" },
+          { "dock": "meketreve-unified-chat", "area": "right" },
+          { "dock": "meketreve-outputs", "area": "right" },
+          { "dock": "mixerDock", "area": "bottom" },
+          { "dock": "controlsDock", "area": "bottom" }
+        ]
+      }
+    ]
+  },
+  "outputs": [
+    { "name": "Twitch", "platform": "twitch", "server": "rtmp://live.twitch.tv/app", "enabled": true },
+    { "name": "YouTube", "platform": "youtube", "server": "rtmps://a.rtmps.youtube.com:443/live2", "enabled": true },
+    { "name": "Kick", "platform": "kick", "server": "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app", "enabled": true }
+  ]
+}

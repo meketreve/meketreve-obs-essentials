@@ -20,6 +20,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QJsonArray>
 
+QList<DockPlacement> defaultDocks(const QString &fixedId)
+{
+	/* Live: what you watch while streaming. Build: what you set scenes up with. */
+	if (fixedId == QLatin1String("live"))
+		return {{QStringLiteral("meketreve-main-canvas"), QStringLiteral("top")},
+			{QStringLiteral("meketreve-unified-chat"), QStringLiteral("right")},
+			{QStringLiteral("mixerDock"), QStringLiteral("bottom")},
+			{QStringLiteral("controlsDock"), QStringLiteral("bottom")}};
+	if (fixedId == QLatin1String("build"))
+		return {{QStringLiteral("meketreve-main-canvas"), QStringLiteral("top")},
+			{QStringLiteral("scenesDock"), QStringLiteral("left")},
+			{QStringLiteral("sourcesDock"), QStringLiteral("left")},
+			{QStringLiteral("transitionsDock"), QStringLiteral("bottom")},
+			{QStringLiteral("mixerDock"), QStringLiteral("bottom")}};
+	return {};
+}
+
 TabsConfig TabsConfig::defaults(const QByteArray &currentState, const QString &myLayoutName)
 {
 	TabsConfig cfg;
@@ -70,6 +87,13 @@ QJsonObject TabsConfig::toJson(bool withStates) const
 			o.insert(QStringLiteral("state"), QString::fromLatin1(t.state.toBase64()));
 			o.insert(QStringLiteral("previewShown"), t.previewShown);
 		}
+		if (!t.docks.isEmpty()) {
+			QJsonArray docks;
+			for (const DockPlacement &d : t.docks)
+				docks.append(QJsonObject{{QStringLiteral("dock"), d.dock},
+							 {QStringLiteral("area"), d.area}});
+			o.insert(QStringLiteral("docks"), docks);
+		}
 		arr.append(o);
 	}
 	return QJsonObject{{QStringLiteral("format"), kFormat},
@@ -77,7 +101,7 @@ QJsonObject TabsConfig::toJson(bool withStates) const
 			   {QStringLiteral("tabs"), arr}};
 }
 
-bool TabsConfig::fromJson(const QJsonObject &obj, TabsConfig &out, QString *error)
+bool TabsConfig::fromJson(const QJsonObject &obj, TabsConfig &out, QString *error, bool fillFixed)
 {
 	const auto fail = [error](const char *why) {
 		if (error)
@@ -103,11 +127,21 @@ bool TabsConfig::fromJson(const QJsonObject &obj, TabsConfig &out, QString *erro
 			t.name = t.id;
 		t.state = QByteArray::fromBase64(o.value(QStringLiteral("state")).toString().toLatin1());
 		t.previewShown = o.value(QStringLiteral("previewShown")).toBool();
+		for (const QJsonValue d : o.value(QStringLiteral("docks")).toArray()) {
+			const QString dock = d.toObject().value(QStringLiteral("dock")).toString();
+			const QString area = d.toObject().value(QStringLiteral("area")).toString();
+			static const QStringList areas{QStringLiteral("left"), QStringLiteral("right"),
+						       QStringLiteral("top"), QStringLiteral("bottom")};
+			if (!dock.isEmpty() && areas.contains(area))
+				t.docks.append({dock, area});
+		}
 		cfg.tabs.append(t);
 	}
 
 	/* Live and Build are always there, even if an edited file lost them. */
 	for (const char *fixed : {"live", "build"}) {
+		if (!fillFixed)
+			break;
 		if (cfg.indexOf(QString::fromLatin1(fixed)) < 0) {
 			TabLayout t;
 			t.id = QString::fromLatin1(fixed);
@@ -115,6 +149,8 @@ bool TabsConfig::fromJson(const QJsonObject &obj, TabsConfig &out, QString *erro
 		}
 	}
 
+	if (cfg.tabs.isEmpty())
+		return fail("no tabs");
 	cfg.current = obj.value(QStringLiteral("current")).toString();
 	if (cfg.indexOf(cfg.current) < 0)
 		cfg.current = cfg.tabs.first().id;

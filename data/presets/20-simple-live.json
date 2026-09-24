@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "name": { "en-US": "Simple live", "pt-BR": "Live simples" },
+  "description": {
+    "en-US": "Brings the Live and Build tabs back to their default layouts.",
+    "pt-BR": "Volta as abas Ao vivo e Montagem para o layout padrão."
+  },
+  "tabs": {
+    "format": 1,
+    "tabs": [{ "id": "live" }, { "id": "build" }]
+  }
+}

@@ -14,6 +14,7 @@ required, though building locally on Linux is a one-liner (see
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
+| **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
 
 ### Layout Tabs
@@ -32,6 +33,19 @@ can place it anywhere. Hotkeys for *next tab*, *previous tab* and *go to tab
 1–9* are in **Settings → Hotkeys**. To turn the tabs off, uncheck
 **Tools → Meketreve: Layout tabs**: your original layout comes back, and after
 a restart the preview is back in the center.
+
+### Share configuration
+
+**Tools → Meketreve: Export configuration** turns your setup into one line of
+text that starts with `MOE1:`. Tick what goes in (tabs and layouts, Unified
+Chat channels, extra outputs), copy it and paste it into **Tools → Meketreve:
+Import configuration** on another computer, or send it to a friend. The import
+dialog shows what the text contains and lets you pick what to apply; it also
+lists the built-in presets (*Chat only*, *Simple live*, *Multistream*).
+
+Stream keys, passwords and login tokens are never part of the text. Imported
+tabs are added next to yours (your own *My layout* is never overwritten); Live
+and Build are replaced.
 
 The idea comes from [Aitum Stream Suite](https://github.com/Aitum/obs-aitum-stream-suite)
 (GPL-2.0).

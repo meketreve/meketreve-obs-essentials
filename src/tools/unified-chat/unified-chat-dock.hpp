@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "chat-connector.hpp"
 
+#include <QJsonObject>
 #include <QWidget>
 
 #include <array>
@@ -32,8 +33,14 @@ class UnifiedChatDock : public QWidget {
 
 public:
 	explicit UnifiedChatDock(QWidget *parent = nullptr);
+	~UnifiedChatDock() override;
 
 	void shutdown();
+
+	/* Channel names for the shareable configuration. */
+	QJsonObject exportChannels() const;
+	void importChannels(const QJsonObject &channels);
+	static QString describeChannels(const QJsonObject &channels);
 
 private:
 	static constexpr size_t kPlatforms = 4;

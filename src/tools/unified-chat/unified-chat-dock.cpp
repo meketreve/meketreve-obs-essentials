@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "youtube-chat.hpp"
 
 #include "../unified-chat.h"
+#include "../config/config-share.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -179,10 +180,48 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	applySettings();
 }
 
+UnifiedChatDock::~UnifiedChatDock()
+{
+	/* The connectors are destroyed after the status labels; a socket that
+	 * reports "closed" on the way out must not reach them. */
+	for (ChatConnector *c : m_connectors)
+		disconnect(c, nullptr, this, nullptr);
+	shutdown();
+}
+
 void UnifiedChatDock::shutdown()
 {
 	for (ChatConnector *c : m_connectors)
 		c->stop();
+}
+
+QJsonObject UnifiedChatDock::exportChannels() const
+{
+	QJsonObject o;
+	for (size_t i = 0; i < kPlatforms; i++)
+		o.insert(QString::fromLatin1(kPlatformInfo[i].configKey), m_targets[i]);
+	return o;
+}
+
+void UnifiedChatDock::importChannels(const QJsonObject &channels)
+{
+	for (size_t i = 0; i < kPlatforms; i++)
+		m_targets[i] = channels.value(QString::fromLatin1(kPlatformInfo[i].configKey)).toString().trimmed();
+	saveSettings();
+	applySettings();
+	if (!m_hasMessages)
+		showPlaceholder();
+}
+
+QString UnifiedChatDock::describeChannels(const QJsonObject &channels)
+{
+	QStringList parts;
+	for (const PlatformInfo &info : kPlatformInfo) {
+		const QString target = channels.value(QString::fromLatin1(info.configKey)).toString().trimmed();
+		if (!target.isEmpty())
+			parts.append(QStringLiteral("%1: %2").arg(T(info.labelKey), target));
+	}
+	return parts.isEmpty() ? T("Config.ChatNone") : parts.join(QStringLiteral(", "));
 }
 
 void UnifiedChatDock::loadSettings()
@@ -353,6 +392,16 @@ void unified_chat_register(void)
 	}
 	g_dock = dock;
 	obs_frontend_add_event_callback(onFrontendEvent, nullptr);
+
+	configShareAddSection({QStringLiteral("chat"), "Config.Section.Chat",
+			       []() { return g_dock ? QJsonValue(g_dock->exportChannels()) : QJsonValue(); },
+			       [](const QJsonValue &v) {
+				       if (g_dock)
+					       g_dock->importChannels(v.toObject());
+			       },
+			       [](const QJsonValue &v) {
+				       return UnifiedChatDock::describeChannels(v.toObject());
+			       }});
 }
 
 void unified_chat_unregister(void)

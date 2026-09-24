@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 #include <obs-hotkey.h>
 
+#include <QJsonValue>
 #include <QObject>
 #include <QPointer>
 
@@ -50,6 +51,10 @@ public:
 	void onFrontendEvent(enum obs_frontend_event event);
 	void handleHotkey(obs_hotkey_id id);
 
+	QJsonValue exportTabs();
+	void importTabs(const QJsonValue &value);
+	QString describeTabs(const QJsonValue &value) const;
+
 public slots:
 	void switchToIndex(int index);
 	void switchRelative(int delta);
@@ -60,7 +65,7 @@ private:
 	void rebuildTabBar();
 	void captureCurrent();
 	void applyTab(int configIndex);
-	void applyDefaultLayout(const QString &id);
+	void applyDockList(const QString &id, const QList<DockPlacement> &docks);
 	void fillCentralSpace();
 	void ensurePreviewVisible(TabLayout &tab);
 	void onCurrentChanged(int index);
@@ -74,6 +79,7 @@ private:
 	int configIndexForTab(int tabIndex) const;
 
 	void runSelfTest(int step);
+	void runImportSelfTest();
 	void registerHotkeys();
 	void unregisterHotkeys();
 	void loadGlobal();
