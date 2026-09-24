@@ -15,6 +15,7 @@ required, though building locally on Linux is a one-liner (see
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
+| **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, TikTok, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
 
 ### Layout Tabs
@@ -33,6 +34,26 @@ can place it anywhere. Hotkeys for *next tab*, *previous tab* and *go to tab
 1–9* are in **Settings → Hotkeys**. To turn the tabs off, uncheck
 **Tools → Meketreve: Layout tabs**: your original layout comes back, and after
 a restart the preview is back in the center.
+
+### Outputs (multistream)
+
+Open **Docks → Outputs** and click **+** for each extra destination: pick the
+platform (the server is filled in), paste the stream key and choose the
+encoder:
+
+- **Reuse the main stream's encoder** (default): no extra CPU/GPU cost; the
+  output uses the main stream's resolution and bitrate and can only run while
+  the main stream is live.
+- **Own encoder**: any video encoder OBS offers (x264, NVENC, …) with its own
+  bitrate, so it can run on its own or send a lower bitrate to one platform.
+
+Outputs set to *start together with the main stream* start and stop with it;
+**Start all** / **Stop all** and each row's button control them by hand. The
+dot shows the state (hover it for errors) and a timer counts the time live.
+A warning appears when the bitrate is above what the platform accepts. Stream
+keys stay in the profile folder on this computer and are never exported.
+
+Based on the idea of [Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream) (GPL-2.0).
 
 ### Share configuration
 

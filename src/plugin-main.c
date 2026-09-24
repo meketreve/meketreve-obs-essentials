@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/unified-chat.h"
 #include "tools/tabs/tabs.h"
 #include "tools/config/config-share.h"
+#include "tools/outputs/outputs.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -50,6 +51,7 @@ bool obs_module_load(void)
 	bass_shake_register();
 	voice_fx_register();
 	unified_chat_register();
+	outputs_register();
 
 	canvas_tools = obs_supports_canvas_tools();
 	if (canvas_tools)
@@ -64,6 +66,7 @@ void obs_module_unload(void)
 {
 	if (canvas_tools)
 		tabs_unregister();
+	outputs_unregister();
 	unified_chat_unregister();
 	obs_log(LOG_INFO, "plugin unloaded");
 }

@@ -45,6 +45,10 @@ target_sources(
     src/tools/config/config-codec.hpp
     src/tools/config/config-share.cpp
     src/tools/config/config-share.hpp
+    src/tools/outputs/output-store.cpp
+    src/tools/outputs/output-store.hpp
+    src/tools/outputs/outputs-dock.cpp
+    src/tools/outputs/outputs-dock.hpp
     src/tools/tabs/layout-store.cpp
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp

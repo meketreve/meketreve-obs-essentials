@@ -42,7 +42,11 @@ add_executable(
   ${_chat}/unified-chat-dock.hpp
   ${_config}/config-codec.cpp
   ${_config}/config-share.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/outputs/output-store.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/outputs/outputs-dock.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/outputs/outputs-dock.hpp
 )
+target_include_directories(dock-harness PRIVATE ${CMAKE_SOURCE_DIR}/src/tools/outputs)
 target_link_libraries(
   dock-harness
   PRIVATE chat-core Qt6::Widgets OBS::libobs OBS::obs-frontend-api plugin-support
@@ -72,3 +76,10 @@ target_compile_definitions(test-config-codec PRIVATE PRESETS_DIR="${CMAKE_SOURCE
 target_link_libraries(test-config-codec PRIVATE Qt6::Core Qt6::Test)
 set_target_properties(test-config-codec PROPERTIES AUTOMOC ON)
 add_test(NAME config-codec COMMAND test-config-codec)
+
+set(_outputs "${CMAKE_SOURCE_DIR}/src/tools/outputs")
+add_executable(test-output-store test-output-store.cpp ${_outputs}/output-store.cpp ${_outputs}/output-store.hpp)
+target_include_directories(test-output-store PRIVATE ${_outputs})
+target_link_libraries(test-output-store PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-output-store PROPERTIES AUTOMOC ON)
+add_test(NAME output-store COMMAND test-output-store)

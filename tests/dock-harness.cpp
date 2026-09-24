@@ -24,6 +24,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "unified-chat-dock.hpp"
 #include "config-share.hpp"
+#include "outputs-dock.hpp"
+
+#include <QJsonArray>
+#include <QJsonDocument>
 
 #include "../src/tools/unified-chat.h"
 
@@ -93,7 +97,7 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -138,6 +142,15 @@ int main(int argc, char **argv)
 	if (args[1] == QLatin1String("chat")) {
 		chat = new UnifiedChatDock();
 		widget = chat;
+	} else if (args[1] == QLatin1String("outputs")) {
+		auto *outputs = new OutputsDock();
+		outputs->importOutputs(QJsonDocument::fromJson(R"json([
+			{"name":"Twitch","platform":"twitch","server":"rtmp://live.twitch.tv/app"},
+			{"name":"YouTube","platform":"youtube","server":"rtmps://a.rtmps.youtube.com:443/live2"},
+			{"name":"Kick (encoder próprio)","platform":"kick","server":"rtmps://x/app","sharedEncoder":false}
+		])json")
+					       .array());
+		widget = outputs;
 	} else {
 		std::fprintf(stderr, "unknown widget '%s'\n", qPrintable(args[1]));
 		return 2;
