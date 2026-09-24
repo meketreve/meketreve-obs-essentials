@@ -50,7 +50,11 @@ runs:
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
         print ::group::Install gersemi
-        brew install --quiet obsproject/tools/gersemi
+        # Homebrew now skips untrusted taps (obsproject/tools), so the
+        # formula no longer installs; take the same pinned version from PyPI.
+        pipx install gersemi==0.21.0 || python3 -m pip install --user --break-system-packages gersemi==0.21.0
+        export PATH="${HOME}/.local/bin:${PATH}"
+        gersemi --version
         print ::endgroup::
 
         print ::group::Run gersemi
