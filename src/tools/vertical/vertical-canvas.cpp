@@ -170,10 +170,6 @@ void frontend_event(obs_frontend_event event, void *private_data)
 			it->LogScenes();
 			it->FinishLoading();
 		}
-		if (!canvas_docks.empty()) {
-			auto cd = canvas_docks.front();
-			cd->AskUpdate();
-		}
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_CHANGED) {
 		for (const auto &it : canvas_docks) {
 			QMetaObject::invokeMethod(it, "MainSceneChanged", Qt::QueuedConnection);
@@ -1037,7 +1033,6 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 		obs_data_set_bool(settings, "backtrack", true);
 		first_time = true;
 	}
-	partnerBlockTime = (time_t)obs_data_get_int(settings, "partner_block");
 	canvas_width = (uint32_t)obs_data_get_int(settings, "width");
 	if ((canvas_width & 1) == 1) {
 		canvas_width++;
@@ -7011,7 +7006,6 @@ obs_data_t *CanvasDock::SaveSettings()
 
 	obs_data_set_int(save_data, "width", canvas_width);
 	obs_data_set_int(save_data, "height", canvas_height);
-	obs_data_set_int(save_data, "partner_block", partnerBlockTime);
 	obs_data_set_bool(save_data, "preview_disabled", preview_disabled);
 	obs_data_set_bool(save_data, "virtual_cam_warned", virtual_cam_warned);
 	obs_data_set_int(save_data, "streaming_video_bitrate", streamingVideoBitrate);
@@ -8505,89 +8499,6 @@ void RemoveWidget(QWidget *widget)
 	delete widget;
 }
 
-void CanvasDock::ApiInfo(QString info)
-{
-	auto d = obs_data_create_from_json(info.toUtf8().constData());
-	if (!d) {
-		return;
-	}
-	auto data_obj = obs_data_get_obj(d, "data");
-	obs_data_release(d);
-	if (!data_obj) {
-		return;
-	}
-	auto version = obs_data_get_string(data_obj, "version");
-	int major;
-	int minor;
-	int patch;
-	if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-		auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
-		if (sv > MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
-			newer_version_available = QString::fromUtf8(version);
-			configButton->setStyleSheet(QString::fromUtf8("background: rgb(192,128,0);"));
-		}
-	}
-	time_t current_time = time(nullptr);
-	if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
-		obs_data_array_t *blocks = obs_data_get_array(data_obj, "partnerBlocks");
-		size_t count = obs_data_array_count(blocks);
-		size_t added_count = 0;
-		for (size_t i = count; i > 0; i--) {
-			obs_data_t *block = obs_data_array_item(blocks, i - 1);
-			auto block_type = obs_data_get_string(block, "type");
-			QBoxLayout *layout = nullptr;
-			if (strcmp(block_type, "LINK") == 0) {
-				auto button = new QPushButton(QString::fromUtf8(obs_data_get_string(block, "label")));
-				button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
-				auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
-				connect(button, &QPushButton::clicked, [url] { QDesktopServices::openUrl(QUrl(url)); });
-				auto buttonRow = new QHBoxLayout;
-				buttonRow->addWidget(button);
-				layout = buttonRow;
-
-			} else if (strcmp(block_type, "IMAGE") == 0) {
-				auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
-				if (image_data.startsWith("data:image/")) {
-					auto pos = image_data.indexOf(";");
-					auto format = image_data.mid(11, pos - 11);
-					QImage image;
-					if (image.loadFromData(QByteArray::fromBase64(
-								       image_data.mid(pos + 7).toUtf8().constData()),
-							       format.toUtf8().constData())) {
-						auto label = new AspectRatioPixmapLabel;
-						label->setPixmap(QPixmap::fromImage(image));
-						label->setAlignment(Qt::AlignCenter);
-						label->setStyleSheet(
-							QString::fromUtf8(obs_data_get_string(block, "qss")));
-						auto labelRow = new QHBoxLayout;
-						labelRow->addWidget(label, 1, Qt::AlignCenter);
-						layout = labelRow;
-					}
-				}
-			}
-			if (layout) {
-				added_count++;
-				if (i == 1) {
-					auto closeButton = new QPushButton("🞫");
-					connect(closeButton, &QPushButton::clicked, [this, added_count] {
-						for (size_t j = 0; j < added_count; j++) {
-							auto item = mainLayout->takeAt(2);
-							RemoveLayoutItem(item);
-						}
-						partnerBlockTime = time(nullptr);
-						SaveSettings();
-					});
-					layout->addWidget(closeButton);
-				}
-				mainLayout->insertLayout(2, layout, 0);
-			}
-			obs_data_release(block);
-		}
-		obs_data_array_release(blocks);
-	}
-	obs_data_release(data_obj);
-}
-
 void CanvasDock::ProfileChanged()
 {
 	for (auto it = streamOutputs.begin(); it != streamOutputs.end(); ++it) {
@@ -9128,65 +9039,6 @@ void CanvasDock::LogFilter(obs_source_t *, obs_source_t *filter, void *v_val)
 	blog(LOG_INFO, "%s- filter: '%s' (%s)", indent.c_str(), name, id);
 }
 
-void CanvasDock::AskUpdate()
-{
-	if (newer_version_available.isEmpty()) {
-		return;
-	}
-	auto parts = newer_version_available.split(".");
-	if (parts.count() < 3) {
-		return;
-	}
-	int major = parts.value(0).toInt();
-	int minor = parts.value(1).toInt();
-	int patch = parts.value(2).toInt();
-	auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
-
-	char *path = obs_module_config_path(VERTICAL_CONFIG_FILE);
-	if (!path) {
-		return;
-	}
-
-	obs_data_t *config = obs_data_create_from_json_file_safe(path, "bak");
-
-	auto skip_version = config ? obs_data_get_int(config, "skip_version") : 0;
-	if (sv == skip_version) {
-		obs_data_release(config);
-		bfree(path);
-		return;
-	}
-
-	auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-
-	QMessageBox mb(QMessageBox::Question, QString::fromUtf8(obs_frontend_get_locale_string("Updater.Title")),
-		       QString::fromUtf8(obs_frontend_get_locale_string("Updater.Text")) + " " +
-			       QString::fromUtf8(obs_module_text("VerticalCanvas")) + " " + newer_version_available,
-		       QMessageBox::StandardButtons(), main_window);
-	auto update = mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.UpdateNow")),
-				   QMessageBox::YesRole);
-	auto remind = mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.RemindMeLater")),
-				   QMessageBox::RejectRole);
-	auto skip =
-		mb.addButton(QString::fromUtf8(obs_frontend_get_locale_string("Updater.Skip")), QMessageBox::NoRole);
-	mb.setDefaultButton(remind);
-	mb.exec();
-	if (mb.clickedButton() == update) {
-		QDesktopServices::openUrl(QUrl(QString::fromUtf8("https://aitum.tv/download/stream-suite")));
-	} else if (mb.clickedButton() == skip) {
-		if (!config) {
-			config = obs_data_create();
-		}
-		obs_data_set_int(config, "skip_version", sv);
-		if (obs_data_save_json_safe(config, path, "tmp", "bak")) {
-			blog(LOG_INFO, "[Vertical Canvas] Saved settings");
-		} else {
-			blog(LOG_ERROR, "[Vertical Canvas] Failed saving settings");
-		}
-	}
-	obs_data_release(config);
-	bfree(path);
-}
-
 LockedCheckBox::LockedCheckBox()
 {
 	setProperty("lockCheckBox", true);
@@ -9202,39 +9054,3 @@ VisibilityCheckBox::VisibilityCheckBox()
 }
 
 VisibilityCheckBox::VisibilityCheckBox(QWidget *parent) : QCheckBox(parent) {}
-
-AspectRatioPixmapLabel::AspectRatioPixmapLabel(QWidget *parent) : QLabel(parent)
-{
-	setMinimumSize(1, 1);
-	setScaledContents(false);
-}
-
-void AspectRatioPixmapLabel::setPixmap(const QPixmap &p)
-{
-	pix = p;
-	QLabel::setPixmap(scaledPixmap());
-}
-
-int AspectRatioPixmapLabel::heightForWidth(int width) const
-{
-	return pix.isNull() ? height() : (pix.height() * width) / pix.width();
-}
-
-QSize AspectRatioPixmapLabel::sizeHint() const
-{
-	int w = width();
-	return QSize(w, heightForWidth(w));
-}
-
-QPixmap AspectRatioPixmapLabel::scaledPixmap() const
-{
-	return pix.scaled(size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-}
-
-void AspectRatioPixmapLabel::resizeEvent(QResizeEvent *e)
-{
-	UNUSED_PARAMETER(e);
-	if (!pix.isNull()) {
-		QLabel::setPixmap(scaledPixmap());
-	}
-}

@@ -94,7 +94,6 @@ class CanvasDock : public QFrame {
 
 private:
 	QPointer<QAction> action;
-	QString newer_version_available;
 	QVBoxLayout *mainLayout;
 	OBSQTDisplay *preview;
 	bool preview_disabled = false;
@@ -105,7 +104,6 @@ private:
 	std::vector<OBSSource> transitions;
 	std::vector<OBSProjector *> projectors;
 	std::unique_ptr<OBSEventFilter> eventFilter;
-	time_t partnerBlockTime = 0;
 
 	std::vector<obs_sceneitem_t *> hoveredPreviewItems;
 	std::vector<obs_sceneitem_t *> selectedItems;
@@ -435,7 +433,6 @@ private slots:
 	void SwitchBackToSelectedTransition();
 	void SceneRemoved(const QString name);
 
-	void ApiInfo(QString data);
 	void updateStreamKey(const QString &newStreamKey, int index);
 	void updateStreamServer(const QString &newStreamServer, int index);
 
@@ -472,7 +469,6 @@ public:
 	bool RecordingActive();
 	bool BacktrackActive();
 	bool VirtualCameraActive();
-	void AskUpdate();
 };
 
 class LockedCheckBox : public QCheckBox {
@@ -489,19 +485,4 @@ class VisibilityCheckBox : public QCheckBox {
 public:
 	VisibilityCheckBox();
 	explicit VisibilityCheckBox(QWidget *parent);
-};
-
-class AspectRatioPixmapLabel : public QLabel {
-	Q_OBJECT
-public:
-	explicit AspectRatioPixmapLabel(QWidget *parent = 0);
-	virtual int heightForWidth(int width) const;
-	virtual QSize sizeHint() const;
-	QPixmap scaledPixmap() const;
-public slots:
-	void setPixmap(const QPixmap &);
-	void resizeEvent(QResizeEvent *);
-
-private:
-	QPixmap pix;
 };

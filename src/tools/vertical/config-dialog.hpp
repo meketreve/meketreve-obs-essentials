@@ -32,7 +32,6 @@ class OBSBasicSettings : public QDialog {
 	Q_PROPERTY(QIcon advancedIcon READ GetAdvancedIcon WRITE SetAdvancedIcon DESIGNABLE true)
 private:
 	CanvasDock *canvasDock;
-	QLabel *newVersion;
 	QListWidget *listWidget;
 	QComboBox *resolution;
 	QSpinBox *streamingVideoBitrate;
