@@ -33,6 +33,26 @@ if(ENABLE_QT)
     ${CMAKE_PROJECT_NAME}
     PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
   )
+  # The vertical canvas preview needs a private Qt header for Wayland on Qt < 6.9.
+  if(OS_LINUX AND Qt6_VERSION VERSION_LESS "6.9.0")
+    find_package(Qt6 QUIET COMPONENTS GuiPrivate)
+    # Distros can ship the CMake target without the headers (no qt6-base-private-dev).
+    set(_qt_qpa_header FALSE)
+    if(TARGET Qt6::GuiPrivate)
+      get_target_property(_qt_private_dirs Qt6::GuiPrivate INTERFACE_INCLUDE_DIRECTORIES)
+      foreach(_dir IN LISTS _qt_private_dirs)
+        if(EXISTS "${_dir}/qpa/qplatformnativeinterface.h")
+          set(_qt_qpa_header TRUE)
+        endif()
+      endforeach()
+    endif()
+    if(_qt_qpa_header)
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::GuiPrivate)
+    else()
+      message(WARNING "qt6-base-private-dev not found: vertical canvas preview will not work on Wayland")
+      target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MEKETREVE_NO_QT_PRIVATE)
+    endif()
+  endif()
 endif()
 
 target_sources(
@@ -40,6 +60,35 @@ target_sources(
   PRIVATE
     src/plugin-main.c
     src/tools/bass-shake.c
+    src/tools/vertical/audio-wrapper-source.c
+    src/tools/vertical/audio-wrapper-source.h
+    src/tools/vertical/config-dialog.cpp
+    src/tools/vertical/config-dialog.hpp
+    src/tools/vertical/display-helpers.hpp
+    src/tools/vertical/hotkey-edit.cpp
+    src/tools/vertical/hotkey-edit.hpp
+    src/tools/vertical/multi-canvas-source.c
+    src/tools/vertical/multi-canvas-source.h
+    src/tools/vertical/name-dialog.cpp
+    src/tools/vertical/name-dialog.hpp
+    src/tools/vertical/obs-websocket-api.h
+    src/tools/vertical/projector.cpp
+    src/tools/vertical/projector.hpp
+    src/tools/vertical/qt-display.cpp
+    src/tools/vertical/qt-display.hpp
+    src/tools/vertical/scenes-dock.cpp
+    src/tools/vertical/scenes-dock.hpp
+    src/tools/vertical/source-tree.cpp
+    src/tools/vertical/source-tree.hpp
+    src/tools/vertical/sources-dock.cpp
+    src/tools/vertical/sources-dock.hpp
+    src/tools/vertical/transitions-dock.cpp
+    src/tools/vertical/transitions-dock.hpp
+    src/tools/vertical/version.h
+    src/tools/vertical/vertical-canvas.cpp
+    src/tools/vertical/vertical-canvas.hpp
+    src/tools/vertical/vertical.h
+    src/tools/vertical/vertical.qrc
     src/tools/voice-fx.c
     src/tools/config/config-codec.cpp
     src/tools/config/config-codec.hpp

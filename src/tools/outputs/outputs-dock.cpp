@@ -710,6 +710,24 @@ void OutputsDock::editOutput(const QString &id)
 	keyRow->addWidget(showKey);
 	form->addRow(T("Outputs.Key"), keyRow);
 
+	/* Extra canvases (the vertical one, for example) always use their own
+	 * encoder: the main stream's encoder only sees the main canvas. */
+	auto *canvas = new QComboBox(&dialog);
+	canvas->addItem(T("Outputs.MainCanvas"), QString());
+	obs_enum_canvases(
+		[](void *param, obs_canvas_t *cv) {
+			auto *combo = static_cast<QComboBox *>(param);
+			const QString canvasName = QString::fromUtf8(obs_canvas_get_name(cv));
+			if (!canvasName.isEmpty() && (obs_canvas_get_flags(cv) & MAIN) == 0 && obs_canvas_has_video(cv))
+				combo->addItem(canvasName, canvasName);
+			return true;
+		},
+		canvas);
+	if (!c.canvas.isEmpty() && canvas->findData(c.canvas) < 0)
+		canvas->addItem(c.canvas, c.canvas);
+	canvas->setCurrentIndex(std::max(0, canvas->findData(c.canvas)));
+	form->addRow(T("Outputs.Canvas"), canvas);
+
 	auto *encoderMode = new QComboBox(&dialog);
 	encoderMode->addItem(T("Outputs.EncoderShared"), true);
 	encoderMode->addItem(T("Outputs.EncoderOwn"), false);
@@ -759,6 +777,10 @@ void OutputsDock::editOutput(const QString &id)
 	layout->addWidget(note);
 
 	const auto update = [=]() {
+		const bool extraCanvas = !canvas->currentData().toString().isEmpty();
+		if (extraCanvas)
+			encoderMode->setCurrentIndex(1);
+		encoderMode->setEnabled(!extraCanvas);
 		const bool own = !encoderMode->currentData().toBool();
 		videoEncoder->setEnabled(own);
 		videoBitrate->setEnabled(own);
@@ -794,6 +816,7 @@ void OutputsDock::editOutput(const QString &id)
 		update();
 	});
 	connect(encoderMode, &QComboBox::currentIndexChanged, &dialog, update);
+	connect(canvas, &QComboBox::currentIndexChanged, &dialog, update);
 	connect(videoBitrate, &QSpinBox::valueChanged, &dialog, update);
 	if (existing < 0 && c.server.isEmpty())
 		Q_EMIT platform->currentIndexChanged(platform->currentIndex());
@@ -811,7 +834,8 @@ void OutputsDock::editOutput(const QString &id)
 	c.name = name->text().trimmed().isEmpty() ? platform->currentText() : name->text().trimmed();
 	c.server = server->text().trimmed();
 	c.key = key->text().trimmed();
-	c.sharedEncoder = encoderMode->currentData().toBool();
+	c.canvas = canvas->currentData().toString();
+	c.sharedEncoder = c.canvas.isEmpty() && encoderMode->currentData().toBool();
 	c.videoEncoder = videoEncoder->currentData().toString();
 	c.videoBitrate = videoBitrate->value();
 	c.audioBitrate = audioBitrate->value();

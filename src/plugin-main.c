@@ -25,6 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/tabs/tabs.h"
 #include "tools/config/config-share.h"
 #include "tools/outputs/outputs.h"
+#include "tools/vertical/vertical.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -62,8 +63,17 @@ bool obs_module_load(void)
 	return true;
 }
 
+void obs_module_post_load(void)
+{
+	/* Needs every module loaded to know whether Aitum's plugin is there. */
+	if (canvas_tools)
+		vertical_canvas_post_load();
+}
+
 void obs_module_unload(void)
 {
+	if (canvas_tools)
+		vertical_canvas_unload();
 	if (canvas_tools)
 		tabs_unregister();
 	outputs_unregister();

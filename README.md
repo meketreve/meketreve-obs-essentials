@@ -16,6 +16,7 @@ required, though building locally on Linux is a one-liner (see
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
 | **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, TikTok, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
+| **Vertical canvas** | Docks | A second 9:16 canvas with its own scenes, sources, preview, recording, backtrack and streaming. Port of Aitum Vertical Canvas. Needs OBS 32+. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
 
 ### Layout Tabs
@@ -54,6 +55,21 @@ A warning appears when the bitrate is above what the platform accepts. Stream
 keys stay in the profile folder on this computer and are never exported.
 
 Based on the idea of [Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream) (GPL-2.0).
+
+### Vertical canvas
+
+The toolkit includes a port of [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas)
+(GPL-2.0): a vertical canvas with its own scene list (**Vertical Scenes**),
+sources, transitions and a preview dock with stream, record, backtrack and
+virtual camera buttons. Its settings (gear button in the Vertical dock) cover
+resolution, streaming servers and recording. In the **Outputs** dock you can
+also pick the vertical canvas as the source of an extra output (it always uses
+its own encoder).
+
+If Aitum's own Vertical Canvas (or Aitum Stream Suite) is installed, the
+toolkit's copy stays off and Aitum's keeps working as before. When you remove
+Aitum's plugin, the copy takes over its settings, scenes and dock positions
+on the next start.
 
 ### Share configuration
 
