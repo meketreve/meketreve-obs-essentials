@@ -1,6 +1,7 @@
 # Meketreve OBS Essentials
 
 A toolkit of small OBS Studio filters/tools bundled in a single native plugin.
+Site: <https://meketreve.github.io/meketreve-obs-essentials/>
 Built on the official [obs-plugintemplate](https://github.com/obsproject/obs-plugintemplate),
 so Windows / macOS / Linux binaries — a Windows installer and a Linux `.deb`
 included — are produced by GitHub Actions. No local OBS dev dependencies

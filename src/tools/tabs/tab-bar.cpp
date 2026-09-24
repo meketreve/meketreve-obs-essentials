@@ -241,7 +241,10 @@ void TabsController::loadProfile()
 		m_loaded = true;
 		rebuildTabBar();
 		ensurePreviewVisible(m_cfg.tabs[0]);
-		QTimer::singleShot(100, this, [this]() {
+		/* The main window is still settling right after loading: size the
+		 * preview again once it has, then keep that as "My layout". */
+		QTimer::singleShot(500, this, &TabsController::fillCentralSpace);
+		QTimer::singleShot(1500, this, [this]() {
 			captureCurrent();
 			saveProfile();
 		});

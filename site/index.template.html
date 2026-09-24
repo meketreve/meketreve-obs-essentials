@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR" class="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meketreve OBS Essentials</title>
+<meta name="description" content="Plugin gratuito para OBS Studio: abas de layout, chat unificado de Twitch, YouTube, Kick e TikTok, multistream, canvas vertical e efeitos. Free OBS plugin: layout tabs, unified chat, multistream, vertical canvas.">
+<style>
+:root {
+  --bg: #f6f7fb; --fg: #1b1d24; --muted: #5d6271; --card: #ffffff; --line: #e1e4ec;
+  --accent: #3b5bdb; --accent-fg: #ffffff; --code: #eef0f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14161c; --fg: #e8eaf0; --muted: #9aa0ae; --card: #1d2029; --line: #2c303b;
+          --accent: #7c93ff; --accent-fg: #0f1117; --code: #262a35; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+header { padding: 18px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header b { font-size: 18px; }
+.lang button { background: none; border: 1px solid var(--line); color: var(--fg); padding: 4px 10px;
+               border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; }
+.lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.hero { padding: 40px 0 28px; }
+.hero h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1.15; margin: 0 0 14px; }
+.hero p { color: var(--muted); font-size: 18px; max-width: 720px; margin: 0 0 22px; }
+.btn { display: inline-block; background: var(--accent); color: var(--accent-fg); text-decoration: none;
+       padding: 10px 18px; border-radius: 8px; font-weight: 600; margin: 0 8px 8px 0; }
+.btn.alt { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+section { padding: 28px 0; border-top: 1px solid var(--line); }
+h2 { font-size: 26px; margin: 0 0 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.shot { margin: 18px 0; }
+.shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.shot figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+code, pre { background: var(--code); border-radius: 6px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; }
+code { padding: 1px 5px; }
+pre { padding: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 8px 0; }
+ol, ul { padding-left: 22px; }
+.preset { margin-bottom: 14px; }
+.preset button { font: inherit; font-size: 14px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line);
+                 background: var(--card); color: var(--fg); cursor: pointer; }
+footer { padding: 28px 0 40px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+a { color: var(--accent); }
+html.pt [lang="en"], html.en [lang="pt-BR"] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <b>Meketreve OBS Essentials</b>
+  <div class="lang" role="group" aria-label="Language">
+    <button id="btn-pt" aria-pressed="true">PT</button>
+    <button id="btn-en" aria-pressed="false">EN</button>
+  </div>
+</header>
+
+<div class="hero">
+  <h1 lang="pt-BR">As ferramentas que faltam no OBS, num plugin só e grátis.</h1>
+  <h1 lang="en">The tools OBS is missing, in one free plugin.</h1>
+  <p lang="pt-BR">Abas de layout, chat unificado de Twitch, YouTube, Kick e TikTok com feed de atividade, multistream, canvas vertical e efeitos de áudio e vídeo. Para Windows, Linux e macOS, código aberto (GPL-2.0).</p>
+  <p lang="en">Layout tabs, a unified Twitch, YouTube, Kick and TikTok chat with an activity feed, multistream, a vertical canvas and audio/video effects. For Windows, Linux and macOS, open source (GPL-2.0).</p>
+  <a class="btn" href="https://github.com/meketreve/meketreve-obs-essentials/releases"><span lang="pt-BR">Baixar</span><span lang="en">Download</span></a>
+  <a class="btn alt" href="https://github.com/meketreve/meketreve-obs-essentials">GitHub</a>
+</div>
+
+<section>
+  <h2 lang="pt-BR">Ferramentas</h2><h2 lang="en">Tools</h2>
+  <div class="grid">
+    <div class="card"><h3 lang="pt-BR">Abas de layout</h3><h3 lang="en">Layout tabs</h3>
+      <p lang="pt-BR">Uma barra embaixo do menu troca o layout inteiro das docas: Ao vivo, Montagem e as suas. Salva sozinho, por perfil.</p>
+      <p lang="en">A bar under the menu swaps the whole dock layout: Live, Build and your own. Saves on its own, per profile.</p></div>
+    <div class="card"><h3 lang="pt-BR">Chat unificado</h3><h3 lang="en">Unified chat</h3>
+      <p lang="pt-BR">Twitch, YouTube, Kick e TikTok numa doca. Com login na Twitch e no Kick: enviar mensagens, silenciar, banir e apagar.</p>
+      <p lang="en">Twitch, YouTube, Kick and TikTok in one dock. Log in to Twitch and Kick to send messages, time out, ban and delete.</p></div>
+    <div class="card"><h3 lang="pt-BR">Atividade</h3><h3 lang="en">Activity</h3>
+      <p lang="pt-BR">Subs, presentes, raids, bits, follows, Super Chats e presentes do TikTok de todas as plataformas numa lista.</p>
+      <p lang="en">Subs, gifts, raids, bits, follows, Super Chats and TikTok gifts from every platform in one list.</p></div>
+    <div class="card"><h3 lang="pt-BR">Saídas (multistream)</h3><h3 lang="en">Outputs (multistream)</h3>
+      <p lang="pt-BR">Transmita para várias plataformas ao mesmo tempo, reaproveitando o codificador da transmissão principal ou com um próprio.</p>
+      <p lang="en">Stream to several platforms at once, reusing the main stream's encoder or with one of its own.</p></div>
+    <div class="card"><h3 lang="pt-BR">Canvas vertical</h3><h3 lang="en">Vertical canvas</h3>
+      <p lang="pt-BR">Um segundo canvas 9:16 com cenas, fontes, gravação e transmissão próprias (baseado no Aitum Vertical).</p>
+      <p lang="en">A second 9:16 canvas with its own scenes, sources, recording and streaming (based on Aitum Vertical).</p></div>
+    <div class="card"><h3 lang="pt-BR">Compartilhar configuração</h3><h3 lang="en">Share configuration</h3>
+      <p lang="pt-BR">Exporte abas, canais e saídas como um texto <code>MOE1:</code> e importe em outro PC. Chaves nunca vão junto.</p>
+      <p lang="en">Export tabs, channels and outputs as one <code>MOE1:</code> text and import it on another PC. Keys never go along.</p></div>
+    <div class="card"><h3>Voice FX</h3>
+      <p lang="pt-BR">Modificador de voz: pitch, rádio, distorção, robô, bitcrusher, tremolo e eco.</p>
+      <p lang="en">Voice changer: pitch, radio, distortion, robot, bitcrusher, tremolo and echo.</p></div>
+    <div class="card"><h3>Bass Shake</h3>
+      <p lang="pt-BR">Faz uma fonte tremer com o grave de um áudio escolhido.</p>
+      <p lang="en">Shakes a source with the bass of a chosen audio input.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2 lang="pt-BR">Como fica</h2><h2 lang="en">How it looks</h2>
+  <figure class="shot"><img src="img/tab-live.png" alt="OBS with the Live tab: preview, unified chat, mixer and controls" loading="lazy" width="1280" height="868">
+    <figcaption lang="pt-BR">Aba Ao vivo: prévia, chat unificado, mixer e controles.</figcaption>
+    <figcaption lang="en">Live tab: preview, unified chat, mixer and controls.</figcaption></figure>
+  <figure class="shot"><img src="img/tab-build.png" alt="OBS with the Build tab: scenes, sources, preview, transitions and mixer" loading="lazy" width="1280" height="868">
+    <figcaption lang="pt-BR">Aba Montagem: cenas, fontes, prévia, transições e mixer.</figcaption>
+    <figcaption lang="en">Build tab: scenes, sources, preview, transitions and mixer.</figcaption></figure>
+  <figure class="shot"><img src="img/activity.png" alt="Unified chat and Activity docks with subs, gifts and raids" loading="lazy">
+    <figcaption lang="pt-BR">Chat unificado com eventos em destaque e a doca Atividade.</figcaption>
+    <figcaption lang="en">Unified chat with highlighted events, and the Activity dock.</figcaption></figure>
+  <div class="pair">
+    <figure class="shot"><img src="img/outputs.png" alt="Outputs dock with Twitch, YouTube and Kick" loading="lazy">
+      <figcaption lang="pt-BR">Doca Saídas.</figcaption><figcaption lang="en">Outputs dock.</figcaption></figure>
+    <figure class="shot"><img src="img/export.png" alt="Export configuration dialog with a MOE1 text" loading="lazy">
+      <figcaption lang="pt-BR">Exportar configuração.</figcaption><figcaption lang="en">Export configuration.</figcaption></figure>
+  </div>
+</section>
+
+<section id="install">
+  <h2 lang="pt-BR">Instalação</h2><h2 lang="en">Install</h2>
+  <p lang="pt-BR">Precisa do OBS Studio 31.1 ou mais novo (abas e canvas vertical: OBS 32+).</p>
+  <p lang="en">Needs OBS Studio 31.1 or newer (tabs and vertical canvas: OBS 32+).</p>
+  <div class="grid">
+    <div class="card"><h3>Windows</h3>
+      <p lang="pt-BR">Baixe o instalador <code>.exe</code> na página de <a href="https://github.com/meketreve/meketreve-obs-essentials/releases">releases</a> e execute. Não precisa de administrador. Reinicie o OBS.</p>
+      <p lang="en">Get the <code>.exe</code> installer from the <a href="https://github.com/meketreve/meketreve-obs-essentials/releases">releases</a> page and run it. No admin needed. Restart OBS.</p></div>
+    <div class="card"><h3>Linux (Ubuntu, Mint, Debian)</h3>
+      <p lang="pt-BR">Baixe o <code>.deb</code> e instale:</p><p lang="en">Get the <code>.deb</code> and install it:</p>
+      <pre>sudo apt install ./meketreve-obs-essentials-*-x86_64-linux-gnu.deb</pre>
+      <p lang="pt-BR">Ou compile do código-fonte com <code>./build-aux/install-linux.sh</code> (tem opção <code>--flatpak</code>).</p>
+      <p lang="en">Or build from source with <code>./build-aux/install-linux.sh</code> (has a <code>--flatpak</code> option).</p></div>
+    <div class="card"><h3>macOS</h3>
+      <p lang="pt-BR">Baixe o <code>.pkg</code> e abra. Reinicie o OBS.</p>
+      <p lang="en">Get the <code>.pkg</code> and open it. Restart OBS.</p></div>
+  </div>
+</section>
+
+<section id="presets">
+  <h2 lang="pt-BR">Predefinições</h2><h2 lang="en">Presets</h2>
+  <p lang="pt-BR">Copie um texto e cole em <b>Ferramentas → Meketreve: Importar configuração</b>. Elas também aparecem na própria janela de importação.</p>
+  <p lang="en">Copy a text and paste it into <b>Tools → Meketreve: Import configuration</b>. They are also listed in the import window itself.</p>
+  %%PRESETS%%
+</section>
+
+<footer>
+  <p lang="pt-BR">Código aberto sob GPL-2.0. O canvas vertical é um port do <a href="https://github.com/Aitum/obs-vertical-canvas">Aitum Vertical Canvas</a>, e as abas e o multistream foram inspirados no <a href="https://github.com/Aitum/obs-aitum-stream-suite">Aitum Stream Suite</a> e no <a href="https://github.com/Aitum/obs-aitum-multistream">Aitum Multistream</a>, todos GPL-2.0 da Aitum. O TikTok usa o serviço Euler Stream para assinar a conexão. Não é afiliado ao OBS Project nem às plataformas citadas.</p>
+  <p lang="en">Open source under GPL-2.0. The vertical canvas is a port of <a href="https://github.com/Aitum/obs-vertical-canvas">Aitum Vertical Canvas</a>, and the tabs and multistream were inspired by <a href="https://github.com/Aitum/obs-aitum-stream-suite">Aitum Stream Suite</a> and <a href="https://github.com/Aitum/obs-aitum-multistream">Aitum Multistream</a>, all GPL-2.0 by Aitum. TikTok uses the Euler Stream service to sign the connection. Not affiliated with the OBS Project or the platforms mentioned.</p>
+</footer>
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  function setLang(lang) {
+    root.className = lang === 'en' ? 'en' : 'pt';
+    root.lang = lang === 'en' ? 'en' : 'pt-BR';
+    document.getElementById('btn-pt').setAttribute('aria-pressed', String(lang !== 'en'));
+    document.getElementById('btn-en').setAttribute('aria-pressed', String(lang === 'en'));
+    try { localStorage.setItem('lang', lang); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('lang'); } catch (e) {}
+  setLang(saved || (navigator.language && navigator.language.indexOf('pt') === 0 ? 'pt' : 'en'));
+  document.getElementById('btn-pt').onclick = function () { setLang('pt'); };
+  document.getElementById('btn-en').onclick = function () { setLang('en'); };
+  document.querySelectorAll('.preset button').forEach(function (b) {
+    b.onclick = function () {
+      var text = document.getElementById(b.dataset.target).textContent.trim();
+      var done = function () { var t = b.innerHTML; b.textContent = '✓'; setTimeout(function () { b.innerHTML = t; }, 1200); };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+    };
+  });
+})();
+</script>
+</body>
+</html>

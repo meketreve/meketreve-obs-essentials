@@ -87,3 +87,7 @@ target_include_directories(test-output-store PRIVATE ${_outputs})
 target_link_libraries(test-output-store PRIVATE Qt6::Core Qt6::Test)
 set_target_properties(test-output-store PROPERTIES AUTOMOC ON)
 add_test(NAME output-store COMMAND test-output-store)
+
+add_executable(config-tool config-tool.cpp ${_config}/config-codec.cpp ${_config}/config-codec.hpp)
+target_include_directories(config-tool PRIVATE ${_config})
+target_link_libraries(config-tool PRIVATE Qt6::Core)

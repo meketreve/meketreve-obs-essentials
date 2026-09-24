@@ -8,6 +8,7 @@
 !/data
 !/src
 !/tests
+!/site
 !.clang-format
 !.gersemirc
 !.gitignore
@@ -25,3 +26,6 @@
 
 # Exclude CMake build number cache
 /cmake/.CMakeBuildNumber
+
+# Generated site
+/site/_site
