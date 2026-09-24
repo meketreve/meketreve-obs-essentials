@@ -70,6 +70,11 @@ QString ChatAccounts::kickRedirectUri()
 	return QStringLiteral("http://localhost:%1/callback").arg(kKickRedirectPort);
 }
 
+QString ChatAccounts::twitchRedirectUri()
+{
+	return QStringLiteral("http://localhost:%1").arg(kTwitchRedirectPort);
+}
+
 ChatAccounts::ChatAccounts(const QString &storePath, QObject *parent) : QObject(parent), m_storePath(storePath)
 {
 	load();
@@ -98,6 +103,11 @@ bool ChatAccounts::canLogIn(ChatPlatform p) const
 	if (p == ChatPlatform::Kick)
 		return !a.clientId.isEmpty() && !a.clientSecret.isEmpty();
 	return p == ChatPlatform::Twitch && !a.clientId.isEmpty();
+}
+
+bool ChatAccounts::usesRedirect(ChatPlatform p) const
+{
+	return p == ChatPlatform::Kick || (p == ChatPlatform::Twitch && !account(p).clientSecret.isEmpty());
 }
 
 void ChatAccounts::load()
@@ -184,8 +194,8 @@ void ChatAccounts::cancelLogin()
 		s->deleteLater();
 	}
 	m_callbackServers.clear();
-	m_kickVerifier.clear();
-	m_kickState.clear();
+	m_authVerifier.clear();
+	m_authState.clear();
 }
 
 void ChatAccounts::post(const QUrl &url, const QByteArray &form, Done done)
@@ -214,7 +224,7 @@ void ChatAccounts::logIn(ChatPlatform p)
 	}
 	const ChatAccount &a = account(p);
 
-	if (p == ChatPlatform::Twitch) {
+	if (!usesRedirect(p)) {
 		post(QUrl(QStringLiteral("https://id.twitch.tv/oauth2/device")),
 		     OAuthUtil::formBody({{QStringLiteral("client_id"), a.clientId},
 					  {QStringLiteral("scopes"), QString::fromLatin1(kTwitchScopes)}}),
@@ -233,35 +243,50 @@ void ChatAccounts::logIn(ChatPlatform p)
 		return;
 	}
 
-	/* Kick: authorization code + PKCE, caught by a one-shot local server. */
+	/* Authorization code caught by a one-shot local server: Kick with PKCE,
+	 * Twitch (confidential app) with the client secret. */
+	const bool kick = p == ChatPlatform::Kick;
+	const quint16 port = kick ? kKickRedirectPort : kTwitchRedirectPort;
+	if (!listenForCallback(port)) {
+		emit loginFailed(p, QStringLiteral("port %1 is in use").arg(port));
+		return;
+	}
+	m_authPlatform = p;
+	m_authState = OAuthUtil::newState();
+	QUrl url(kick ? QStringLiteral("https://id.kick.com/oauth/authorize")
+		      : QStringLiteral("https://id.twitch.tv/oauth2/authorize"));
+	QUrlQuery q;
+	q.addQueryItem(QStringLiteral("client_id"), a.clientId);
+	q.addQueryItem(QStringLiteral("response_type"), QStringLiteral("code"));
+	q.addQueryItem(QStringLiteral("redirect_uri"), kick ? kickRedirectUri() : twitchRedirectUri());
+	q.addQueryItem(QStringLiteral("scope"), QString::fromLatin1(kick ? kKickScopes : kTwitchScopes));
+	q.addQueryItem(QStringLiteral("state"), QString::fromLatin1(m_authState));
+	if (kick) {
+		m_authVerifier = OAuthUtil::newCodeVerifier();
+		q.addQueryItem(QStringLiteral("code_challenge"),
+			       QString::fromLatin1(OAuthUtil::codeChallengeS256(m_authVerifier)));
+		q.addQueryItem(QStringLiteral("code_challenge_method"), QStringLiteral("S256"));
+	} else {
+		/* The old bot may still hold a session on this app. */
+		q.addQueryItem(QStringLiteral("force_verify"), QStringLiteral("true"));
+	}
+	url.setQuery(q);
+	emit openBrowser(url);
+}
+
+bool ChatAccounts::listenForCallback(quint16 port)
+{
 	for (const QHostAddress &addr :
 	     {QHostAddress(QHostAddress::LocalHost), QHostAddress(QHostAddress::LocalHostIPv6)}) {
 		auto *server = new QTcpServer(this);
-		if (server->listen(addr, kKickRedirectPort)) {
-			connect(server, &QTcpServer::newConnection, this, &ChatAccounts::onKickCallback);
+		if (server->listen(addr, port)) {
+			connect(server, &QTcpServer::newConnection, this, &ChatAccounts::onAuthCallback);
 			m_callbackServers.append(server);
 		} else {
 			delete server;
 		}
 	}
-	if (m_callbackServers.isEmpty()) {
-		emit loginFailed(p, QStringLiteral("port %1 is in use").arg(kKickRedirectPort));
-		return;
-	}
-	m_kickVerifier = OAuthUtil::newCodeVerifier();
-	m_kickState = OAuthUtil::newState();
-	QUrl url(QStringLiteral("https://id.kick.com/oauth/authorize"));
-	QUrlQuery q;
-	q.addQueryItem(QStringLiteral("client_id"), a.clientId);
-	q.addQueryItem(QStringLiteral("response_type"), QStringLiteral("code"));
-	q.addQueryItem(QStringLiteral("redirect_uri"), kickRedirectUri());
-	q.addQueryItem(QStringLiteral("scope"), QString::fromLatin1(kKickScopes));
-	q.addQueryItem(QStringLiteral("state"), QString::fromLatin1(m_kickState));
-	q.addQueryItem(QStringLiteral("code_challenge"),
-		       QString::fromLatin1(OAuthUtil::codeChallengeS256(m_kickVerifier)));
-	q.addQueryItem(QStringLiteral("code_challenge_method"), QStringLiteral("S256"));
-	url.setQuery(q);
-	emit openBrowser(url);
+	return !m_callbackServers.isEmpty();
 }
 
 void ChatAccounts::pollTwitchDevice()
@@ -298,19 +323,25 @@ void ChatAccounts::pollTwitchDevice()
 	     });
 }
 
-void ChatAccounts::onKickCallback()
+void ChatAccounts::onAuthCallback()
 {
 	for (QTcpServer *server : m_callbackServers) {
 		while (QTcpSocket *socket = server->nextPendingConnection()) {
 			connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
 				if (!socket->canReadLine())
 					return;
+				const ChatPlatform p = m_authPlatform;
+				const bool kick = p == ChatPlatform::Kick;
 				QUrlQuery query;
 				const QString path = OAuthUtil::parseRequestLine(socket->readLine(), query);
-				const bool isCallback = path == QLatin1String("/callback");
+				const bool isCallback = path == QLatin1String(kick ? "/callback" : "/");
 				const QString code = query.queryItemValue(QStringLiteral("code"));
 				const QString state = query.queryItemValue(QStringLiteral("state"));
-				const QString denied = query.queryItemValue(QStringLiteral("error"));
+				QString denied =
+					query.queryItemValue(QStringLiteral("error_description"), QUrl::FullyDecoded);
+				if (denied.isEmpty())
+					denied = query.queryItemValue(QStringLiteral("error"));
+				denied.replace(QLatin1Char('+'), QLatin1Char(' '));
 
 				const QByteArray page =
 					"<html><body style=\"font-family:sans-serif\"><h3>Meketreve OBS Essentials</h3>"
@@ -323,33 +354,36 @@ void ChatAccounts::onKickCallback()
 					      (isCallback ? page : QByteArray()));
 				socket->disconnectFromHost();
 				socket->deleteLater();
-				if (!isCallback || m_kickState.isEmpty())
+				if (!isCallback || m_authState.isEmpty())
 					return;
 
-				const QByteArray verifier = m_kickVerifier;
-				const bool stateOk = state.toLatin1() == m_kickState;
+				const QByteArray verifier = m_authVerifier;
+				const bool stateOk = state.toLatin1() == m_authState;
 				cancelLogin();
 				if (!denied.isEmpty() || code.isEmpty() || !stateOk) {
-					emit loginFailed(ChatPlatform::Kick,
-							 !denied.isEmpty() ? denied
-							 : stateOk         ? QStringLiteral("no code in the answer")
-									   : QStringLiteral("state mismatch"));
+					emit loginFailed(p, !denied.isEmpty() ? denied
+							    : stateOk         ? QStringLiteral("no code in the answer")
+									      : QStringLiteral("state mismatch"));
 					return;
 				}
-				const ChatAccount &a = account(ChatPlatform::Kick);
-				post(QUrl(QStringLiteral("https://id.kick.com/oauth/token")),
-				     OAuthUtil::formBody(
-					     {{QStringLiteral("code"), code},
-					      {QStringLiteral("client_id"), a.clientId},
-					      {QStringLiteral("client_secret"), a.clientSecret},
-					      {QStringLiteral("redirect_uri"), kickRedirectUri()},
-					      {QStringLiteral("grant_type"), QStringLiteral("authorization_code")},
-					      {QStringLiteral("code_verifier"), QString::fromLatin1(verifier)}}),
-				     [this](int, const QJsonObject &body, const QString &error) {
+				const ChatAccount &a = account(p);
+				QList<QPair<QString, QString>> form{{QStringLiteral("code"), code},
+								    {QStringLiteral("client_id"), a.clientId},
+								    {QStringLiteral("client_secret"), a.clientSecret},
+								    {QStringLiteral("redirect_uri"),
+								     kick ? kickRedirectUri() : twitchRedirectUri()},
+								    {QStringLiteral("grant_type"),
+								     QStringLiteral("authorization_code")}};
+				if (kick)
+					form.append({QStringLiteral("code_verifier"), QString::fromLatin1(verifier)});
+				post(QUrl(kick ? QStringLiteral("https://id.kick.com/oauth/token")
+					       : QStringLiteral("https://id.twitch.tv/oauth2/token")),
+				     OAuthUtil::formBody(form),
+				     [this, p](int, const QJsonObject &body, const QString &error) {
 					     if (!error.isEmpty())
-						     emit loginFailed(ChatPlatform::Kick, error);
+						     emit loginFailed(p, error);
 					     else
-						     finishLogin(ChatPlatform::Kick, body);
+						     finishLogin(p, body);
 				     });
 			});
 		}
@@ -409,7 +443,8 @@ void ChatAccounts::refresh(ChatPlatform p, std::function<void(bool)> done)
 	QList<QPair<QString, QString>> form{{QStringLiteral("grant_type"), QStringLiteral("refresh_token")},
 					    {QStringLiteral("refresh_token"), a.refreshToken},
 					    {QStringLiteral("client_id"), a.clientId}};
-	if (p == ChatPlatform::Kick)
+	/* Kick always has a secret; Twitch only for a confidential app. */
+	if (!a.clientSecret.isEmpty())
 		form.append({QStringLiteral("client_secret"), a.clientSecret});
 	post(QUrl(p == ChatPlatform::Twitch ? QStringLiteral("https://id.twitch.tv/oauth2/token")
 					    : QStringLiteral("https://id.kick.com/oauth/token")),

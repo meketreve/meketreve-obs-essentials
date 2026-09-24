@@ -157,6 +157,12 @@ secret, so you create your own app once (free):
   `http://localhost`; Category: *Chat Bot*; **Client Type: Public**. Copy the
   *Client ID* into Unified Chat → Settings → Twitch and click **Log in**. OBS
   shows a code and opens twitch.tv/activate; approve it there.
+  - **Already have a Confidential app** (for example the one the old
+    texuguito bot used)? Add `http://localhost:17563` to its OAuth Redirect
+    URLs, paste its *Client ID* and *Client Secret* (the Secret field is
+    optional on Twitch) and click **Log in**: the browser opens Twitch's
+    login and comes back to OBS, no code to type. **Import old bot** in the
+    Texuguito dock fills both fields from the bot's `.env` (never its tokens).
 - **Kick:** go to [kick.com/settings/developer](https://kick.com/settings/developer)
   → create an app with Redirect URL `http://localhost:53682/callback` and the
   scopes *user:read, channel:read, chat:write, moderation:ban,

@@ -89,9 +89,9 @@ int main(int argc, char **argv)
 		return rc;
 	}
 
-	/* chat-probe login-twitch <client id> | login-kick <client id> <secret>:
-	 * runs the login flow; for Kick the browser step is simulated by
-	 * calling the local callback with a made-up code. */
+	/* chat-probe login-twitch <client id> [secret] | login-kick <client id> <secret>:
+	 * runs the login flow; for Kick and Twitch with a secret the browser
+	 * step is simulated by calling the local callback with a made-up code. */
 	if (platform.startsWith(QLatin1String("login-"))) {
 		const ChatPlatform p = platform == QLatin1String("login-kick") ? ChatPlatform::Kick
 									       : ChatPlatform::Twitch;
@@ -101,11 +101,12 @@ int main(int argc, char **argv)
 		QObject::connect(&accounts, &ChatAccounts::deviceCode, [&out](const QString &code, const QUrl &url) {
 			out << "[device] open " << url.toString() << " code " << code << Qt::endl;
 		});
-		QObject::connect(&accounts, &ChatAccounts::openBrowser, [&out, &net](const QUrl &url) {
+		QObject::connect(&accounts, &ChatAccounts::openBrowser, [&out, &net, p](const QUrl &url) {
 			out << "[browser] " << url.toString() << Qt::endl;
 			const QString state = QUrlQuery(url).queryItemValue(QStringLiteral("state"));
-			net.get(QNetworkRequest(QUrl(ChatAccounts::kickRedirectUri() +
-						     QStringLiteral("?code=fake-code&state=") + state)));
+			const QString callback = p == ChatPlatform::Kick ? ChatAccounts::kickRedirectUri()
+									 : ChatAccounts::twitchRedirectUri() + '/';
+			net.get(QNetworkRequest(QUrl(callback + QStringLiteral("?code=fake-code&state=") + state)));
 		});
 		QObject::connect(&accounts, &ChatAccounts::loginFailed, [&out, &app](ChatPlatform, const QString &e) {
 			out << "[login failed] " << e << Qt::endl;

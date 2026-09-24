@@ -34,8 +34,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 class QTcpServer;
 
-/* A logged-in account on Twitch or Kick. The client id (and Kick's client
- * secret) belong to an app the user registers; the plugin ships none. */
+/* A logged-in account on Twitch or Kick. The client id and secret belong to
+ * an app the user registers; the plugin ships none. The secret is required on
+ * Kick and optional on Twitch (a confidential app). */
 struct ChatAccount {
 	QString clientId;
 	QString clientSecret;
@@ -48,8 +49,9 @@ struct ChatAccount {
 	bool loggedIn() const { return !accessToken.isEmpty(); }
 };
 
-/* Logins (Twitch device code flow, Kick OAuth 2.1 + PKCE with a loopback
- * redirect), sending chat, moderation and Twitch follows over EventSub.
+/* Logins (Twitch device code flow for public apps or authorization code with
+ * a loopback redirect for confidential ones, Kick OAuth 2.1 + PKCE with a
+ * loopback redirect), sending chat, moderation and Twitch follows over EventSub.
  * Tokens are stored as plain text in the module's config folder. */
 class ChatAccounts : public QObject {
 	Q_OBJECT
@@ -57,6 +59,9 @@ class ChatAccounts : public QObject {
 public:
 	static constexpr quint16 kKickRedirectPort = 53682;
 	static QString kickRedirectUri();
+	/* Same port as the old texuguito bot, so its Twitch app works as is. */
+	static constexpr quint16 kTwitchRedirectPort = 17563;
+	static QString twitchRedirectUri();
 
 	ChatAccounts(const QString &storePath, QObject *parent = nullptr);
 	~ChatAccounts() override;
@@ -64,6 +69,9 @@ public:
 	const ChatAccount &account(ChatPlatform p) const;
 	static bool supports(ChatPlatform p) { return p == ChatPlatform::Twitch || p == ChatPlatform::Kick; }
 	bool canLogIn(ChatPlatform p) const;
+	/* Twitch with a client secret logs in through the browser redirect
+	 * instead of the device code. */
+	bool usesRedirect(ChatPlatform p) const;
 	void setClient(ChatPlatform p, const QString &clientId, const QString &clientSecret);
 	void logIn(ChatPlatform p);
 	void logOut(ChatPlatform p);
@@ -100,7 +108,8 @@ private:
 	void finishLogin(ChatPlatform p, const QJsonObject &token);
 	void fetchIdentity(ChatPlatform p);
 	void pollTwitchDevice();
-	void onKickCallback();
+	bool listenForCallback(quint16 port);
+	void onAuthCallback();
 	void refresh(ChatPlatform p, std::function<void(bool)> done);
 	void api(ChatPlatform p, const QByteArray &verb, const QUrl &url, const QJsonObject &body, Done done,
 		 bool retried = false);
@@ -118,10 +127,11 @@ private:
 	QTimer m_devicePoll;
 	qint64 m_deviceDeadline = 0;
 
-	/* Kick authorization in progress. */
+	/* Browser authorization in progress (Kick, or Twitch with a secret). */
 	QList<QTcpServer *> m_callbackServers;
-	QByteArray m_kickVerifier;
-	QByteArray m_kickState;
+	ChatPlatform m_authPlatform = ChatPlatform::Kick;
+	QByteArray m_authVerifier; /* PKCE, Kick only */
+	QByteArray m_authState;
 
 	WsClient m_eventSub;
 	QString m_followChannelId;
