@@ -14,6 +14,27 @@ required, though building locally on Linux is a one-liner (see
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
+| **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
+
+### Layout Tabs
+
+A tab bar sits under the menu. Each tab remembers where every dock is:
+
+- **My layout** is the layout you had before installing the plugin, untouched.
+- **Live** shows the preview, Unified Chat, the audio mixer and the controls.
+- **Build** shows the preview, scenes, sources, transitions and the mixer.
+- **+** makes a new tab from the current layout. Right-click a tab to rename or
+  remove it, or to bring Live/Build back to their default layout.
+
+Layouts save on their own when you switch tabs and when OBS closes, and each
+profile keeps its own tabs. The preview becomes a dock (**Preview**) so tabs
+can place it anywhere. Hotkeys for *next tab*, *previous tab* and *go to tab
+1–9* are in **Settings → Hotkeys**. To turn the tabs off, uncheck
+**Tools → Meketreve: Layout tabs**: your original layout comes back, and after
+a restart the preview is back in the center.
+
+The idea comes from [Aitum Stream Suite](https://github.com/Aitum/obs-aitum-stream-suite)
+(GPL-2.0).
 
 ### Unified Chat
 

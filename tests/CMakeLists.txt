@@ -45,3 +45,14 @@ add_executable(test-chat-parsers test-chat-parsers.cpp)
 target_link_libraries(test-chat-parsers PRIVATE chat-core Qt6::Test)
 set_target_properties(test-chat-parsers PROPERTIES AUTOMOC ON)
 add_test(NAME chat-parsers COMMAND test-chat-parsers)
+
+add_executable(
+  test-layout-store
+  test-layout-store.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/tabs/layout-store.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/tabs/layout-store.hpp
+)
+target_include_directories(test-layout-store PRIVATE ${CMAKE_SOURCE_DIR}/src/tools/tabs)
+target_link_libraries(test-layout-store PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-layout-store PROPERTIES AUTOMOC ON)
+add_test(NAME layout-store COMMAND test-layout-store)

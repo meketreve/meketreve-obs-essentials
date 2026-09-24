@@ -41,6 +41,10 @@ target_sources(
     src/plugin-main.c
     src/tools/bass-shake.c
     src/tools/voice-fx.c
+    src/tools/tabs/layout-store.cpp
+    src/tools/tabs/layout-store.hpp
+    src/tools/tabs/tab-bar.cpp
+    src/tools/tabs/tab-bar.hpp
     src/tools/unified-chat/chat-connector.cpp
     src/tools/unified-chat/chat-connector.hpp
     src/tools/unified-chat/irc-message.cpp
