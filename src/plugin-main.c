@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "tools/bass-shake.h"
 #include "tools/voice-fx.h"
+#include "tools/unified-chat.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -30,6 +31,7 @@ bool obs_module_load(void)
 	/* Register every tool in the toolkit here. */
 	bass_shake_register();
 	voice_fx_register();
+	unified_chat_register();
 
 	obs_log(LOG_INFO, "Meketreve OBS Essentials loaded (version %s)", PLUGIN_VERSION);
 	return true;
@@ -37,5 +39,6 @@ bool obs_module_load(void)
 
 void obs_module_unload(void)
 {
+	unified_chat_unregister();
 	obs_log(LOG_INFO, "plugin unloaded");
 }

@@ -13,6 +13,28 @@ required, though building locally on Linux is a one-liner (see
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
+| **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
+
+### Unified Chat
+
+Open it from **Docks → Unified Chat**, click **Settings** and fill in the
+channels you stream to. Each field takes a plain name or a link:
+
+| Platform | Example | How it connects |
+|----------|---------|-----------------|
+| Twitch | `xqc` or `twitch.tv/xqc` | Anonymous read-only IRC over WebSocket. |
+| YouTube | `@handle`, channel link or live/video link | The same InnerTube endpoint the popout chat uses, so no API key and no daily quota. |
+| Kick | `westcol` or `kick.com/westcol` | Kick's public Pusher channel. If Kick's API is blocked, type the numeric chatroom id instead. |
+| TikTok | `@user` or `tiktok.com/@user` | TikTok signs its chat WebSocket URL, so the signed URL comes from [Euler Stream](https://www.eulerstream.com) (the sign server TikTok-Live-Connector uses); after that the connection goes straight to TikTok. |
+
+Leave a field empty to turn that platform off. A channel that is not live is
+checked again every minute, so the chat connects on its own when the stream
+starts, and dropped connections retry with backoff. Hover the colored dots at
+the top to see each platform's status.
+
+The chat is read-only: nothing is sent to any platform and no login is needed.
+YouTube and TikTok use unofficial endpoints, so a change on their side can
+break those two until the plugin is updated.
 
 ### Voice FX Mixer
 
@@ -58,8 +80,8 @@ loads automatically. No admin rights needed.
 
 ### Linux
 
-The plugin is plain C against `libobs` with no platform-specific code, so it
-builds and runs natively on Linux.
+The plugin is portable C/C++ against `libobs`, `obs-frontend-api` and Qt 6 with
+no platform-specific code, so it builds and runs natively on Linux.
 
 **From the `.deb`** (Debian / Ubuntu / Mint), attached to each release:
 
@@ -70,7 +92,7 @@ sudo apt install ./meketreve-obs-essentials-1.0.0-x86_64-linux-gnu.deb
 **From source**, which also installs into your user plugin directory:
 
 ```bash
-sudo apt install libobs-dev cmake build-essential
+sudo apt install libobs-dev qt6-base-dev cmake build-essential
 ./build-aux/install-linux.sh
 ```
 
@@ -117,8 +139,10 @@ git push origin 1.0.0
 
 ## Adding a new tool
 
-1. Create `src/tools/<tool>.c` + `.h` exposing `void <tool>_register(void);`.
-2. Add the `.c` to `target_sources(...)` in `CMakeLists.txt`.
+1. Create `src/tools/<tool>.c` + `.h` exposing `void <tool>_register(void);`
+   (C++/Qt tools: put the sources in `src/tools/<tool>/` and expose the
+   register function through an `extern "C"` header, like `unified-chat.h`).
+2. Add the sources to `target_sources(...)` in `CMakeLists.txt`.
 3. Call `<tool>_register();` in `obs_module_load()` (`src/plugin-main.c`).
 4. Add any shader to `data/effects/` and locale strings to **both**
    `data/locale/en-US.ini` and `data/locale/pt-BR.ini` (keep the keys in sync).

@@ -40,7 +40,7 @@ done
 if ((do_build)); then
   if ! pkg-config --exists libobs; then
     echo "error: libobs development files not found." >&2
-    echo "  Debian/Ubuntu/Mint: sudo apt install libobs-dev cmake build-essential" >&2
+    echo "  Debian/Ubuntu/Mint: sudo apt install libobs-dev qt6-base-dev cmake build-essential" >&2
     exit 1
   fi
 
@@ -56,8 +56,8 @@ if ((do_build)); then
   cmake -S . -B "$BUILD_DIR" -G "$generator" \
     -DCMAKE_BUILD_TYPE="$CONFIG" \
     -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu \
-    -DENABLE_FRONTEND_API=FALSE \
-    -DENABLE_QT=FALSE
+    -DENABLE_FRONTEND_API=TRUE \
+    -DENABLE_QT=TRUE
 
   cmake --build "$BUILD_DIR" -j"$(nproc)"
 fi
