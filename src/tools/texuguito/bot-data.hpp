@@ -47,6 +47,10 @@ std::pair<bool, QString> validateAccessory(const QString &raw);
 QString validateNick(const QString &raw); /* empty = invalid */
 const QStringList &hats();
 const QStringList &accessories();
+/* The options as the chat should read them: the canonical Portuguese names,
+ * or their shortest one-word English alias. */
+QStringList hatNames(bool english);
+QStringList accessoryNames(bool english);
 
 } // namespace BotData
 

@@ -36,6 +36,7 @@ QByteArray requestBody(const QString &chunk, const QString &lang = QStringLitera
 /* The MP3 inside a batchexecute answer, or empty. */
 QByteArray parseResponse(const QByteArray &body);
 void synthesize(QNetworkAccessManager *net, const QString &text,
-		std::function<void(QByteArray mp3, QString error)> done, QObject *context);
+		std::function<void(QByteArray mp3, QString error)> done, QObject *context,
+		const QString &lang = QStringLiteral("pt"));
 
 } // namespace GoogleTts

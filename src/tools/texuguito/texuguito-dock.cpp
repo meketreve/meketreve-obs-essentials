@@ -112,8 +112,10 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 
 	m_engine = new BotEngine(m_dataDir, m_audioDir, this);
 	m_engine->setVolume(m_volume);
+	m_engine->setText([](const char *key) { return T(key); });
 	m_engine->setTts([this](const QString &text, std::function<void(QByteArray, QString)> done) {
-		GoogleTts::synthesize(&m_net, text, std::move(done), this);
+		/* The voice speaks the language the bot replies in. */
+		GoogleTts::synthesize(&m_net, text, std::move(done), this, T("Texuguito.Bot.Language"));
 	});
 
 	OverlayServer::Routes routes;

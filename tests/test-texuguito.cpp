@@ -49,6 +49,34 @@ QStringList replies(QSignalSpy &spy)
 	return out;
 }
 
+/* A plugin locale file (Key="value" lines), as OBS would read it. */
+QHash<QString, QString> readLocale(const char *name)
+{
+	QHash<QString, QString> texts;
+	QFile file(QStringLiteral(MEKETREVE_LOCALE_DIR "/") + QLatin1String(name));
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+		return texts;
+	while (!file.atEnd()) {
+		const QString line = QString::fromUtf8(file.readLine()).trimmed();
+		const qsizetype eq = line.indexOf(QLatin1Char('='));
+		if (eq <= 0 || line.startsWith(QLatin1Char('#')))
+			continue;
+		QString value = line.mid(eq + 1);
+		if (value.startsWith(QLatin1Char('"')) && value.endsWith(QLatin1Char('"')))
+			value = value.mid(1, value.size() - 2);
+		texts.insert(line.left(eq), value.replace(QStringLiteral("\\\""), QStringLiteral("\"")));
+	}
+	return texts;
+}
+
+BotEngine::TextFunction locale(const char *name)
+{
+	const QHash<QString, QString> texts = readLocale(name);
+	return [texts](const char *key) {
+		return texts.value(QLatin1String(key), QLatin1String(key));
+	};
+}
+
 void writeFile(const QString &path, const QByteArray &data)
 {
 	QFile f(path);
@@ -97,6 +125,7 @@ private slots:
 		writeFile(dir.filePath(QStringLiteral("custom_commands.json")), "this is not json");
 
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		QCOMPARE(bot.points().get(QStringLiteral("FULANO")), 120);
 		QCOMPARE(bot.viewers().getOrCreate(QStringLiteral("fulano")).chapeu, QStringLiteral("coroa"));
 		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("custom_commands.json.corrupt"))));
@@ -115,6 +144,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
 		QSignalSpy said(&bot, &BotEngine::reply);
 
@@ -143,6 +173,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		BotMessage m = msg(QStringLiteral("Ana"), QStringLiteral("@Beto !apelido Nova"));
 		m.isReply = true;
 		bot.handleMessage(m);
@@ -153,6 +184,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		QSignalSpy said(&bot, &BotEngine::reply);
 
 		bot.handleMessage(msg(QStringLiteral("viewer"), QStringLiteral("!darpontos @viewer 999")));
@@ -183,6 +215,7 @@ private slots:
 		writeFile(audio + QStringLiteral("/10/Buzina Alta.mp3"), "x");
 		writeFile(audio + QStringLiteral("/grátis/ignorado.mp3"), "x");
 		BotEngine bot(dir.path(), audio);
+		bot.setText(locale("pt-BR.ini"));
 		QCOMPARE(bot.clips().size(), size_t(1));
 		QCOMPARE(bot.clips().begin()->second.url, QStringLiteral("/audios/10/Buzina%20Alta.mp3"));
 
@@ -218,6 +251,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		bot.setOverlayListeners(1);
 		bot.points().add(QStringLiteral("ana"), 450);
 		QString spoken;
@@ -252,6 +286,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		QSignalSpy said(&bot, &BotEngine::reply);
 		BotMessage mod = msg(QStringLiteral("Mod"), QString());
 		mod.isMod = true;
@@ -283,6 +318,7 @@ private slots:
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("oi")));
 		bot.setTwitchChatters({QStringLiteral("quieto")});
@@ -301,10 +337,44 @@ private slots:
 		QCOMPARE(bot.snapshot().value(QStringLiteral("viewers")).toArray().size(), 1);
 	}
 
+	void englishReplies()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("en-US.ini"));
+		QSignalSpy said(&bot, &BotEngine::reply);
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!points")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🪙 Viewer, you have 0 points."));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!chapeu sombrero")));
+		QVERIFY(replies(said).last().startsWith(
+			QStringLiteral("@Viewer invalid hat. Options: cap, crown, horns,")));
+		QVERIFY(replies(said).last().contains(QStringLiteral("tophat, tiara, coconut, santa, wizard, viking")));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!comandos")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("@Viewer commands: !color <color>")));
+		QVERIFY(!replies(said).last().contains(QStringLiteral("!raffle")));
+	}
+
+	void localeFilesHaveTheSameKeys()
+	{
+		const QHash<QString, QString> en = readLocale("en-US.ini");
+		const QHash<QString, QString> pt = readLocale("pt-BR.ini");
+		QVERIFY(en.size() > 300);
+		QStringList missing;
+		for (auto it = en.constBegin(); it != en.constEnd(); ++it)
+			if (!pt.contains(it.key()))
+				missing.append(QStringLiteral("pt-BR: ") + it.key());
+		for (auto it = pt.constBegin(); it != pt.constEnd(); ++it)
+			if (!en.contains(it.key()))
+				missing.append(QStringLiteral("en-US: ") + it.key());
+		QVERIFY2(missing.isEmpty(), qPrintable(missing.join(QStringLiteral(", "))));
+		QCOMPARE(BotData::hatNames(false), BotData::hats());
+	}
+
 	void raffle()
 	{
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
 		bot.setRaffleChooser([](const QStringList &list) { return list.last(); });
 		QSignalSpy said(&bot, &BotEngine::reply);
 		bot.handleMessage(msg(QStringLiteral("Mod"), QStringLiteral("!sorteio 100 1")));

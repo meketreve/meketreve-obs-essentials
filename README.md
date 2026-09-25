@@ -54,6 +54,9 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
   `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
   the full list. Every command also has an English alias (`!color`, `!play`…).
+- **Language:** the bot answers in the language OBS is set to (Portuguese or
+  English; any other language gets English), and `!falar`/`!speak` uses a
+  voice in that language too.
 
 It reads every platform set up in Unified Chat. Replies go back to the
 platform the command came from when you are logged in there (Twitch and Kick,

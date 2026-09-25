@@ -123,6 +123,36 @@ const QStringList &accessories()
 	return list;
 }
 
+static QStringList optionNames(const QStringList &options, const QHash<QString, QString> &aliases, bool english)
+{
+	if (!english)
+		return options;
+	QStringList names;
+	for (const QString &option : options) {
+		QString best;
+		for (auto it = aliases.constBegin(); it != aliases.constEnd(); ++it) {
+			const QString &alias = it.key();
+			if (it.value() != option || alias.contains(QLatin1Char(' ')))
+				continue;
+			if (best.isEmpty() || alias.size() < best.size() ||
+			    (alias.size() == best.size() && alias < best))
+				best = alias;
+		}
+		names.append(best.isEmpty() ? option : best);
+	}
+	return names;
+}
+
+QStringList hatNames(bool english)
+{
+	return optionNames(hats(), hatAliases(), english);
+}
+
+QStringList accessoryNames(bool english)
+{
+	return optionNames(accessories(), accessoryAliases(), english);
+}
+
 QJsonObject readJsonFile(const QString &path)
 {
 	QFile file(path);

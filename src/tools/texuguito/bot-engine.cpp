@@ -39,12 +39,6 @@ const QStringList kRemove{QStringLiteral("del"),     QStringLiteral("delete"), Q
 			  QStringLiteral("remover"), QStringLiteral("rm"),     QStringLiteral("apagar")};
 const QStringList kList{QStringLiteral("list"), QStringLiteral("lista"), QStringLiteral("listar")};
 
-QString noOverlayReply()
-{
-	return QStringLiteral(
-		"🔇 O overlay não está aberto, então não tem onde tocar o áudio. Nenhum ponto foi cobrado.");
-}
-
 } // namespace
 
 namespace BotText {
@@ -336,12 +330,11 @@ QString BotEngine::handleComando(const BotMessage &msg, const QStringList &args)
 	if (kList.contains(action) || (action.isEmpty() && !priv)) {
 		const QStringList names = m_custom.names();
 		if (names.isEmpty())
-			return QStringLiteral("📝 Nenhum comando personalizado ainda.");
+			return t("Texuguito.Bot.NoCustomCommands");
 		QStringList bang;
 		for (const QString &n : names)
 			bang.append(QLatin1Char('!') + n);
-		return BotText::truncate(QStringLiteral("📝 Comandos personalizados: ") +
-					 bang.join(QStringLiteral(", ")));
+		return BotText::truncate(t("Texuguito.Bot.CustomCommands").arg(bang.join(QStringLiteral(", "))));
 	}
 	if (!priv)
 		return QString();
@@ -351,71 +344,67 @@ QString BotEngine::handleComando(const BotMessage &msg, const QStringList &args)
 			raw.remove(0, 1);
 		return raw.toLower();
 	};
-	const auto nameError = [](const QString &name) -> QString {
+	const auto nameError = [this](const QString &name) -> QString {
 		static const QRegularExpression valid(QStringLiteral("^[\\w-]+$"),
 						      QRegularExpression::UseUnicodePropertiesOption);
 		if (name.isEmpty())
-			return QStringLiteral("❌ Faltou o nome do comando.");
+			return t("Texuguito.Bot.CommandNameMissing");
 		if (name.size() > kCustomNameMax)
-			return QStringLiteral("❌ O nome do comando pode ter no máximo %1 caracteres.")
-				.arg(kCustomNameMax);
+			return t("Texuguito.Bot.CommandNameTooLong").arg(kCustomNameMax);
 		if (!valid.match(name).hasMatch())
-			return QStringLiteral("❌ O nome do comando só pode ter letras, números, _ e -.");
+			return t("Texuguito.Bot.CommandNameInvalid");
 		return QString();
 	};
 
 	if (kAdd.contains(action) || kEdit.contains(action)) {
 		if (args.size() < 3)
-			return QStringLiteral("❌ Use: !comando %1 <nome> <resposta>")
+			return t("Texuguito.Bot.CommandUsageAddEdit")
 				.arg(action.isEmpty() ? QStringLiteral("add") : action);
 		const QString name = normalize(args[1]);
 		const QString error = nameError(name);
 		if (!error.isEmpty())
 			return error;
 		if (reservedNames().contains(name))
-			return QStringLiteral("❌ '!%1' é um comando do bot e não pode ser substituído.").arg(name);
+			return t("Texuguito.Bot.CommandReserved").arg(name);
 		const bool exists = m_custom.contains(name);
 		if (kAdd.contains(action) && exists)
-			return QStringLiteral("❌ '!%1' já existe. Use !comando edit %1 <resposta> para mudar.")
-				.arg(name);
+			return t("Texuguito.Bot.CommandExists").arg(name);
 		if (kEdit.contains(action) && !exists)
-			return QStringLiteral("❌ '!%1' não existe. Use !comando add %1 <resposta>.").arg(name);
+			return t("Texuguito.Bot.CommandMissing").arg(name);
 		const QString response = args.mid(2).join(QLatin1Char(' '));
 		if (response.size() > kCustomResponseMax)
-			return QStringLiteral("❌ A resposta pode ter no máximo %1 caracteres.").arg(kCustomResponseMax);
+			return t("Texuguito.Bot.ReplyTooLong").arg(kCustomResponseMax);
 		m_custom.set(name, response);
-		return QStringLiteral("✅ Comando !%1 %2!")
-			.arg(name, exists ? QStringLiteral("atualizado") : QStringLiteral("criado"));
+		return (exists ? t("Texuguito.Bot.CommandUpdated") : t("Texuguito.Bot.CommandCreated")).arg(name);
 	}
 
 	if (kRemove.contains(action)) {
 		if (args.size() < 2)
-			return QStringLiteral("❌ Use: !comando del <nome>");
+			return t("Texuguito.Bot.CommandUsageDel");
 		const QString name = normalize(args[1]);
 		if (!m_custom.remove(name))
-			return QStringLiteral("❌ '!%1' não existe.").arg(name);
-		return QStringLiteral("🗑️ Comando !%1 removido.").arg(name);
+			return t("Texuguito.Bot.CommandNotFound").arg(name);
+		return t("Texuguito.Bot.CommandRemoved").arg(name);
 	}
 
-	return QStringLiteral("❌ Use: !comando add <nome> <resposta> | !comando edit <nome> <resposta> | "
-			      "!comando del <nome> | !comando list");
+	return t("Texuguito.Bot.CommandUsage");
 }
 
 void BotEngine::playTts(const BotMessage &msg, const QString &key, const QStringList &args)
 {
 	if (args.isEmpty()) {
-		say(msg.platform, QStringLiteral("❌ Use: !falar <mensagem>"));
+		say(msg.platform, t("Texuguito.Bot.TtsUsage"));
 		return;
 	}
 	if (m_listeners <= 0) {
-		say(msg.platform, noOverlayReply());
+		say(msg.platform, t("Texuguito.Bot.NoOverlay"));
 		return;
 	}
 	if (!m_tts || !m_points.spend(key, kTtsCost)) {
-		say(msg.platform, QStringLiteral("❌ Pontos insuficientes (%1 pts necessários).").arg(kTtsCost));
+		say(msg.platform, t("Texuguito.Bot.TtsNoPoints").arg(kTtsCost));
 		return;
 	}
-	const QString text = QStringLiteral("%1 enviou a mensagem: %2").arg(msg.user, args.join(QLatin1Char(' ')));
+	const QString text = t("Texuguito.Bot.TtsText").arg(msg.user, args.join(QLatin1Char(' ')));
 	const ChatPlatform platform = msg.platform;
 	const QString user = msg.user;
 	QPointer<BotEngine> self = this;
@@ -425,7 +414,7 @@ void BotEngine::playTts(const BotMessage &msg, const QString &key, const QString
 		if (mp3.isEmpty()) {
 			/* Nothing was played: give the points back. */
 			self->m_points.add(key, kTtsCost);
-			self->say(platform, QStringLiteral("❌ Erro ao gerar o TTS. Seus pontos foram devolvidos."));
+			self->say(platform, self->t("Texuguito.Bot.TtsError"));
 			Q_UNUSED(error);
 			return;
 		}
@@ -437,8 +426,7 @@ void BotEngine::playTts(const BotMessage &msg, const QString &key, const QString
 		emit self->overlayMessage(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio")},
 						      {QStringLiteral("url"), QStringLiteral("/tts/") + id},
 						      {QStringLiteral("volume"), self->m_volume}});
-		self->say(platform,
-			  QStringLiteral("🎙️ [TTS] %1 enviou uma mensagem! (-%2 pts)").arg(user).arg(kTtsCost));
+		self->say(platform, self->t("Texuguito.Bot.TtsSent").arg(user).arg(kTtsCost));
 	});
 }
 
@@ -453,15 +441,12 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("color")},
 		 [this, updated](const BotMessage &m, const QString &key, const QStringList &args) {
 			 if (args.isEmpty()) {
-				 say(m.platform, QStringLiteral("@%1 uso: !cor <nome ou hex>").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.ColorUsage").arg(m.user));
 				 return;
 			 }
 			 const auto cor = BotData::validateColor(args.join(QLatin1Char(' ')));
 			 if (!cor) {
-				 say(m.platform,
-				     QStringLiteral("@%1 cor inválida. Use um nome em português (ex: azul) ou "
-						    "inglês (ex: blue) ou hex (#rrggbb).")
-					     .arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.ColorInvalid").arg(m.user));
 				 return;
 			 }
 			 m_viewers.setColor(key, *cor);
@@ -477,14 +462,14 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("hat")},
 		 [this, updated](const BotMessage &m, const QString &key, const QStringList &args) {
 			 if (args.isEmpty()) {
-				 say(m.platform,
-				     QStringLiteral("@%1 uso: !chapeu <boné|coroa|chifres|nenhum>").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.HatUsage").arg(m.user));
 				 return;
 			 }
 			 const auto [ok, value] = BotData::validateHat(args.join(QLatin1Char(' ')));
 			 if (!ok) {
-				 say(m.platform, QStringLiteral("@%1 chapéu inválido. Opções: %2.")
-							 .arg(m.user, BotData::hats().join(QStringLiteral(", "))));
+				 say(m.platform,
+				     t("Texuguito.Bot.HatInvalid")
+					     .arg(m.user, BotData::hatNames(english()).join(QStringLiteral(", "))));
 				 return;
 			 }
 			 m_viewers.setHat(key, value);
@@ -494,15 +479,14 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("accessory")},
 		 [this, updated](const BotMessage &m, const QString &key, const QStringList &args) {
 			 if (args.isEmpty()) {
-				 say(m.platform,
-				     QStringLiteral("@%1 uso: !acessorio <óculos|capa|asas|nenhum>").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.AccessoryUsage").arg(m.user));
 				 return;
 			 }
 			 const auto [ok, value] = BotData::validateAccessory(args.join(QLatin1Char(' ')));
 			 if (!ok) {
-				 say(m.platform,
-				     QStringLiteral("@%1 acessório inválido. Opções: %2.")
-					     .arg(m.user, BotData::accessories().join(QStringLiteral(", "))));
+				 say(m.platform, t("Texuguito.Bot.AccessoryInvalid")
+							 .arg(m.user, BotData::accessoryNames(english()).join(
+									      QStringLiteral(", "))));
 				 return;
 			 }
 			 m_viewers.setAccessory(key, value);
@@ -512,12 +496,12 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("nick"), QStringLiteral("nickname")},
 		 [this, updated](const BotMessage &m, const QString &key, const QStringList &args) {
 			 if (args.isEmpty()) {
-				 say(m.platform, QStringLiteral("@%1 uso: !apelido <nome>").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.NickUsage").arg(m.user));
 				 return;
 			 }
 			 const QString nick = BotData::validateNick(args.join(QLatin1Char(' ')));
 			 if (nick.isEmpty()) {
-				 say(m.platform, QStringLiteral("@%1 apelido inválido.").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.NickInvalid").arg(m.user));
 				 return;
 			 }
 			 m_viewers.setNick(key, nick);
@@ -535,12 +519,12 @@ void BotEngine::registerCommands()
 			 if (!privileged(m))
 				 return;
 			 if (args.size() < 2) {
-				 say(m.platform, QStringLiteral("@%1 uso: !avatarmod <usuario> <cor>").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.AvatarModUsage").arg(m.user));
 				 return;
 			 }
 			 const auto cor = BotData::validateColor(args.mid(1).join(QLatin1Char(' ')));
 			 if (!cor) {
-				 say(m.platform, QStringLiteral("@%1 cor inválida.").arg(m.user));
+				 say(m.platform, t("Texuguito.Bot.AvatarModInvalid").arg(m.user));
 				 return;
 			 }
 			 QString target = args[0];
@@ -553,29 +537,12 @@ void BotEngine::registerCommands()
 		{QStringLiteral("comandos"),
 		 {QStringLiteral("ajuda"), QStringLiteral("help"), QStringLiteral("commands")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
-			 QStringList list{QStringLiteral("!cor <cor>"),
-					  QStringLiteral("!resetcor"),
-					  QStringLiteral("!chapeu <opção>"),
-					  QStringLiteral("!acessorio <opção>"),
-					  QStringLiteral("!apelido <nome>"),
-					  QStringLiteral("!dança"),
-					  QStringLiteral("!pontos"),
-					  QStringLiteral("!tocar <nome>"),
-					  QStringLiteral("!audios"),
-					  QStringLiteral("!falar <msg>"),
-					  QStringLiteral("!parar"),
-					  QStringLiteral("!entrar"),
-					  QStringLiteral("!comando lista"),
-					  QStringLiteral("!status"),
-					  QStringLiteral("!ping")};
+			 QString list = t("Texuguito.Bot.CommandList");
 			 if (privileged(m))
-				 list << QStringLiteral("!avatarmod <usuario> <cor>")
-				      << QStringLiteral("!darpontos <usuario> <qtd>") << QStringLiteral("!recarregar")
-				      << QStringLiteral("!comando add/edit/del <nome> <resposta>");
+				 list += QStringLiteral(", ") + t("Texuguito.Bot.CommandListMod");
 			 if (m.isBroadcaster)
-				 list << QStringLiteral("!sorteio <pts> <min>");
-			 say(m.platform, QStringLiteral("@%1 comandos: %2 (tem alias em inglês)")
-						 .arg(m.user, list.join(QStringLiteral(", "))));
+				 list += QStringLiteral(", ") + t("Texuguito.Bot.CommandListRaffle");
+			 say(m.platform, t("Texuguito.Bot.Commands").arg(m.user, list));
 		 }},
 		{QStringLiteral("comando"),
 		 {QStringLiteral("cmd"), QStringLiteral("command")},
@@ -585,13 +552,12 @@ void BotEngine::registerCommands()
 		{QStringLiteral("ping"),
 		 {},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
-			 say(m.platform, QStringLiteral("🏓 Pong, %1!").arg(m.user));
+			 say(m.platform, t("Texuguito.Bot.Pong").arg(m.user));
 		 }},
 		{QStringLiteral("pontos"),
 		 {QStringLiteral("pts"), QStringLiteral("points")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
-			 say(m.platform,
-			     QStringLiteral("🪙 %1, você tem %2 pontos.").arg(m.user).arg(m_points.get(key)));
+			 say(m.platform, t("Texuguito.Bot.Points").arg(m.user).arg(m_points.get(key)));
 		 }},
 		{QStringLiteral("darpontos"),
 		 {QStringLiteral("dar"), QStringLiteral("addpontos"), QStringLiteral("addpoints"),
@@ -602,7 +568,7 @@ void BotEngine::registerCommands()
 			 bool ok = false;
 			 const qint64 amount = args.size() >= 2 ? args[1].toLongLong(&ok) : 0;
 			 if (!ok) {
-				 say(m.platform, QStringLiteral("❌ Use: !darpontos <@usuario> <quantidade>"));
+				 say(m.platform, t("Texuguito.Bot.GivePointsUsage"));
 				 return;
 			 }
 			 QString target = args[0].toLower();
@@ -610,49 +576,43 @@ void BotEngine::registerCommands()
 				 target.remove(0, 1);
 			 const QString targetKey = keyFor(m.platform, target);
 			 m_points.add(targetKey, amount);
-			 say(m.platform, QStringLiteral("✅ %1 pontos adicionados para %2! Saldo: %3 pts.")
-						 .arg(amount)
-						 .arg(target)
-						 .arg(m_points.get(targetKey)));
+			 say(m.platform,
+			     t("Texuguito.Bot.PointsGiven").arg(amount).arg(target).arg(m_points.get(targetKey)));
 		 }},
 		{QStringLiteral("tocar"),
 		 {QStringLiteral("p"), QStringLiteral("play")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &args) {
 			 if (args.isEmpty()) {
-				 say(m.platform, QStringLiteral("❌ Use: !tocar <nome>"));
+				 say(m.platform, t("Texuguito.Bot.PlayUsage"));
 				 return;
 			 }
 			 if (m_lastClip.isValid()) {
 				 const qint64 left = kClipCooldownSeconds * 1000LL - m_lastClip.elapsed();
 				 if (left > 0) {
-					 say(m.platform, QStringLiteral("⏳ Cooldown ativo! Aguarde mais %1 segundos.")
-								 .arg(left / 1000 + 1));
+					 say(m.platform, t("Texuguito.Bot.Cooldown").arg(left / 1000 + 1));
 					 return;
 				 }
 			 }
 			 const QString name = args.join(QLatin1Char(' ')).toLower();
 			 const auto clip = m_clips.find(name);
 			 if (clip == m_clips.end()) {
-				 say(m.platform, QStringLiteral("❌ Áudio '%1' não encontrado.").arg(name));
+				 say(m.platform, t("Texuguito.Bot.AudioNotFound").arg(name));
 				 return;
 			 }
 			 if (m_listeners <= 0) {
-				 say(m.platform, noOverlayReply());
+				 say(m.platform, t("Texuguito.Bot.NoOverlay"));
 				 return;
 			 }
 			 if (!m_points.spend(key, clip->second.cost)) {
-				 say(m.platform, QStringLiteral("❌ Pontos insuficientes! '%1' custa %2 pts.")
-							 .arg(clip->second.name)
-							 .arg(clip->second.cost));
+				 say(m.platform,
+				     t("Texuguito.Bot.PlayNoPoints").arg(clip->second.name).arg(clip->second.cost));
 				 return;
 			 }
 			 m_lastClip.start();
 			 emit overlayMessage(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio")},
 							 {QStringLiteral("url"), clip->second.url},
 							 {QStringLiteral("volume"), m_volume}});
-			 say(m.platform, QStringLiteral("🔊 Tocando: %1. Saldo: %2 pts.")
-						 .arg(clip->second.name)
-						 .arg(m_points.get(key)));
+			 say(m.platform, t("Texuguito.Bot.Playing").arg(clip->second.name).arg(m_points.get(key)));
 		 }},
 		{QStringLiteral("falar"),
 		 {QStringLiteral("tts"), QStringLiteral("speak")},
@@ -663,7 +623,7 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("sons"), QStringLiteral("sounds"), QStringLiteral("audio")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
 			 if (m_clips.empty()) {
-				 say(m.platform, QStringLiteral("🔈 Nenhum áudio encontrado nas pastas."));
+				 say(m.platform, t("Texuguito.Bot.NoAudios"));
 				 return;
 			 }
 			 std::map<int, QStringList> byCost;
@@ -676,27 +636,25 @@ void BotEngine::registerCommands()
 						      .arg(entry.first)
 						      .arg(entry.second.join(QStringLiteral(", "))));
 			 }
-			 say(m.platform, BotText::truncate(QStringLiteral("🎵 Sons Disponíveis: ") +
-							   parts.join(QStringLiteral(" | "))));
+			 say(m.platform,
+			     BotText::truncate(t("Texuguito.Bot.Sounds").arg(parts.join(QStringLiteral(" | ")))));
 		 }},
 		{QStringLiteral("parar"),
 		 {QStringLiteral("stop")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
 			 emit overlayMessage(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio_stop")}});
-			 say(m.platform, QStringLiteral("⏹️ Áudio parado!"));
+			 say(m.platform, t("Texuguito.Bot.Stopped"));
 		 }},
 		{QStringLiteral("recarregar"),
 		 {QStringLiteral("reload")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
 			 if (privileged(m))
-				 say(m.platform, QStringLiteral("🔄 Recarregado! %1 áudios.").arg(reloadClips()));
+				 say(m.platform, t("Texuguito.Bot.Reloaded").arg(reloadClips()));
 		 }},
 		{QStringLiteral("status"),
 		 {QStringLiteral("estado")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
-			 say(m.platform, QStringLiteral("📊 [STATUS] Texuguito está online! 🎵 %1 áudios carregados. "
-							"🪙 Sistema de pontos ativo.")
-						 .arg(m_clips.size()));
+			 say(m.platform, t("Texuguito.Bot.Status").arg(m_clips.size()));
 		 }},
 		{QStringLiteral("sorteio"),
 		 {QStringLiteral("raffle")},
@@ -704,32 +662,25 @@ void BotEngine::registerCommands()
 			 if (!m.isBroadcaster)
 				 return;
 			 if (m_raffle.active()) {
-				 say(m.platform, QStringLiteral("❌ Já existe um sorteio em andamento!"));
+				 say(m.platform, t("Texuguito.Bot.RaffleRunning"));
 				 return;
 			 }
 			 const qint64 prize = args.size() >= 2 ? args[0].toLongLong() : 0;
 			 const int minutes = args.size() >= 2 ? args[1].toInt() : 0;
 			 if (prize <= 0 || minutes <= 0) {
-				 say(m.platform, QStringLiteral("❌ Use: !sorteio <pontos> <minutos>"));
+				 say(m.platform, t("Texuguito.Bot.RaffleUsage"));
 				 return;
 			 }
 			 m_raffle.start(prize);
-			 say(m.platform,
-			     QStringLiteral("🎉 [SORTEIO] Um sorteio de %1 pontos começou! Digite !entrar para "
-					    "participar. Tempo: %2 min.")
-				     .arg(prize)
-				     .arg(minutes));
+			 say(m.platform, t("Texuguito.Bot.RaffleStarted").arg(prize).arg(minutes));
 			 const ChatPlatform platform = m.platform;
 			 QTimer::singleShot(minutes * 60000, this, [this, platform]() {
 				 const auto [winner, won] = m_raffle.finish(m_points);
 				 if (winner.isEmpty())
-					 say(platform,
-					     QStringLiteral("⚠️ O sorteio terminou, mas não houve participantes."));
+					 say(platform, t("Texuguito.Bot.RaffleEmpty"));
 				 else
 					 say(platform,
-					     QStringLiteral("🎊 PARABÉNS @%1! Você ganhou o sorteio de %2 pontos! 🥳")
-						     .arg(displayName(winner))
-						     .arg(won));
+					     t("Texuguito.Bot.RaffleWinner").arg(displayName(winner)).arg(won));
 			 });
 		 }},
 		{QStringLiteral("entrar"),

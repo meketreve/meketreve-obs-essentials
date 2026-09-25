@@ -106,6 +106,7 @@ add_executable(
   ${_texuguito}/tts-client.cpp
 )
 target_include_directories(test-texuguito PRIVATE ${_texuguito})
+target_compile_definitions(test-texuguito PRIVATE MEKETREVE_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
 target_link_libraries(test-texuguito PRIVATE chat-core Qt6::Test)
 set_target_properties(test-texuguito PROPERTIES AUTOMOC ON)
 add_test(NAME texuguito COMMAND test-texuguito)

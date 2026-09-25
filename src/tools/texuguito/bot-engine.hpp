@@ -57,6 +57,9 @@ class BotEngine : public QObject {
 public:
 	using TtsFunction =
 		std::function<void(const QString &text, std::function<void(QByteArray mp3, QString error)>)>;
+	/* Chat replies by locale key ("Texuguito.Bot.*"); OBS answers them in
+	 * its UI language. */
+	using TextFunction = std::function<QString(const char *key)>;
 
 	static constexpr int kClipCooldownSeconds = 60;
 	static constexpr int kTtsCost = 200;
@@ -70,6 +73,7 @@ public:
 	static QString keyFor(ChatPlatform platform, const QString &user);
 
 	void setTts(TtsFunction tts) { m_tts = std::move(tts); }
+	void setText(TextFunction text) { m_text = std::move(text); }
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
 	void setAudioDir(const QString &dir);
@@ -125,6 +129,8 @@ private:
 	const Command *findCommand(const QString &name) const;
 	QSet<QString> reservedNames() const;
 	void say(ChatPlatform platform, const QString &text);
+	QString t(const char *key) const { return m_text ? m_text(key) : QString::fromLatin1(key); }
+	bool english() const { return t("Texuguito.Bot.Language") == QLatin1String("en"); }
 	void viewerEvent(const QString &type, const QString &key);
 	QJsonObject viewerPayload(const QString &key);
 	QString displayName(const QString &key);
@@ -146,6 +152,7 @@ private:
 	double m_volume = 1.0;
 	int m_listeners = 0;
 	TtsFunction m_tts;
+	TextFunction m_text;
 	QHash<QString, QByteArray> m_ttsClips;
 	QStringList m_ttsOrder;
 	QSet<QString> m_lastTickPresent;

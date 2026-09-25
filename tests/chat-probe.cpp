@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 	QNetworkAccessManager net;
 	const QString platform = args[1].toLower();
 
-	/* chat-probe tts "<text>" <out.mp3>: Google TTS as the Texuguito uses it. */
+	/* chat-probe tts "<text>" <out.mp3> [lang]: Google TTS as the Texuguito uses it. */
 	if (platform == QLatin1String("tts") && args.size() > 3) {
 		int rc = 1;
 		GoogleTts::synthesize(
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 				rc = mp3.isEmpty() ? 1 : 0;
 				app.quit();
 			},
-			&app);
+			&app, args.size() > 4 ? args[4] : QStringLiteral("pt"));
 		app.exec();
 		return rc;
 	}

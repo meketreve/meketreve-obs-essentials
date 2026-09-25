@@ -38,6 +38,7 @@ constexpr const char *kUrl = "https://translate.google.com.br/_/TranslateWebserv
 struct Job {
 	QNetworkAccessManager *net = nullptr;
 	QStringList chunks;
+	QString lang;
 	QByteArray mp3;
 	std::function<void(QByteArray, QString)> done;
 	QPointer<QObject> context;
@@ -59,7 +60,7 @@ void next(const std::shared_ptr<Job> &job)
 			 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
 			 "Chrome/140.0.0.0 Safari/537.36");
 	req.setTransferTimeout(15000);
-	QNetworkReply *reply = job->net->post(req, requestBody(job->chunks.takeFirst()));
+	QNetworkReply *reply = job->net->post(req, requestBody(job->chunks.takeFirst(), job->lang));
 	QObject::connect(reply, &QNetworkReply::finished, job->context.data(), [job, reply]() {
 		reply->deleteLater();
 		const QByteArray piece = parseResponse(reply->readAll());
@@ -127,10 +128,11 @@ QByteArray parseResponse(const QByteArray &body)
 }
 
 void synthesize(QNetworkAccessManager *net, const QString &text, std::function<void(QByteArray, QString)> done,
-		QObject *context)
+		QObject *context, const QString &lang)
 {
 	auto job = std::make_shared<Job>();
 	job->net = net;
+	job->lang = lang;
 	job->chunks = splitText(text);
 	job->done = std::move(done);
 	job->context = context;
