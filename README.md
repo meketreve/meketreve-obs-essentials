@@ -149,22 +149,21 @@ ban, delete message. On Twitch it also brings follows into Activity (you must
 be the broadcaster or a moderator). YouTube stays read-only and TikTok has no
 sending.
 
-Both platforms only let registered apps log in, and a plugin cannot ship a
-secret, so you create your own app once (free):
-
-- **Twitch:** go to [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps)
-  → *Register Your Application*. Name: anything; OAuth Redirect URL:
-  `http://localhost`; Category: *Chat Bot*; **Client Type: Public**. Copy the
-  *Client ID* into Unified Chat → Settings → Twitch and click **Log in**. OBS
-  shows a code and opens twitch.tv/activate; approve it there.
+- **Twitch:** nothing to set up. Click **Log in** in Unified Chat → Settings →
+  Twitch; OBS shows a code and opens twitch.tv/activate, approve it there. The
+  plugin ships its own public app (a public app has no secret to hide).
+  - **Want your own app?** At [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps)
+    → *Register Your Application* (Category *Chat Bot*, **Client Type:
+    Public**, OAuth Redirect URL `http://localhost`) and paste its *Client ID*.
   - **Already have a Confidential app** (for example the one the old
     texuguito bot used)? Add `http://localhost:17563` to its OAuth Redirect
     URLs, paste its *Client ID* and *Client Secret* (the Secret field is
     optional on Twitch) and click **Log in**: the browser opens Twitch's
     login and comes back to OBS, no code to type. **Import old bot** in the
     Texuguito dock fills both fields from the bot's `.env` (never its tokens).
-- **Kick:** go to [kick.com/settings/developer](https://kick.com/settings/developer)
-  → create an app with Redirect URL `http://localhost:53682/callback` and the
+- **Kick:** only apps with a secret can log in, and a plugin cannot ship a
+  secret, so you create your own app once (free): go to
+  [kick.com/settings/developer](https://kick.com/settings/developer) → create an app with Redirect URL `http://localhost:53682/callback` and the
   scopes *user:read, channel:read, chat:write, moderation:ban,
   moderation:chat_message:manage*. Paste its *Client ID* and *Client Secret*
   and click **Log in**; the browser opens Kick's login and comes back to OBS.

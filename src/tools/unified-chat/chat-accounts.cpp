@@ -39,6 +39,7 @@ namespace {
 const char *const kTwitchScopes =
 	"user:read:chat user:write:chat moderator:manage:banned_users moderator:manage:chat_messages "
 	"moderator:read:followers moderator:read:chatters";
+const char *const kTwitchClientId = "r61r2wwuew4j0e8uohmwif5022r4bc";
 const char *const kKickScopes = "user:read channel:read chat:write moderation:ban moderation:chat_message:manage";
 
 size_t slot(ChatPlatform p)
@@ -68,6 +69,11 @@ QString errorText(const QJsonObject &body, const QString &fallback)
 QString ChatAccounts::kickRedirectUri()
 {
 	return QStringLiteral("http://localhost:%1/callback").arg(kKickRedirectPort);
+}
+
+QString ChatAccounts::defaultClientId(ChatPlatform p)
+{
+	return p == ChatPlatform::Twitch ? QString::fromLatin1(kTwitchClientId) : QString();
 }
 
 QString ChatAccounts::twitchRedirectUri()
@@ -112,6 +118,8 @@ bool ChatAccounts::usesRedirect(ChatPlatform p) const
 
 void ChatAccounts::load()
 {
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick})
+		acc(p).clientId = defaultClientId(p);
 	QFile file(m_storePath);
 	if (!file.open(QIODevice::ReadOnly))
 		return;
@@ -120,6 +128,8 @@ void ChatAccounts::load()
 		const QJsonObject o = root.value(QLatin1String(platformKey(p))).toObject();
 		ChatAccount &a = acc(p);
 		a.clientId = o.value(QStringLiteral("clientId")).toString();
+		if (a.clientId.isEmpty())
+			a.clientId = defaultClientId(p);
 		a.clientSecret = o.value(QStringLiteral("clientSecret")).toString();
 		a.accessToken = o.value(QStringLiteral("accessToken")).toString();
 		a.refreshToken = o.value(QStringLiteral("refreshToken")).toString();
@@ -135,7 +145,8 @@ void ChatAccounts::save()
 	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
 		const ChatAccount &a = account(p);
 		root.insert(QLatin1String(platformKey(p)),
-			    QJsonObject{{QStringLiteral("clientId"), a.clientId},
+			    QJsonObject{{QStringLiteral("clientId"),
+					 a.clientId == defaultClientId(p) ? QString() : a.clientId},
 					{QStringLiteral("clientSecret"), a.clientSecret},
 					{QStringLiteral("accessToken"), a.accessToken},
 					{QStringLiteral("refreshToken"), a.refreshToken},
@@ -154,12 +165,13 @@ void ChatAccounts::save()
 void ChatAccounts::setClient(ChatPlatform p, const QString &clientId, const QString &clientSecret)
 {
 	ChatAccount &a = acc(p);
-	if (a.clientId == clientId.trimmed() && a.clientSecret == clientSecret.trimmed())
+	const QString id = clientId.trimmed().isEmpty() ? defaultClientId(p) : clientId.trimmed();
+	if (a.clientId == id && a.clientSecret == clientSecret.trimmed())
 		return;
 	/* Tokens belong to the old app. */
-	if (a.clientId != clientId.trimmed())
+	if (a.clientId != id)
 		a = ChatAccount();
-	a.clientId = clientId.trimmed();
+	a.clientId = id;
 	a.clientSecret = clientSecret.trimmed();
 	save();
 	emit accountChanged(p);

@@ -34,9 +34,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 class QTcpServer;
 
-/* A logged-in account on Twitch or Kick. The client id and secret belong to
- * an app the user registers; the plugin ships none. The secret is required on
- * Kick and optional on Twitch (a confidential app). */
+/* A logged-in account on Twitch or Kick. Twitch defaults to the plugin's own
+ * public app (device code, no secret); a user's app can replace it, with an
+ * optional secret for a confidential one. Kick needs the user's app and its
+ * secret. */
 struct ChatAccount {
 	QString clientId;
 	QString clientSecret;
@@ -62,6 +63,8 @@ public:
 	/* Same port as the old texuguito bot, so its Twitch app works as is. */
 	static constexpr quint16 kTwitchRedirectPort = 17563;
 	static QString twitchRedirectUri();
+	/* The plugin's public Twitch app, used while the user sets none. */
+	static QString defaultClientId(ChatPlatform p);
 
 	ChatAccounts(const QString &storePath, QObject *parent = nullptr);
 	~ChatAccounts() override;
