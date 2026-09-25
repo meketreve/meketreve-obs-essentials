@@ -415,9 +415,9 @@ QString TexuguitoDock::importFrom(const QString &dir)
 		if (QFile::copy(src, dst))
 			files++;
 	}
-	/* The old bot's .env has its Twitch channel and app; only those lines
-	 * are read, never the tokens (the user logs in again here). */
-	QString channel, clientId, clientSecret;
+	/* The old bot knew its Twitch channel from .env; only that line is read,
+	 * never its app or tokens (Twitch logs in with the plugin's own app). */
+	QString channel;
 	QFile env(root.filePath(QStringLiteral(".env")));
 	if (env.open(QIODevice::ReadOnly | QIODevice::Text)) {
 		while (!env.atEnd()) {
@@ -425,25 +425,16 @@ QString TexuguitoDock::importFrom(const QString &dir)
 			const qsizetype eq = line.indexOf(QLatin1Char('='));
 			if (eq <= 0)
 				continue;
-			const QString key = line.left(eq).trimmed();
-			QString value = line.mid(eq + 1).trimmed();
-			value.remove(QLatin1Char('"'));
-			value.remove(QLatin1Char('\''));
-			if (key == QLatin1String("CHANNEL"))
-				channel = value;
-			else if (key == QLatin1String("CLIENT_ID"))
-				clientId = value;
-			else if (key == QLatin1String("CLIENT_SECRET"))
-				clientSecret = value;
+			if (line.left(eq).trimmed() != QLatin1String("CHANNEL"))
+				continue;
+			channel = line.mid(eq + 1).trimmed();
+			channel.remove(QLatin1Char('"'));
+			channel.remove(QLatin1Char('\''));
 		}
 	}
 	const bool setChannel = !channel.isEmpty() && m_chat->target(ChatPlatform::Twitch).trimmed().isEmpty();
 	if (setChannel)
 		m_chat->setTarget(ChatPlatform::Twitch, channel);
-	ChatAccounts *accounts = m_chat->accounts();
-	const bool setApp = !clientId.isEmpty() && !accounts->account(ChatPlatform::Twitch).loggedIn();
-	if (setApp)
-		accounts->setClient(ChatPlatform::Twitch, clientId, clientSecret);
 
 	const int audios = root.exists(QStringLiteral("audios"))
 				   ? copyTree(root.filePath(QStringLiteral("audios")), m_engine->audioDir())
@@ -456,8 +447,6 @@ QString TexuguitoDock::importFrom(const QString &dir)
 					    : T("Texuguito.ImportNothing");
 	if (setChannel)
 		result += QStringLiteral("\n\n") + T("Texuguito.ImportedChannel").arg(channel);
-	if (setApp)
-		result += QStringLiteral("\n\n") + T("Texuguito.ImportedTwitchApp");
 	return result;
 }
 
