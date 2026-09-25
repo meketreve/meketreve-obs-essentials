@@ -404,11 +404,19 @@ void BotEngine::playTts(const BotMessage &msg, const QString &key, const QString
 		say(msg.platform, t("Texuguito.Bot.TtsNoPoints").arg(kTtsCost));
 		return;
 	}
-	const QString text = t("Texuguito.Bot.TtsText").arg(msg.user, args.join(QLatin1Char(' ')));
+	/* The command picks the voice: !falar speaks Portuguese, !speak English,
+	 * !tts the language OBS is in. The spoken intro goes with the voice, not
+	 * with OBS. */
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	const bool englishVoice = invoked == QLatin1String("speak") || (invoked != QLatin1String("falar") && english());
+	const QString lang = englishVoice ? QStringLiteral("en") : QStringLiteral("pt");
+	const QString text =
+		(englishVoice ? QStringLiteral("%1 sent the message: %2") : QStringLiteral("%1 enviou a mensagem: %2"))
+			.arg(msg.user, args.join(QLatin1Char(' ')));
 	const ChatPlatform platform = msg.platform;
 	const QString user = msg.user;
 	QPointer<BotEngine> self = this;
-	m_tts(text, [self, platform, user, key](QByteArray mp3, QString error) {
+	m_tts(text, lang, [self, platform, user, key](QByteArray mp3, QString error) {
 		if (!self)
 			return;
 		if (mp3.isEmpty()) {
@@ -537,12 +545,13 @@ void BotEngine::registerCommands()
 		{QStringLiteral("comandos"),
 		 {QStringLiteral("ajuda"), QStringLiteral("help"), QStringLiteral("commands")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
-			 QString list = t("Texuguito.Bot.CommandList");
-			 if (privileged(m))
-				 list += QStringLiteral(", ") + t("Texuguito.Bot.CommandListMod");
-			 if (m.isBroadcaster)
-				 list += QStringLiteral(", ") + t("Texuguito.Bot.CommandListRaffle");
-			 say(m.platform, t("Texuguito.Bot.Commands").arg(m.user, list));
+			 /* The page in the language of the command that asked for it. */
+			 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
+			 const bool englishPage = invoked == QLatin1String("commands") ||
+						  invoked == QLatin1String("help");
+			 say(m.platform,
+			     t("Texuguito.Bot.Commands")
+				     .arg(m.user, QLatin1String(englishPage ? kCommandsUrlEn : kCommandsUrlPt)));
 		 }},
 		{QStringLiteral("comando"),
 		 {QStringLiteral("cmd"), QStringLiteral("command")},

@@ -254,17 +254,20 @@ private slots:
 		bot.setText(locale("pt-BR.ini"));
 		bot.setOverlayListeners(1);
 		bot.points().add(QStringLiteral("ana"), 450);
-		QString spoken;
+		QString spoken, voice;
 		bool fail = false;
-		bot.setTts([&](const QString &text, std::function<void(QByteArray, QString)> done) {
-			spoken = text;
-			done(fail ? QByteArray() : QByteArray("ID3mp3"), QString());
-		});
+		bot.setTts(
+			[&](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
+				spoken = text;
+				voice = lang;
+				done(fail ? QByteArray() : QByteArray("ID3mp3"), QString());
+			});
 		QSignalSpy said(&bot, &BotEngine::reply);
 		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
 
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!falar olá chat")));
 		QCOMPARE(spoken, QStringLiteral("Ana enviou a mensagem: olá chat"));
+		QCOMPARE(voice, QStringLiteral("pt"));
 		QCOMPARE(bot.points().get(QStringLiteral("ana")), 250);
 		const QString url = overlay.last().at(0).toJsonObject().value(QStringLiteral("url")).toString();
 		QVERIFY(url.startsWith(QStringLiteral("/tts/")));
@@ -278,6 +281,8 @@ private slots:
 		fail = false;
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!speak caro")));
 		QCOMPARE(bot.points().get(QStringLiteral("ana")), 50);
+		QCOMPARE(spoken, QStringLiteral("Ana sent the message: caro"));
+		QCOMPARE(voice, QStringLiteral("en"));
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!speak caro")));
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ Pontos insuficientes (200 pts necessários)."));
 	}
@@ -349,9 +354,12 @@ private slots:
 		QVERIFY(replies(said).last().startsWith(
 			QStringLiteral("@Viewer invalid hat. Options: cap, crown, horns,")));
 		QVERIFY(replies(said).last().contains(QStringLiteral("tophat, tiara, coconut, santa, wizard, viking")));
+		/* The page's language follows the command, the wording follows OBS. */
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!comandos")));
-		QVERIFY(replies(said).last().startsWith(QStringLiteral("@Viewer commands: !color <color>")));
-		QVERIFY(!replies(said).last().contains(QStringLiteral("!raffle")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("@Viewer all commands: ") + QLatin1String(BotEngine::kCommandsUrlPt));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!commands")));
+		QVERIFY(replies(said).last().endsWith(QStringLiteral("/commands.html")));
 	}
 
 	void localeFilesHaveTheSameKeys()

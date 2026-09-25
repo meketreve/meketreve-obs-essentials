@@ -1,0 +1,86 @@
+{
+  "sections": [
+    {
+      "title": {"pt": "Avatar no desfile", "en": "Parade avatar"},
+      "commands": [
+        {"pt": "!cor <cor>", "en": "!color <color>", "who": "all",
+         "desc": {"pt": "Muda a cor do seu avatar: nome de cor em português ou inglês (<code>azul</code>, <code>verde limão</code>, <code>hotpink</code>) ou hex (<code>#ff8800</code>).",
+                  "en": "Changes your avatar's color: a color name in English or Portuguese (<code>blue</code>, <code>hotpink</code>, <code>azul</code>) or hex (<code>#ff8800</code>)."}},
+        {"pt": "!resetcor", "en": "!resetcolor", "who": "all",
+         "desc": {"pt": "Volta para a cor que o bot escolheu para você.", "en": "Goes back to the color the bot picked for you."}},
+        {"pt": "!chapeu <opção>", "en": "!hat <option>", "who": "all",
+         "desc": {"pt": "Põe um chapéu: boné, coroa, chifres, tricornio, bicorne, cartola, tiara, coco, natalino, mago, viking, elmo, legionario, bandana, capuz, faixa ou nenhum.",
+                  "en": "Puts on a hat: cap, crown, horns, tricorne, bicorn, tophat, tiara, coconut, santa, wizard, viking, helmet, legionary, bandana, hood, headband or none."}},
+        {"pt": "!acessorio <opção>", "en": "!accessory <option>", "who": "all",
+         "desc": {"pt": "Põe um acessório: óculos, capa, asas, colar, cachecol, laco, tapaolho, oculosescuros, monoculo, asasmorcego, asasborboleta, asaslibelula ou nenhum.",
+                  "en": "Adds an accessory: glasses, cape, wings, necklace, scarf, bow, eyepatch, sunglasses, monocle, batwings, butterflywings, dragonflywings or none."}},
+        {"pt": "!apelido <nome>", "en": "!nick <name>", "also": ["!nickname"], "who": "all",
+         "desc": {"pt": "Nome que aparece em cima do avatar (até 16 letras).", "en": "The name shown above your avatar (up to 16 letters)."}},
+        {"pt": "!dança", "en": "!dance", "also": ["!danca"], "who": "all",
+         "desc": {"pt": "O avatar dança por alguns segundos.", "en": "Your avatar dances for a few seconds."}},
+        {"pt": "!avatarmod <usuário> <cor>", "en": "!setavatar <user> <color>", "who": "mod",
+         "desc": {"pt": "Muda a cor do avatar de outra pessoa.", "en": "Changes someone else's avatar color."}}
+      ]
+    },
+    {
+      "title": {"pt": "Pontos, sons e voz", "en": "Points, sounds and voice"},
+      "intro": {"pt": "Quem está no chat ganha 1 ponto por minuto. Os sons e a voz tocam no overlay da live.",
+                "en": "Everyone in chat earns 1 point per minute. Sounds and voice play on the stream's overlay."},
+      "commands": [
+        {"pt": "!pontos", "en": "!points", "also": ["!pts"], "who": "all",
+         "desc": {"pt": "Mostra quantos pontos você tem.", "en": "Shows how many points you have."}},
+        {"pt": "!audios", "en": "!sounds", "also": ["!sons", "!audio"], "who": "all",
+         "desc": {"pt": "Lista os sons e o preço de cada um.", "en": "Lists the sounds and what each one costs."}},
+        {"pt": "!tocar <nome>", "en": "!play <name>", "also": ["!p"], "who": "all",
+         "desc": {"pt": "Toca um som, pagando o preço dele. Um som por minuto no canal todo.", "en": "Plays a sound for its price. One sound per minute for the whole channel."}},
+        {"pt": "!falar <mensagem>", "en": "!speak <message>", "who": "all",
+         "desc": {"pt": "Lê a sua mensagem em voz alta por 200 pontos. <code>!falar</code> fala em português e <code>!speak</code> em inglês.",
+                  "en": "Reads your message out loud for 200 points. <code>!speak</code> talks in English and <code>!falar</code> in Portuguese."}},
+        {"pt": "!tts <mensagem>", "en": "!tts <message>", "who": "all",
+         "desc": {"pt": "Igual ao <code>!falar</code>, com a voz no idioma do OBS do streamer.", "en": "Same as <code>!speak</code>, with the voice in the language of the streamer's OBS."}},
+        {"pt": "!parar", "en": "!stop", "who": "all",
+         "desc": {"pt": "Para o som que está tocando.", "en": "Stops the sound that is playing."}},
+        {"pt": "!darpontos <usuário> <quantidade>", "en": "!givepoints <user> <amount>", "also": ["!dar", "!give", "!addpontos", "!addpoints"], "who": "mod",
+         "desc": {"pt": "Dá pontos para alguém (número negativo tira).", "en": "Gives someone points (a negative number takes them away)."}},
+        {"pt": "!recarregar", "en": "!reload", "who": "mod",
+         "desc": {"pt": "Lê de novo a pasta de sons.", "en": "Reads the sound folder again."}}
+      ]
+    },
+    {
+      "title": {"pt": "Sorteio", "en": "Raffle"},
+      "commands": [
+        {"pt": "!sorteio <pontos> <minutos>", "en": "!raffle <points> <minutes>", "who": "owner",
+         "desc": {"pt": "Abre um sorteio de pontos. No fim do tempo, uma pessoa entre as que entraram leva o prêmio.",
+                  "en": "Starts a points raffle. When the time is up, one of the people who joined wins the prize."}},
+        {"pt": "!entrar", "en": "!join", "who": "all",
+         "desc": {"pt": "Entra no sorteio aberto.", "en": "Joins the running raffle."}}
+      ]
+    },
+    {
+      "title": {"pt": "Comandos do canal", "en": "Channel commands"},
+      "intro": {"pt": "Moderadores criam respostas prontas pelo próprio chat. Na resposta, <code>{user}</code> vira o nome de quem usou o comando e <code>{args}</code> o que veio depois dele.",
+                "en": "Moderators create ready-made replies from the chat itself. In the reply, <code>{user}</code> becomes the name of whoever used the command and <code>{args}</code> whatever came after it."},
+      "commands": [
+        {"pt": "!comando lista", "en": "!command list", "also": ["!cmd"], "who": "all",
+         "desc": {"pt": "Lista os comandos criados no canal.", "en": "Lists the commands created in the channel."}},
+        {"pt": "!comando add <nome> <resposta>", "en": "!command add <name> <reply>", "who": "mod",
+         "desc": {"pt": "Cria um comando. Ex.: <code>!comando add discord Entra aí {user}: discord.gg/...</code>", "en": "Creates a command. E.g. <code>!command add discord Come in {user}: discord.gg/...</code>"}},
+        {"pt": "!comando edit <nome> <resposta>", "en": "!command edit <name> <reply>", "who": "mod",
+         "desc": {"pt": "Troca a resposta de um comando.", "en": "Changes a command's reply."}},
+        {"pt": "!comando del <nome>", "en": "!command del <name>", "who": "mod",
+         "desc": {"pt": "Apaga um comando.", "en": "Deletes a command."}}
+      ]
+    },
+    {
+      "title": {"pt": "Outros", "en": "Other"},
+      "commands": [
+        {"pt": "!comandos", "en": "!commands", "also": ["!ajuda", "!help"], "who": "all",
+         "desc": {"pt": "Manda o link desta página.", "en": "Sends the link to this page."}},
+        {"pt": "!status", "en": "!status", "also": ["!estado"], "who": "all",
+         "desc": {"pt": "Mostra se o bot está no ar e quantos sons tem.", "en": "Shows that the bot is up and how many sounds it has."}},
+        {"pt": "!ping", "en": "!ping", "who": "all",
+         "desc": {"pt": "O bot responde \"Pong\".", "en": "The bot answers \"Pong\"."}}
+      ]
+    }
+  ]
+}

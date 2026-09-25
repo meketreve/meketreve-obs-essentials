@@ -55,8 +55,9 @@ class BotEngine : public QObject {
 	Q_OBJECT
 
 public:
-	using TtsFunction =
-		std::function<void(const QString &text, std::function<void(QByteArray mp3, QString error)>)>;
+	/* lang: "pt" or "en", the voice to speak with. */
+	using TtsFunction = std::function<void(const QString &text, const QString &lang,
+					       std::function<void(QByteArray mp3, QString error)>)>;
 	/* Chat replies by locale key ("Texuguito.Bot.*"); OBS answers them in
 	 * its UI language. */
 	using TextFunction = std::function<QString(const char *key)>;
@@ -67,6 +68,11 @@ public:
 	/* Without a viewer list (every platform but a logged-in Twitch), a
 	 * viewer counts as present for this long after their last message. */
 	static constexpr int kPresenceMinutes = 10;
+	/* The site's command list, one page per language. */
+	static constexpr const char *kCommandsUrlPt =
+		"https://meketreve.github.io/meketreve-obs-essentials/comandos.html";
+	static constexpr const char *kCommandsUrlEn =
+		"https://meketreve.github.io/meketreve-obs-essentials/commands.html";
 
 	BotEngine(const QString &dataDir, const QString &audioDir, QObject *parent = nullptr);
 

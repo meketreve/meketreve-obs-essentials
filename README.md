@@ -53,10 +53,12 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
   `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points).
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
   `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
-  the full list. Every command also has an English alias (`!color`, `!play`…).
+  the link to the [command list](https://meketreve.github.io/meketreve-obs-essentials/commands.html)
+  (`!comandos` opens it in Portuguese, `!commands` in English). Every command
+  also has an English alias (`!color`, `!play`…).
 - **Language:** the bot answers in the language OBS is set to (Portuguese or
-  English; any other language gets English), and `!falar`/`!speak` uses a
-  voice in that language too.
+  English; any other language gets English). The voice goes by the command:
+  `!falar` speaks Portuguese, `!speak` English and `!tts` the language of OBS.
 
 It reads every platform set up in Unified Chat. Replies go back to the
 platform the command came from when you are logged in there (Twitch and Kick,
