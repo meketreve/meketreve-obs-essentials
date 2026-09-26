@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 #include "chat-accounts.hpp"
+#include "viewers-dialog.hpp"
 
 #include "../unified-chat.h"
 #include "../config/config-share.hpp"
@@ -176,6 +177,11 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 		showPlaceholder();
 	});
 	bar->addWidget(clear);
+
+	auto *viewers = new QToolButton(this);
+	viewers->setText(T("UnifiedChat.Viewers"));
+	connect(viewers, &QToolButton::clicked, this, &UnifiedChatDock::openViewers);
+	bar->addWidget(viewers);
 
 	auto *settings = new QToolButton(this);
 	settings->setText(T("UnifiedChat.Settings"));
@@ -628,6 +634,20 @@ void UnifiedChatDock::addAccountRows(QFormLayout *form, QWidget *dialog)
 		codeBox->hide();
 		QMessageBox::warning(dialog, T("UnifiedChat.LogIn"), T("UnifiedChat.LoginFailed").arg(error));
 	});
+}
+
+void UnifiedChatDock::openViewers()
+{
+	const QString channel = m_targets[indexOf(ChatPlatform::Twitch)];
+	if (!m_viewers) {
+		m_viewers = new ViewersDialog(m_accounts, channel, this);
+		m_viewers->setAttribute(Qt::WA_DeleteOnClose);
+	}
+	m_viewers->setChannel(channel);
+	m_viewers->show();
+	m_viewers->raise();
+	m_viewers->activateWindow();
+	m_viewers->refresh();
 }
 
 bool UnifiedChatDock::canModerate(const ChatMessage &msg) const

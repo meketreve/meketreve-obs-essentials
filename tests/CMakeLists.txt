@@ -45,6 +45,8 @@ add_executable(
   dock-harness.cpp
   ${_chat}/unified-chat-dock.cpp
   ${_chat}/unified-chat-dock.hpp
+  ${_chat}/viewers-dialog.cpp
+  ${_chat}/viewers-dialog.hpp
   ${_config}/config-codec.cpp
   ${_config}/config-share.cpp
   ${CMAKE_SOURCE_DIR}/src/tools/outputs/output-store.cpp

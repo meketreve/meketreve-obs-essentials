@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
+#include <QPointer>
 #include <QWidget>
 
 #include <array>
@@ -35,6 +36,7 @@ class QUrl;
 class QLineEdit;
 class QLabel;
 class QTextBrowser;
+class ViewersDialog;
 
 /* Subs, gifts, raids, follows... from every platform, one line each. */
 class ActivityDock : public QWidget {
@@ -98,6 +100,7 @@ private:
 	void saveSettings();
 	void applySettings();
 	void openSettings();
+	void openViewers();
 	void appendEventLine(const ChatMessage &msg, const QString &description);
 	void appendSystemLine(ChatPlatform platform, const QString &text);
 	bool canModerate(const ChatMessage &msg) const;
@@ -125,6 +128,7 @@ private:
 	quint64 m_lastRecentId = 0;
 	bool m_eventsInChat = true;
 	bool m_activityLikes = false;
+	QPointer<ViewersDialog> m_viewers;
 };
 
 /* The dock created at load, or null. */

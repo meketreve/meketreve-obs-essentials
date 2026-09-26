@@ -595,12 +595,15 @@ void ChatAccounts::sendMessage(ChatPlatform p, const QString &channel, const QSt
 	});
 }
 
-void ChatAccounts::timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds)
+void ChatAccounts::timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds,
+			       ActionDone done)
 {
-	withBroadcaster(p, channel, [this, p, userId, seconds](const QString &broadcaster) {
-		const auto report = [this, p](int, const QJsonObject &, const QString &error) {
+	withBroadcaster(p, channel, [this, p, userId, seconds, done](const QString &broadcaster) {
+		const auto report = [this, p, done](int, const QJsonObject &, const QString &error) {
 			if (!error.isEmpty())
 				emit actionFailed(p, error);
+			if (done)
+				done(error);
 		};
 		if (p == ChatPlatform::Twitch) {
 			QUrl url(QStringLiteral("https://api.twitch.tv/helix/moderation/bans"));
@@ -622,17 +625,19 @@ void ChatAccounts::timeoutUser(ChatPlatform p, const QString &channel, const QSt
 	});
 }
 
-void ChatAccounts::banUser(ChatPlatform p, const QString &channel, const QString &userId)
+void ChatAccounts::banUser(ChatPlatform p, const QString &channel, const QString &userId, ActionDone done)
 {
-	timeoutUser(p, channel, userId, 0);
+	timeoutUser(p, channel, userId, 0, std::move(done));
 }
 
-void ChatAccounts::unbanUser(ChatPlatform p, const QString &channel, const QString &userId)
+void ChatAccounts::unbanUser(ChatPlatform p, const QString &channel, const QString &userId, ActionDone done)
 {
-	withBroadcaster(p, channel, [this, p, userId](const QString &broadcaster) {
-		const auto report = [this, p](int, const QJsonObject &, const QString &error) {
+	withBroadcaster(p, channel, [this, p, userId, done](const QString &broadcaster) {
+		const auto report = [this, p, done](int, const QJsonObject &, const QString &error) {
 			if (!error.isEmpty())
 				emit actionFailed(p, error);
+			if (done)
+				done(error);
 		};
 		if (p == ChatPlatform::Twitch) {
 			QUrl url(QStringLiteral("https://api.twitch.tv/helix/moderation/bans"));
@@ -666,6 +671,80 @@ void ChatAccounts::deleteMessage(ChatPlatform p, const QString &channel, const Q
 				       {QStringLiteral("moderator_id"), account(p).userId},
 				       {QStringLiteral("message_id"), messageId}});
 		api(p, "DELETE", url, QJsonObject(), report);
+	});
+}
+
+void ChatAccounts::helixPages(const QUrl &url, int maxPages,
+			      std::function<void(const QJsonArray &, const QString &)> done, QJsonArray collected,
+			      const QString &cursor)
+{
+	QUrl page = url;
+	QUrlQuery query(url);
+	if (!cursor.isEmpty())
+		query.addQueryItem(QStringLiteral("after"), cursor);
+	page.setQuery(query);
+	api(ChatPlatform::Twitch, "GET", page, QJsonObject(),
+	    [this, url, maxPages, done, collected](int, const QJsonObject &body, const QString &error) mutable {
+		    if (!error.isEmpty()) {
+			    done(collected, error);
+			    return;
+		    }
+		    for (const QJsonValue v : body.value(QStringLiteral("data")).toArray())
+			    collected.append(v);
+		    const QString next = body.value(QStringLiteral("pagination"))
+						 .toObject()
+						 .value(QStringLiteral("cursor"))
+						 .toString();
+		    if (next.isEmpty() || maxPages <= 1)
+			    done(collected, QString());
+		    else
+			    helixPages(url, maxPages - 1, done, collected, next);
+	    });
+}
+
+void ChatAccounts::twitchChatterList(const QString &channel, UsersDone done)
+{
+	withBroadcaster(ChatPlatform::Twitch, channel, [this, done](const QString &broadcaster) {
+		QUrl url(QStringLiteral("https://api.twitch.tv/helix/chat/chatters"));
+		url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), broadcaster},
+				       {QStringLiteral("moderator_id"), account(ChatPlatform::Twitch).userId},
+				       {QStringLiteral("first"), QStringLiteral("1000")}});
+		helixPages(url, 10, [done](const QJsonArray &data, const QString &error) {
+			QList<ChatUser> users;
+			for (const QJsonValue v : data) {
+				const QJsonObject o = v.toObject();
+				users.append({o.value(QStringLiteral("user_id")).toString(),
+					      o.value(QStringLiteral("user_login")).toString(),
+					      o.value(QStringLiteral("user_name")).toString(),
+					      {},
+					      {},
+					      {}});
+			}
+			done(users, error);
+		});
+	});
+}
+
+void ChatAccounts::twitchBanList(const QString &channel, UsersDone done)
+{
+	withBroadcaster(ChatPlatform::Twitch, channel, [this, done](const QString &broadcaster) {
+		QUrl url(QStringLiteral("https://api.twitch.tv/helix/moderation/banned"));
+		url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), broadcaster},
+				       {QStringLiteral("first"), QStringLiteral("100")}});
+		helixPages(url, 20, [done](const QJsonArray &data, const QString &error) {
+			QList<ChatUser> users;
+			for (const QJsonValue v : data) {
+				const QJsonObject o = v.toObject();
+				users.append({o.value(QStringLiteral("user_id")).toString(),
+					      o.value(QStringLiteral("user_login")).toString(),
+					      o.value(QStringLiteral("user_name")).toString(),
+					      QDateTime::fromString(o.value(QStringLiteral("expires_at")).toString(),
+								    Qt::ISODate),
+					      o.value(QStringLiteral("reason")).toString(),
+					      o.value(QStringLiteral("moderator_name")).toString()});
+			}
+			done(users, error);
+		});
 	});
 }
 

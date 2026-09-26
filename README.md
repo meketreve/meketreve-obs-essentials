@@ -153,8 +153,11 @@ Without logging in the chat is read-only and nothing is sent to any platform.
 
 Logging in to Twitch and/or Kick adds a message box under the chat (send to
 one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
-ban, delete message. On Twitch it also brings follows into Activity (you must
-be the broadcaster or a moderator). YouTube stays read-only and TikTok has no
+ban, unban / lift timeout, delete message. On Twitch it also brings follows
+into Activity (you must be the broadcaster or a moderator), and the **Viewers**
+button lists who is in chat (broadcaster or moderator) and who is banned
+(broadcaster only), with timeout, ban and unban right there; Kick, YouTube and
+TikTok do not offer these lists. YouTube stays read-only and TikTok has no
 sending.
 
 - **Twitch:** nothing to set up. Click **Log in** in Unified Chat → Settings →

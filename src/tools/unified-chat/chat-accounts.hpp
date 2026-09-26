@@ -20,8 +20,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-connector.hpp"
 #include "ws-client.hpp"
 
+#include <QDateTime>
 #include <QHash>
 #include <QSet>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
@@ -48,6 +50,17 @@ struct ChatAccount {
 	qint64 expiresAt = 0; /* ms since epoch */
 
 	bool loggedIn() const { return !accessToken.isEmpty(); }
+};
+
+/* Someone in a Twitch channel's chat or ban list. */
+struct ChatUser {
+	QString id;
+	QString login;
+	QString name;
+	/* Ban list only: when a timeout ends (invalid = permanent ban). */
+	QDateTime expiresAt;
+	QString reason;
+	QString moderator;
 };
 
 /* Logins (Twitch device code flow for public apps or authorization code with
@@ -82,16 +95,27 @@ public:
 
 	/* channel = what the user typed as the chat target (name or link). */
 	void sendMessage(ChatPlatform p, const QString &channel, const QString &text);
-	void timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds);
-	void banUser(ChatPlatform p, const QString &channel, const QString &userId);
+	/* done (optional) gets the error, empty on success; failures also go
+	 * to actionFailed. */
+	using ActionDone = std::function<void(const QString &error)>;
+	void timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds,
+			 ActionDone done = {});
+	void banUser(ChatPlatform p, const QString &channel, const QString &userId, ActionDone done = {});
 	/* Lifts a ban or a timeout (both platforms treat them the same). */
-	void unbanUser(ChatPlatform p, const QString &channel, const QString &userId);
+	void unbanUser(ChatPlatform p, const QString &channel, const QString &userId, ActionDone done = {});
 	void deleteMessage(ChatPlatform p, const QString &channel, const QString &messageId);
 
 	/* Logins in the Twitch channel's chat right now (Helix chatters; needs
 	 * the account to be the broadcaster or a moderator there). */
 	void twitchChatters(const QString &channel,
 			    std::function<void(const QSet<QString> &logins, int status, const QString &error)> done);
+
+	/* Full lists for the viewers window. Chatters need a broadcaster or
+	 * moderator login; the ban list only the broadcaster's. Failures before
+	 * the request (unknown channel) come through actionFailed. */
+	using UsersDone = std::function<void(const QList<ChatUser> &users, const QString &error)>;
+	void twitchChatterList(const QString &channel, UsersDone done);
+	void twitchBanList(const QString &channel, UsersDone done);
 
 	/* Twitch follows need a moderator token: subscribe over EventSub. */
 	void watchTwitchFollows(const QString &channel);
@@ -120,6 +144,10 @@ private:
 		 bool retried = false);
 	void post(const QUrl &url, const QByteArray &form, Done done);
 	void withBroadcaster(ChatPlatform p, const QString &channel, std::function<void(const QString &)> then);
+	/* GET every page of a Helix list (cursor pagination), up to maxPages. */
+	void helixPages(const QUrl &url, int maxPages,
+			std::function<void(const QJsonArray &data, const QString &error)> done,
+			QJsonArray collected = {}, const QString &cursor = {});
 	void onEventSubText(const QByteArray &data);
 
 	QString m_storePath;

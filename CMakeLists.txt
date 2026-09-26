@@ -133,6 +133,8 @@ target_sources(
     src/tools/unified-chat/twitch-chat.hpp
     src/tools/unified-chat/unified-chat-dock.cpp
     src/tools/unified-chat/unified-chat-dock.hpp
+    src/tools/unified-chat/viewers-dialog.cpp
+    src/tools/unified-chat/viewers-dialog.hpp
     src/tools/unified-chat/ws-client.cpp
     src/tools/unified-chat/ws-client.hpp
     src/tools/unified-chat/youtube-chat.cpp

@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * channels. */
 
 #include "unified-chat-dock.hpp"
+#include "viewers-dialog.hpp"
 #include "config-share.hpp"
 #include "outputs-dock.hpp"
 
@@ -99,7 +100,7 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|chat-settings|activity|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|chat-settings|activity|viewers|viewers-bans|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -195,6 +196,28 @@ int main(int argc, char **argv)
 			{ChatPlatform::Kick, QStringLiteral("kicker"), QString(), QStringLiteral("salve"), QString()});
 		widget = box;
 		box->resize(900, 560);
+	} else if (args[1].startsWith(QLatin1String("viewers"))) {
+		/* The viewers window with made-up lists (no login needed). */
+		chat = new UnifiedChatDock();
+		auto *dialog = new ViewersDialog(chat->accounts(), QStringLiteral("meketreve"));
+		QList<ChatUser> chatters;
+		for (const char *n : {"texuguito_fan", "Ana", "zeca", "Bia_Streams", "nightbot", "meketreve"})
+			chatters.append(
+				{QStringLiteral("1"), QString::fromUtf8(n).toLower(), QString::fromUtf8(n), {}, {}, {}});
+		dialog->showChatters(chatters, QString());
+		dialog->showBanned({{QStringLiteral("2"),
+				     QStringLiteral("spammer"),
+				     QStringLiteral("Spammer"),
+				     {},
+				     QStringLiteral("links"),
+				     QStringLiteral("meketreve")},
+				    {QStringLiteral("3"), QStringLiteral("chato"), QStringLiteral("Chato"),
+				     QDateTime::currentDateTime().addSecs(600), QString(), QStringLiteral("Ana")}},
+				   QString());
+		if (args[1] == QLatin1String("viewers-bans"))
+			dialog->showBanTab();
+		widget = dialog;
+		dialog->resize(460, 560);
 	} else if (args[1] == QLatin1String("outputs")) {
 		auto *outputs = new OutputsDock();
 		outputs->importOutputs(QJsonDocument::fromJson(R"json([
