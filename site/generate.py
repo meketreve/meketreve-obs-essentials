@@ -104,6 +104,7 @@ def commands_page(lang: str) -> str:
         "%%TITLE%%": "Texuguito commands" if lang == "en" else "Comandos do Texuguito",
         "%%HTMLLANG%%": "en" if lang == "en" else "pt-BR",
         "%%LANG%%": lang,
+        "%%PAGE%%": "commands.html" if lang == "en" else "comandos.html",
     }.items():
         page = page.replace(key, value)
     return page
