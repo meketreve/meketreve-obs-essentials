@@ -103,6 +103,12 @@ resolution, streaming servers and recording. In the **Outputs** dock you can
 also pick the vertical canvas as the source of an extra output (it always uses
 its own encoder).
 
+The canvas is called **Meketreve Vertical** (pick it as the extra canvas for
+multitrack video in OBS, or in the Outputs dock). Its obs-websocket vendor is
+`meketreve-vertical-canvas` and its procedures are `meketreve_vertical_*`, so
+tools written for Aitum's plugin (Aitum Multistream, vendor requests to
+`aitum-vertical-canvas`) do not drive this copy.
+
 If Aitum's own Vertical Canvas (or Aitum Stream Suite) is installed, the
 toolkit's copy stays off and Aitum's keeps working as before. When you remove
 Aitum's plugin, the copy takes over its settings, scenes and dock positions

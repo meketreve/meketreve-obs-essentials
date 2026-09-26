@@ -153,8 +153,8 @@ private:
 	gs_stagesurf_t *stagesurface = nullptr;
 	QPushButton *virtualCamButton;
 	QPushButton *recordButton;
-	QIcon recordActiveIcon = QIcon(":/aitum/media/recording.svg");
-	QIcon recordInactiveIcon = QIcon(":/aitum/media/record.svg");
+	QIcon recordActiveIcon = QIcon(":/vertical/media/recording.svg");
+	QIcon recordInactiveIcon = QIcon(":/vertical/media/record.svg");
 	QPushButton *replayButton;
 	QPushButton *replayEnableButton;
 	QCheckBox *replayEnable;
@@ -163,14 +163,14 @@ private:
 	QTimer recordDurationTimer;
 	QPushButton *streamButton;
 	QPushButton *streamButtonMulti;
-	QIcon streamActiveIcon = QIcon(":/aitum/media/streaming.svg");
-	QIcon streamInactiveIcon = QIcon(":/aitum/media/stream.svg");
+	QIcon streamActiveIcon = QIcon(":/vertical/media/streaming.svg");
+	QIcon streamInactiveIcon = QIcon(":/vertical/media/stream.svg");
 
-	QIcon replayActiveIcon = QIcon(":/aitum/media/backtrack_on.svg");
-	QIcon replayInactiveIcon = QIcon(":/aitum/media/backtrack_off.svg");
+	QIcon replayActiveIcon = QIcon(":/vertical/media/backtrack_on.svg");
+	QIcon replayInactiveIcon = QIcon(":/vertical/media/backtrack_off.svg");
 
-	QIcon virtualCamActiveIcon = QIcon(":/aitum/media/virtual_cam_on.svg");
-	QIcon virtualCamInactiveIcon = QIcon(":/aitum/media/virtual_cam_off.svg");
+	QIcon virtualCamActiveIcon = QIcon(":/vertical/media/virtual_cam_on.svg");
+	QIcon virtualCamInactiveIcon = QIcon(":/vertical/media/virtual_cam_off.svg");
 	QComboBox *scenesCombo = nullptr;
 	QCheckBox *linkedButton = nullptr;
 	CanvasScenesDock *scenesDock = nullptr;

@@ -52,8 +52,9 @@ extern "C" {
 
 #define SPACER_LABEL_MARGIN 6.0f
 
-/* Kept as in the original so scene collections made with it still load. */
-#define CANVAS_NAME "Aitum Vertical"
+/* Renamed from the original "Aitum Vertical"; shows up in OBS (multitrack
+ * extra canvas) and in the Outputs dock. */
+#define CANVAS_NAME "Meketreve Vertical"
 #define VERTICAL_CONFIG_FILE "vertical-canvas.json"
 
 inline std::list<CanvasDock *> canvas_docks;
@@ -660,25 +661,26 @@ static bool vertical_canvas_register_sources(void)
 	obs_register_source(&multi_canvas_source);
 
 	auto ph = obs_get_proc_handler();
-	proc_handler_add(ph, "void aitum_vertical_get_video(in int width, in int height, out ptr video)", get_video,
+	proc_handler_add(ph, "void meketreve_vertical_get_video(in int width, in int height, out ptr video)", get_video,
 			 nullptr);
-	proc_handler_add(ph, "void aitum_vertical_get_stream_settings(in int width, in int height, out ptr outputs)",
+	proc_handler_add(ph,
+			 "void meketreve_vertical_get_stream_settings(in int width, in int height, out ptr outputs)",
 			 get_stream_settings, nullptr);
-	proc_handler_add(ph, "void aitum_vertical_set_stream_settings(in int width, in int height, in ptr outputs)",
+	proc_handler_add(ph, "void meketreve_vertical_set_stream_settings(in int width, in int height, in ptr outputs)",
 			 set_stream_settings, nullptr);
 	proc_handler_add(
 		ph,
-		"void aitum_vertical_get_stream_output(in int width, in int height, in string name, out ptr output)",
+		"void meketreve_vertical_get_stream_output(in int width, in int height, in string name, out ptr output)",
 		get_stream_output, nullptr);
-	proc_handler_add(ph, "void aitum_vertical_start_stream_output(in int width, in int height, in string name)",
+	proc_handler_add(ph, "void meketreve_vertical_start_stream_output(in int width, in int height, in string name)",
 			 start_stream_output, nullptr);
-	proc_handler_add(ph, "void aitum_vertical_stop_stream_output(in int width, in int height, in string name)",
+	proc_handler_add(ph, "void meketreve_vertical_stop_stream_output(in int width, in int height, in string name)",
 			 stop_stream_output, nullptr);
-	proc_handler_add(ph, "void aitum_vertical_add_chapter(in int width, in int height, in string chapter_name)",
+	proc_handler_add(ph, "void meketreve_vertical_add_chapter(in int width, in int height, in string chapter_name)",
 			 add_chapter, nullptr);
-	proc_handler_add(ph, "void aitum_vertical_get_scene(in int width, in int height, out string scene)", get_scene,
-			 nullptr);
-	proc_handler_add(ph, "void aitum_vertical_switch_scene(in int width, in int height, in string scene)",
+	proc_handler_add(ph, "void meketreve_vertical_get_scene(in int width, in int height, out string scene)",
+			 get_scene, nullptr);
+	proc_handler_add(ph, "void meketreve_vertical_switch_scene(in int width, in int height, in string scene)",
 			 switch_scene, nullptr);
 
 	return true;
@@ -736,7 +738,7 @@ extern "C" void vertical_canvas_post_load(void)
 	obs_data_array_release(canvas);
 
 	if (!vendor) {
-		vendor = obs_websocket_register_vendor("aitum-vertical-canvas");
+		vendor = obs_websocket_register_vendor("meketreve-vertical-canvas");
 	}
 	if (!vendor) {
 		return;
@@ -2275,7 +2277,7 @@ static obs_source_t *CreateLabel(float pixelRatio, int i)
 
 	struct dstr name;
 	dstr_init(&name);
-	dstr_printf(&name, "Aitum Vertical Preview spacing label %d", i);
+	dstr_printf(&name, "Meketreve Vertical Preview spacing label %d", i);
 	OBSSource txtSource = obs_source_create_private(text_source_id, name.array, settings);
 	dstr_free(&name);
 	return txtSource;
@@ -8908,7 +8910,7 @@ void CanvasDock::save_load(obs_data_t *save_data, bool saving, void *param)
 void CanvasDock::LogScenes()
 {
 	blog(LOG_INFO, "------------------------------------------------");
-	blog(LOG_INFO, "[Aitum Vertical] Canvas '%s' scenes:", obs_canvas_get_name(canvas));
+	blog(LOG_INFO, "[Vertical Canvas] Canvas '%s' scenes:", obs_canvas_get_name(canvas));
 	if (scenesDock && scenesDock->sceneList) {
 		for (int j = 0; j < scenesDock->sceneList->count(); j++) {
 			auto item = scenesDock->sceneList->item(j);

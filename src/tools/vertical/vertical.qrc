@@ -1,5 +1,5 @@
 <RCC>
-  <qresource prefix="/aitum">
+  <qresource prefix="/vertical">
     <file>media/record.svg</file>
     <file>media/recording.svg</file>
     <file>media/stream.svg</file>
