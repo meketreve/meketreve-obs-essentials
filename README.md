@@ -26,7 +26,7 @@ required, though building locally on Linux is a one-liner (see
 A tab bar sits under the menu. Each tab remembers where every dock is:
 
 - **My layout** is the layout you had before installing the plugin, untouched.
-- **Live** shows the preview, Unified Chat, the audio mixer and the controls.
+- **Live** shows the preview, Unified Chat with Texuguito under it, the audio mixer and the controls.
 - **Build** shows the preview, scenes, sources, transitions and the mixer.
 - **+** makes a new tab from the current layout. Right-click a tab to rename or
   remove it, or to bring Live/Build back to their default layout.

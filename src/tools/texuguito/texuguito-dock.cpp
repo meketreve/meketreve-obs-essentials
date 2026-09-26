@@ -47,6 +47,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QUrl>
@@ -548,9 +550,18 @@ void texuguito_register(void)
 	}
 	auto *main = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	auto *dock = new TexuguitoDock(chat, main);
-	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("Texuguito.Title"), dock)) {
+	/* Scrolls instead of clipping lines when the dock is short (it sits
+	 * under the chat on the Live tab). */
+	auto *scroll = new QScrollArea(main);
+	scroll->setWidget(dock);
+	scroll->setWidgetResizable(true);
+	scroll->setFrameShape(QFrame::NoFrame);
+	scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	/* Only scroll up and down: keep the width the buttons need. */
+	scroll->setMinimumWidth(dock->minimumSizeHint().width() + scroll->verticalScrollBar()->sizeHint().width());
+	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("Texuguito.Title"), scroll)) {
 		obs_log(LOG_WARNING, "[texuguito] could not add dock");
-		delete dock;
+		delete scroll;
 		return;
 	}
 	g_dock = dock;

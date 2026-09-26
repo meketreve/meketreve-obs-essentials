@@ -48,6 +48,8 @@ namespace {
 
 constexpr const char *kPreviewDockId = "meketreve-main-canvas";
 constexpr const char *kChatDockId = "meketreve-unified-chat";
+/* A short strip under the chat on the Live tab. */
+constexpr int kSideSecondHeight = 270;
 constexpr const char *kProfileFile = "meketreve-tabs.json";
 constexpr const char *kGlobalFile = "tabs.json";
 constexpr int kGoToHotkeys = 9;
@@ -404,6 +406,13 @@ void TabsController::applyDockList(const QString &id, const QList<DockPlacement>
 			m_main->resizeDocks({side.first()},
 					    {side.first()->objectName() == QLatin1String(kChatDockId) ? 340 : 300},
 					    Qt::Horizontal);
+		/* The chat keeps the height; the dock below it (Texuguito) stays small.
+		 * Split the column's real height, or Qt scales both sizes down. */
+		if (side.size() == 2 && side.first()->objectName() == QLatin1String(kChatDockId)) {
+			const int column = side[0]->height() + side[1]->height();
+			m_main->resizeDocks(side, {std::max(200, column - kSideSecondHeight), kSideSecondHeight},
+					    Qt::Vertical);
+		}
 		if (!bottom.isEmpty())
 			m_main->resizeDocks({bottom.first()}, {220}, Qt::Vertical);
 		fillCentralSpace();

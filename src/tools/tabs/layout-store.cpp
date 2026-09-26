@@ -26,6 +26,7 @@ QList<DockPlacement> defaultDocks(const QString &fixedId)
 	if (fixedId == QLatin1String("live"))
 		return {{QStringLiteral("meketreve-main-canvas"), QStringLiteral("top")},
 			{QStringLiteral("meketreve-unified-chat"), QStringLiteral("right")},
+			{QStringLiteral("meketreve-texuguito"), QStringLiteral("right")},
 			{QStringLiteral("mixerDock"), QStringLiteral("bottom")},
 			{QStringLiteral("controlsDock"), QStringLiteral("bottom")}};
 	if (fixedId == QLatin1String("build"))
