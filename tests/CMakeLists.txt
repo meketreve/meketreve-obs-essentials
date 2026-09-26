@@ -112,3 +112,10 @@ target_compile_definitions(test-texuguito PRIVATE MEKETREVE_LOCALE_DIR="${CMAKE_
 target_link_libraries(test-texuguito PRIVATE chat-core Qt6::Test)
 set_target_properties(test-texuguito PROPERTIES AUTOMOC ON)
 add_test(NAME texuguito COMMAND test-texuguito)
+
+set(_updater "${CMAKE_SOURCE_DIR}/src/tools/updater")
+add_executable(test-updater test-updater.cpp ${_updater}/update-logic.cpp)
+target_include_directories(test-updater PRIVATE ${_updater})
+target_link_libraries(test-updater PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-updater PROPERTIES AUTOMOC ON)
+add_test(NAME updater COMMAND test-updater)

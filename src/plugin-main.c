@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/outputs/outputs.h"
 #include "tools/vertical/vertical.h"
 #include "tools/texuguito/texuguito.h"
+#include "tools/updater/updater.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -60,6 +61,7 @@ bool obs_module_load(void)
 	if (canvas_tools)
 		tabs_register();
 	config_share_register();
+	updater_register();
 
 	obs_log(LOG_INFO, "Meketreve OBS Essentials loaded (version %s)", PLUGIN_VERSION);
 	return true;

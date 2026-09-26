@@ -49,6 +49,11 @@ jobs:
               ;;
             workflow_dispatch)
               config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
+              # release.yaml starts the tag's build this way (a tag pushed with
+              # GITHUB_TOKEN starts no push run), so build it like a pushed tag.
+              if [[ "${GITHUB_REF_TYPE}" == 'tag' ]]; then
+                config_data=('codesign:true' 'notarize:true' 'package:true' 'config:Release')
+              fi
               ;;
             schedule)
               config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')

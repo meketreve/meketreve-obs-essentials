@@ -267,6 +267,21 @@ Confirm it loaded by checking the OBS log:
 
 CI produces a `.pkg`; it is built and uploaded but not regularly tested.
 
+## Updates
+
+When OBS starts, the plugin checks GitHub for a newer release and shows what
+changed, with **Update**, **Later** and **Skip this version**. **Update**
+downloads the package, checks it against the SHA-256 published with the
+release and installs it **after you close OBS** (never mid-stream):
+
+- **Windows:** runs the installer silently (plugin in `%ProgramData%\obs-studio\plugins`).
+- **Linux:** unpacks the `.deb` into the plugin folder in your home; a
+  system-wide install (`/usr`) asks for your password through `pkexec`.
+  Flatpak OBS only gets a link to the release page.
+- **macOS:** opens the `.pkg` in Installer.
+
+Check by hand or turn the startup check off in **Tools → Meketreve: Check for updates**.
+
 ## Language
 
 The UI ships with **English (en-US)** and **Portuguese (pt-BR)** strings, and
@@ -278,12 +293,15 @@ Everything builds in GitHub Actions:
 
 - **Any push** to `main` → builds all platforms and uploads artifacts:
   Windows `.zip` + installer `.exe`, Linux `.deb` / `.ddeb` / `.tar.xz`, macOS `.pkg`.
-- **Tag** like `1.0.0` → also creates a draft GitHub Release with those attached.
-
-```bash
-git tag 1.0.0
-git push origin 1.0.0
-```
+- **Releases** come from the **Release** workflow, run by hand once `main`
+  has been tested in OBS (Actions → Release → Run workflow, or
+  `gh workflow run release.yaml`; tick *dry run* to preview). It stops unless
+  the last CI run on `main` passed, and only releases when there is a
+  `feat:` (minor bump) or `fix:` (patch bump) commit since the last version
+  tag (`feat!:` / `fix!:` bump the major version). It updates
+  `buildspec.json`, tags with notes built from those commits and builds the
+  tag, which publishes the GitHub Release the updater picks up.
+  Preview locally: `python3 .github/scripts/next_release.py notes.md`.
 
 ## Adding a new tool
 

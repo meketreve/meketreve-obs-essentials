@@ -8,6 +8,8 @@ on:
       - 'release/**'
     tags:
       - '*'
+  # release.yaml starts the tag's run this way.
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -90,12 +92,24 @@ jobs:
 
       - name: Generate Checksums 🪪
         if: fromJSON(steps.check.outputs.validTag)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           : Generate Checksums 🪪
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
           shopt -s extglob
 
-          echo "### Checksums" > ${{ github.workspace }}/CHECKSUMS.txt
+          # The release notes are the annotated tag's message (release.yaml).
+          tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" --jq '.object.type + " " + .object.sha')"
+          if [[ "${tag_object}" == tag\ * ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object#tag }" --jq '.message' \
+              | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' > ${{ github.workspace }}/CHECKSUMS.txt
+            echo >> ${{ github.workspace }}/CHECKSUMS.txt
+          else
+            : > ${{ github.workspace }}/CHECKSUMS.txt
+          fi
+          # The plugin's updater reads this block to check its download.
+          echo "### Checksums" >> ${{ github.workspace }}/CHECKSUMS.txt
           for file in ${{ github.workspace }}/@(*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip); do
             echo "    ${file##*/}: $(sha256sum "${file}" | cut -d " " -f 1)" >> ${{ github.workspace }}/CHECKSUMS.txt
           done
@@ -105,7 +119,10 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
         with:
-          draft: true
+          # Published right away: the plugin's updater only sees published
+          # releases, and tags are cut after testing (release.yaml).
+          draft: false
+          make_latest: ${{ !fromJSON(steps.check.outputs.prerelease) }}
           prerelease: ${{ fromJSON(steps.check.outputs.prerelease) }}
           tag_name: ${{ steps.check.outputs.version }}
           name: ${{ needs.build-project.outputs.pluginName }} ${{ steps.check.outputs.version }}

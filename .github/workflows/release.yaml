@@ -1,0 +1,91 @@
+name: Release
+run-name: Release${{ inputs.dry_run && ' (dry run)' || '' }} 🏷️
+# Run by hand once main has been tested in OBS: it only releases when the
+# last CI run on main passed and there is a feat/fix commit since the last
+# version tag. It bumps buildspec.json, tags with the release notes and starts
+# the tag's build (push.yaml), which publishes the release the plugin's
+# updater picks up.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Só mostrar a versão e as notas, sem criar nada / Preview only
+        type: boolean
+        default: false
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: release
+jobs:
+  release:
+    name: Tag and build 🏷️
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check CI on main ☑️
+        run: |
+          : Check CI on main ☑️
+          sha="$(git rev-parse HEAD)"
+          result="$(gh run list --workflow push.yaml --branch main --commit "${sha}" --limit 1 \
+            --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')"
+          echo "CI for ${sha:0:9}: ${result:-none}"
+          if [[ "${result}" != 'completed success' ]]; then
+            echo "::error::The last commit on main (${sha:0:9}) has no passing CI run (${result:-none}); fix or wait for it first."
+            exit 1
+          fi
+
+      - name: Work out the version 🔢
+        id: next
+        run: |
+          : Work out the version 🔢
+          python3 .github/scripts/next_release.py "${RUNNER_TEMP}/notes.md" >> "${GITHUB_OUTPUT}"
+          {
+            echo '### Release preview'
+            python3 .github/scripts/next_release.py /dev/null 2>&1 | grep -- '->'
+            echo
+            cat "${RUNNER_TEMP}/notes.md"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Nothing to release 💤
+        if: steps.next.outputs.release != 'true'
+        run: |
+          echo "::notice::No feat or fix commit since ${{ steps.next.outputs.previous }}, so there is nothing to release."
+
+      - name: Tag ${{ steps.next.outputs.version }} 🏷️
+        if: steps.next.outputs.release == 'true' && !inputs.dry_run
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          : Tag 🏷️
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path("buildspec.json")
+          spec = json.loads(path.read_text(encoding="utf-8"))
+          spec["version"] = os.environ["VERSION"]
+          path.write_text(json.dumps(spec, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore(release): ${VERSION}"
+          git tag -a "${VERSION}" -F "${RUNNER_TEMP}/notes.md"
+          git push origin HEAD:main "refs/tags/${VERSION}"
+
+      - name: Build and publish 🚀
+        if: steps.next.outputs.release == 'true' && !inputs.dry_run
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          : Build and publish 🚀
+          # A tag pushed with GITHUB_TOKEN starts no push run: start it here.
+          gh workflow run push.yaml --ref "${VERSION}"
+          echo "::notice::Tagged ${VERSION}; the push run for the tag builds and publishes the release."
