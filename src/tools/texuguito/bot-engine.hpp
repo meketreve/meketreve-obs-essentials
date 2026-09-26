@@ -62,7 +62,6 @@ public:
 	 * its UI language. */
 	using TextFunction = std::function<QString(const char *key)>;
 
-	static constexpr int kClipCooldownSeconds = 60;
 	static constexpr int kTtsCost = 200;
 	static constexpr int kPointsTickSeconds = 60;
 	/* Without a viewer list (every platform but a logged-in Twitch), a
@@ -82,6 +81,12 @@ public:
 	void setText(TextFunction text) { m_text = std::move(text); }
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
+	/* Seconds between two sounds of the same price (per price folder); a
+	 * price without an entry uses defaultCooldownSeconds(). */
+	void setClipCooldowns(const QHash<int, int> &seconds) { m_cooldowns = seconds; }
+	int clipCooldownSeconds(int cost) const { return m_cooldowns.value(cost, defaultCooldownSeconds(cost)); }
+	static int defaultCooldownSeconds(int cost);
+	QList<int> clipCosts() const;
 	void setAudioDir(const QString &dir);
 	QString audioDir() const { return m_audioDir; }
 	int reloadClips();
@@ -105,8 +110,8 @@ public:
 	ViewerStore &viewers() { return m_viewers; }
 	CustomCommandStore &customCommands() { return m_custom; }
 	void setRaffleChooser(Raffle::Chooser chooser) { m_raffle = Raffle(std::move(chooser)); }
-	/* For tests: move the clip cooldown clock back. */
-	void resetClipCooldown() { m_lastClip.invalidate(); }
+	/* For tests: move the clip cooldown clocks back. */
+	void resetClipCooldown() { m_lastClip.clear(); }
 
 signals:
 	void reply(ChatPlatform platform, const QString &text);
@@ -153,7 +158,8 @@ private:
 	QList<Command> m_commands;
 	std::map<QString, AudioClip> m_clips;
 	QString m_audioDir;
-	QElapsedTimer m_lastClip;
+	QHash<int, QElapsedTimer> m_lastClip; /* by price */
+	QHash<int, int> m_cooldowns;
 	QElapsedTimer m_clock;
 	double m_volume = 1.0;
 	int m_listeners = 0;

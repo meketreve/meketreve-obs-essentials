@@ -65,6 +65,7 @@ private:
 	QString m_audioDir;
 	quint16 m_port = 8901;
 	double m_volume = 1.0;
+	QHash<int, int> m_cooldowns; /* price -> seconds */
 	bool m_enabled = true;
 	bool m_chattersDenied = false;
 	/* What the bot said lately: the same text coming back through the

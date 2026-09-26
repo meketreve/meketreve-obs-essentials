@@ -32,7 +32,7 @@
         {"pt": "!audios", "en": "!sounds", "also": ["!sons", "!audio"], "who": "all",
          "desc": {"pt": "Lista os sons e o preço de cada um.", "en": "Lists the sounds and what each one costs."}},
         {"pt": "!tocar <nome>", "en": "!play <name>", "also": ["!p"], "who": "all",
-         "desc": {"pt": "Toca um som, pagando o preço dele. Um som por minuto no canal todo.", "en": "Plays a sound for its price. One sound per minute for the whole channel."}},
+         "desc": {"pt": "Toca um som, pagando o preço dele. Cada preço tem sua espera: os sons baratos voltam antes dos caros (o streamer escolhe os tempos).", "en": "Plays a sound for its price. Each price has its own wait: cheap sounds come back sooner than expensive ones (the streamer picks the times)."}},
         {"pt": "!falar <mensagem>", "en": "!speak <message>", "who": "all",
          "desc": {"pt": "Lê a sua mensagem em voz alta por 200 pontos. <code>!falar</code> fala em português e <code>!speak</code> em inglês.",
                   "en": "Reads your message out loud for 200 points. <code>!speak</code> talks in English and <code>!falar</code> in Portuguese."}},

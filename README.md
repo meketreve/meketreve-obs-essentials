@@ -50,7 +50,10 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
   `!apelido` and `!dança`. Bits, Super Chats and TikTok gifts make them cheer.
 - **Points:** a point per minute in chat, spent on `!tocar <clip>` (clips in
   the audio folder, in subfolders named after their price, e.g.
-  `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points).
+  `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points). Each
+  price has its own wait between sounds, set in the dock's **Settings**
+  (defaults: up to 20 pts 10 s, up to 100 pts 30 s, up to 200 pts 60 s,
+  above that 120 s); a cheap sound can play right after an expensive one.
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
   `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
   the link to the [command list](https://meketreve.github.io/meketreve-obs-essentials/commands.html)

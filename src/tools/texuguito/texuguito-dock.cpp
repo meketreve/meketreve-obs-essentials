@@ -112,6 +112,7 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 
 	m_engine = new BotEngine(m_dataDir, m_audioDir, this);
 	m_engine->setVolume(m_volume);
+	m_engine->setClipCooldowns(m_cooldowns);
 	m_engine->setText([](const char *key) { return T(key); });
 	m_engine->setTts(
 		[this](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
@@ -232,6 +233,14 @@ void TexuguitoDock::loadSettings()
 	const QString audio = QString::fromUtf8(obs_data_get_string(data, "audioDir"));
 	if (!audio.isEmpty())
 		m_audioDir = audio;
+	obs_data_t *cooldowns = obs_data_get_obj(data, "cooldowns");
+	for (obs_data_item_t *item = obs_data_first(cooldowns); item; obs_data_item_next(&item)) {
+		bool ok = false;
+		const int cost = QString::fromUtf8(obs_data_item_get_name(item)).toInt(&ok);
+		if (ok)
+			m_cooldowns.insert(cost, static_cast<int>(obs_data_item_get_int(item)));
+	}
+	obs_data_release(cooldowns);
 	obs_data_release(data);
 }
 
@@ -242,6 +251,11 @@ void TexuguitoDock::saveSettings()
 	obs_data_set_int(data, "port", m_port);
 	obs_data_set_double(data, "volume", m_volume);
 	obs_data_set_string(data, "audioDir", m_engine->audioDir().toUtf8().constData());
+	obs_data_t *cooldowns = obs_data_create();
+	for (auto it = m_cooldowns.constBegin(); it != m_cooldowns.constEnd(); ++it)
+		obs_data_set_int(cooldowns, QByteArray::number(it.key()).constData(), it.value());
+	obs_data_set_obj(data, "cooldowns", cooldowns);
+	obs_data_release(cooldowns);
 	const QString path = QDir(m_dataDir).filePath(QStringLiteral("settings.json"));
 	obs_data_save_json_safe(data, path.toUtf8().constData(), "tmp", "bak");
 	obs_data_release(data);
@@ -483,6 +497,25 @@ void TexuguitoDock::openSettings()
 	auto *note = new QLabel(T("Texuguito.AudioHint"), &dialog);
 	note->setWordWrap(true);
 	layout->addWidget(note);
+
+	/* One wait per price folder that has sounds. */
+	QHash<int, QSpinBox *> cooldownSpins;
+	const QList<int> costs = m_engine->clipCosts();
+	if (!costs.isEmpty()) {
+		auto *cooldownForm = new QFormLayout();
+		auto *title =
+			new QLabel(QStringLiteral("<b>%1</b>").arg(T("Texuguito.Cooldowns").toHtmlEscaped()), &dialog);
+		layout->addWidget(title);
+		for (int cost : costs) {
+			auto *spin = new QSpinBox(&dialog);
+			spin->setRange(0, 3600);
+			spin->setSuffix(QStringLiteral(" s"));
+			spin->setValue(m_engine->clipCooldownSeconds(cost));
+			cooldownForm->addRow(T("Texuguito.CooldownPrice").arg(cost), spin);
+			cooldownSpins.insert(cost, spin);
+		}
+		layout->addLayout(cooldownForm);
+	}
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -493,6 +526,9 @@ void TexuguitoDock::openSettings()
 	const auto newPort = static_cast<quint16>(port->value());
 	m_volume = volume->value() / 100.0;
 	m_engine->setVolume(m_volume);
+	for (auto it = cooldownSpins.constBegin(); it != cooldownSpins.constEnd(); ++it)
+		m_cooldowns.insert(it.key(), it.value()->value());
+	m_engine->setClipCooldowns(m_cooldowns);
 	if (audio->text().trimmed() != m_engine->audioDir())
 		m_engine->setAudioDir(audio->text().trimmed());
 	if (newPort != m_port) {

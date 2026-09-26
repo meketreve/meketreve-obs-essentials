@@ -313,6 +313,28 @@ QSet<QString> BotEngine::reservedNames() const
 	return names;
 }
 
+int BotEngine::defaultCooldownSeconds(int cost)
+{
+	if (cost <= 20)
+		return 10;
+	if (cost <= 100)
+		return 30;
+	if (cost <= 200)
+		return 60;
+	return 120;
+}
+
+QList<int> BotEngine::clipCosts() const
+{
+	QList<int> costs;
+	for (const auto &entry : m_clips) {
+		if (!costs.contains(entry.second.cost))
+			costs.append(entry.second.cost);
+	}
+	std::sort(costs.begin(), costs.end());
+	return costs;
+}
+
 QString BotEngine::handleCustomCommand(const BotMessage &msg, const QString &name, const QStringList &args)
 {
 	QString response = m_custom.get(name);
@@ -595,18 +617,22 @@ void BotEngine::registerCommands()
 				 say(m.platform, t("Texuguito.Bot.PlayUsage"));
 				 return;
 			 }
-			 if (m_lastClip.isValid()) {
-				 const qint64 left = kClipCooldownSeconds * 1000LL - m_lastClip.elapsed();
-				 if (left > 0) {
-					 say(m.platform, t("Texuguito.Bot.Cooldown").arg(left / 1000 + 1));
-					 return;
-				 }
-			 }
 			 const QString name = args.join(QLatin1Char(' ')).toLower();
 			 const auto clip = m_clips.find(name);
 			 if (clip == m_clips.end()) {
 				 say(m.platform, t("Texuguito.Bot.AudioNotFound").arg(name));
 				 return;
+			 }
+			 /* Each price has its own wait: a cheap sound can play right
+			  * after an expensive one. */
+			 const int cost = clip->second.cost;
+			 const QElapsedTimer last = m_lastClip.value(cost);
+			 if (last.isValid()) {
+				 const qint64 left = clipCooldownSeconds(cost) * 1000LL - last.elapsed();
+				 if (left > 0) {
+					 say(m.platform, t("Texuguito.Bot.Cooldown").arg(cost).arg(left / 1000 + 1));
+					 return;
+				 }
 			 }
 			 if (m_listeners <= 0) {
 				 say(m.platform, t("Texuguito.Bot.NoOverlay"));
@@ -617,7 +643,7 @@ void BotEngine::registerCommands()
 				     t("Texuguito.Bot.PlayNoPoints").arg(clip->second.name).arg(clip->second.cost));
 				 return;
 			 }
-			 m_lastClip.start();
+			 m_lastClip[cost].start();
 			 emit overlayMessage(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio")},
 							 {QStringLiteral("url"), clip->second.url},
 							 {QStringLiteral("volume"), m_volume}});

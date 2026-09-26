@@ -234,7 +234,7 @@ private slots:
 			 QStringLiteral("audio"));
 
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar buzina alta")));
-		QVERIFY(replies(said).last().startsWith(QStringLiteral("⏳ Cooldown ativo!")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("⏳ Os sons de 10 pts estão em espera!")));
 
 		bot.resetClipCooldown();
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar buzina alta")));
@@ -245,6 +245,44 @@ private slots:
 
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!sons")));
 		QCOMPARE(replies(said).last(), QStringLiteral("🎵 Sons Disponíveis: [10 pts: buzina alta]"));
+	}
+
+	void cooldownPerPrice()
+	{
+		QTemporaryDir dir;
+		const QString audio = dir.filePath(QStringLiteral("audios"));
+		QDir().mkpath(audio + QStringLiteral("/20"));
+		QDir().mkpath(audio + QStringLiteral("/200"));
+		writeFile(audio + QStringLiteral("/20/pato.mp3"), "x");
+		writeFile(audio + QStringLiteral("/20/sino.mp3"), "x");
+		writeFile(audio + QStringLiteral("/200/trovao.mp3"), "x");
+		BotEngine bot(dir.path(), audio);
+		bot.setText(locale("pt-BR.ini"));
+		bot.setOverlayListeners(1);
+		bot.points().add(QStringLiteral("ana"), 1000);
+		QCOMPARE(bot.clipCosts(), (QList<int>{20, 200}));
+		QCOMPARE(bot.clipCooldownSeconds(20), 10);
+		QCOMPARE(bot.clipCooldownSeconds(200), 60);
+		QCOMPARE(bot.clipCooldownSeconds(500), 120);
+		QSignalSpy said(&bot, &BotEngine::reply);
+
+		/* An expensive sound does not hold back a cheap one... */
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar trovao")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: trovao")));
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar pato")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: pato")));
+		/* ...but the same price waits, even for another sound. */
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar sino")));
+		QVERIFY(replies(said).last().startsWith(
+			QStringLiteral("⏳ Os sons de 20 pts estão em espera! Aguarde mais 1")));
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar trovao")));
+		QVERIFY(replies(said).last().contains(QStringLiteral("Aguarde mais 6")));
+
+		/* The streamer's own wait replaces the default; 0 turns it off. */
+		bot.setClipCooldowns({{20, 0}});
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar sino")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: sino")));
+		QCOMPARE(bot.clipCooldownSeconds(200), 60);
 	}
 
 	void ttsChargesAndRefunds()
