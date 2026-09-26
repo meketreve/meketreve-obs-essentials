@@ -1474,40 +1474,6 @@ CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 	connect(configButton, SIGNAL(clicked()), this, SLOT(ConfigButtonClicked()));
 	buttonRow->addWidget(configButton);
 
-	auto aitumButtonGroupLayout = new QHBoxLayout();
-	aitumButtonGroupLayout->setContentsMargins(0, 0, 0, 0);
-	aitumButtonGroupLayout->setSpacing(0);
-
-	auto contributeButton = new QPushButton;
-	contributeButton->setMinimumHeight(30);
-	QPixmap pixmap(32, 32);
-	pixmap.fill(Qt::transparent);
-
-	QPainter painter(&pixmap);
-	QFont font = painter.font();
-	font.setPixelSize(32);
-	painter.setFont(font);
-	painter.drawText(pixmap.rect(), Qt::AlignCenter, "❤️");
-	contributeButton->setIcon(QIcon(pixmap));
-	contributeButton->setToolTip(QString::fromUtf8(obs_module_text("VerticalDonate")));
-	contributeButton->setStyleSheet(
-		QString::fromUtf8("QPushButton{ border-top-right-radius: 0; border-bottom-right-radius: 0;}"));
-	QPushButton::connect(contributeButton, &QPushButton::clicked,
-			     [] { QDesktopServices::openUrl(QUrl("https://aitum.tv/contribute")); });
-
-	aitumButtonGroupLayout->addWidget(contributeButton);
-
-	auto aitumButton = new QPushButton;
-	aitumButton->setMinimumHeight(30);
-	aitumButton->setIcon(QIcon(":/aitum/media/aitum.png"));
-	aitumButton->setToolTip(QString::fromUtf8("https://aitum.tv"));
-	aitumButton->setStyleSheet(
-		QString::fromUtf8("QPushButton{border-top-left-radius: 0; border-bottom-left-radius: 0;}"));
-	connect(aitumButton, &QPushButton::clicked, [] { QDesktopServices::openUrl(QUrl("https://aitum.tv")); });
-	aitumButtonGroupLayout->addWidget(aitumButton);
-
-	buttonRow->addLayout(aitumButtonGroupLayout);
-
 	setStyleSheet(QString::fromUtf8("QPushButton{padding-left: 4px; padding-right: 4px;}"));
 
 	mainLayout->addLayout(buttonRow);
