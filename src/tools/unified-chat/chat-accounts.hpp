@@ -84,6 +84,8 @@ public:
 	void sendMessage(ChatPlatform p, const QString &channel, const QString &text);
 	void timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds);
 	void banUser(ChatPlatform p, const QString &channel, const QString &userId);
+	/* Lifts a ban or a timeout (both platforms treat them the same). */
+	void unbanUser(ChatPlatform p, const QString &channel, const QString &userId);
 	void deleteMessage(ChatPlatform p, const QString &channel, const QString &messageId);
 
 	/* Logins in the Twitch channel's chat right now (Helix chatters; needs

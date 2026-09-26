@@ -627,6 +627,28 @@ void ChatAccounts::banUser(ChatPlatform p, const QString &channel, const QString
 	timeoutUser(p, channel, userId, 0);
 }
 
+void ChatAccounts::unbanUser(ChatPlatform p, const QString &channel, const QString &userId)
+{
+	withBroadcaster(p, channel, [this, p, userId](const QString &broadcaster) {
+		const auto report = [this, p](int, const QJsonObject &, const QString &error) {
+			if (!error.isEmpty())
+				emit actionFailed(p, error);
+		};
+		if (p == ChatPlatform::Twitch) {
+			QUrl url(QStringLiteral("https://api.twitch.tv/helix/moderation/bans"));
+			url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), broadcaster},
+					       {QStringLiteral("moderator_id"), account(p).userId},
+					       {QStringLiteral("user_id"), userId}});
+			api(p, "DELETE", url, QJsonObject(), report);
+		} else {
+			api(p, "DELETE", QUrl(QStringLiteral("https://api.kick.com/public/v1/moderation/bans")),
+			    QJsonObject{{QStringLiteral("broadcaster_user_id"), broadcaster.toLongLong()},
+					{QStringLiteral("user_id"), userId.toLongLong()}},
+			    report);
+		}
+	});
+}
+
 void ChatAccounts::deleteMessage(ChatPlatform p, const QString &channel, const QString &messageId)
 {
 	const auto report = [this, p](int, const QJsonObject &, const QString &error) {

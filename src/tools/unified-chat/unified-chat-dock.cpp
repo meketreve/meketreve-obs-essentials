@@ -667,6 +667,8 @@ void UnifiedChatDock::onAuthorClicked(const QUrl &url)
 		    QMessageBox::Yes)
 			m_accounts->banUser(msg.platform, channel, msg.userId);
 	});
+	menu.addAction(T("UnifiedChat.Unban"), this,
+		       [this, msg, channel]() { m_accounts->unbanUser(msg.platform, channel, msg.userId); });
 	QAction *del = menu.addAction(T("UnifiedChat.DeleteMessage"), this, [this, msg, channel]() {
 		m_accounts->deleteMessage(msg.platform, channel, msg.id);
 	});
