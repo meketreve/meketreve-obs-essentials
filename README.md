@@ -304,7 +304,8 @@ Everything builds in GitHub Actions:
   `gh workflow run release.yaml`; tick *dry run* to preview). It stops unless
   the last CI run on `main` passed, and only releases when there is a
   `feat:` (minor bump) or `fix:` (patch bump) commit since the last version
-  tag (`feat!:` / `fix!:` bump the major version). It updates
+  tag (`feat!:` / `fix!:` bump the major version); `refactor:` and `perf:`
+  commits are listed under *Other changes* but never trigger a release alone. It updates
   `buildspec.json`, tags with notes built from those commits and builds the
   tag, which publishes the GitHub Release the updater picks up.
   Preview locally: `python3 .github/scripts/next_release.py notes.md`.

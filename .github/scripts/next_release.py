@@ -3,8 +3,8 @@
 
 Conventional commit subjects decide it: "feat" bumps the minor version,
 "fix" the patch, and "!" before the colon (feat!:, fix(x)!:) the major one.
-Anything else (chore, docs, test, style, ci, refactor...) does not warrant a
-release on its own.
+"refactor" and "perf" go into the notes under "Other changes" but do not
+warrant a release on their own; chore, docs, test, style and ci stay out.
 
 Prints key=value lines for $GITHUB_OUTPUT (version, previous, release) and
 writes the release notes (Markdown) to the path given as the first argument.
@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SUBJECT = re.compile(r"^(?P<type>feat|fix)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<text>.+)$")
+SUBJECT = re.compile(r"^(?P<type>feat|fix|refactor|perf)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<text>.+)$")
 
 
 def git(*args: str) -> str:
@@ -48,7 +48,7 @@ def main() -> None:
     else:
         log = git("log", "--format=%H%x1f%s%x1f%b%x1e", f"{previous}..HEAD")
 
-    features, fixes, breaking = [], [], []
+    features, fixes, breaking, others = [], [], [], []
     for entry in filter(None, (e.strip() for e in log.split("\x1e"))):
         sha, subject, body = (entry.split("\x1f") + ["", ""])[:3]
         m = SUBJECT.match(subject.strip())
@@ -58,8 +58,12 @@ def main() -> None:
         line = f"- {scope}{m['text']} ({sha[:7]})"
         if m["bang"] or "BREAKING CHANGE" in body:
             breaking.append(line)
+        elif m["type"] == "feat":
+            features.append(line)
+        elif m["type"] == "fix":
+            fixes.append(line)
         else:
-            (features if m["type"] == "feat" else fixes).append(line)
+            others.append(line)
 
     level = "major" if breaking else "minor" if features else "patch" if fixes else None
     version = bump(previous, level) if level else ""
@@ -71,6 +75,8 @@ def main() -> None:
         sections.append("## ✨ Novidades / New\n" + "\n".join(features))
     if fixes:
         sections.append("## 🐛 Correções / Fixes\n" + "\n".join(fixes))
+    if others and level:
+        sections.append("## 🔧 Outras mudanças / Other changes\n" + "\n".join(others))
     notes = "\n\n".join(sections) + "\n"
     if notes_path:
         notes_path.write_text(notes, encoding="utf-8")
@@ -79,7 +85,7 @@ def main() -> None:
     print(f"version={version}")
     print(f"release={'true' if level else 'false'}")
     print(f"{previous} -> {version or '(no release)'}: {len(features)} feat, {len(fixes)} fix, "
-          f"{len(breaking)} breaking", file=sys.stderr)
+          f"{len(breaking)} breaking, {len(others)} other", file=sys.stderr)
 
 
 if __name__ == "__main__":
