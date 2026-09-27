@@ -140,6 +140,7 @@ private:
 	QUrl tokenUrl(ChatPlatform p) const;
 	void pollTwitchDevice();
 	bool listenForCallback(quint16 port);
+	void closeCallbackServers();
 	void onAuthCallback();
 	void refresh(ChatPlatform p, std::function<void(bool)> done);
 	void api(ChatPlatform p, const QByteArray &verb, const QUrl &url, const QJsonObject &body, Done done,
@@ -164,6 +165,10 @@ private:
 
 	/* Browser authorization in progress (Kick, or Twitch with a secret). */
 	QList<QTcpServer *> m_callbackServers;
+	/* A later login (or cancel) closes the servers itself; an older timer
+	 * must not close the new ones. */
+	quint64 m_callbackGeneration = 0;
+	static constexpr int kCallbackLingerMs = 60000;
 	ChatPlatform m_authPlatform = ChatPlatform::Kick;
 	QByteArray m_authVerifier; /* PKCE, Kick only */
 	QByteArray m_authState;

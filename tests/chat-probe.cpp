@@ -106,11 +106,22 @@ int main(int argc, char **argv)
 			const QString state = QUrlQuery(url).queryItemValue(QStringLiteral("state"));
 			const QString callback = p == ChatPlatform::Kick ? ChatAccounts::kickRedirectUri()
 									 : ChatAccounts::twitchRedirectUri() + '/';
-			net.get(QNetworkRequest(QUrl(callback + QStringLiteral("?code=fake-code&state=") + state)));
+			const QUrl back(callback + QStringLiteral("?code=fake-code&state=") + state);
+			net.get(QNetworkRequest(back));
+			/* Browsers may load the redirect twice: it must still answer. */
+			QTimer::singleShot(1500, &net, [&out, &net, back]() {
+				QNetworkReply *again = net.get(QNetworkRequest(back));
+				QObject::connect(again, &QNetworkReply::finished, again, [&out, again]() {
+					out << "[second visit] HTTP "
+					    << again->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ' '
+					    << again->errorString() << Qt::endl;
+					again->deleteLater();
+				});
+			});
 		});
 		QObject::connect(&accounts, &ChatAccounts::loginFailed, [&out, &app](ChatPlatform, const QString &e) {
 			out << "[login failed] " << e << Qt::endl;
-			app.exit(3);
+			QTimer::singleShot(3000, &app, [&app]() { app.exit(3); });
 		});
 		QObject::connect(&accounts, &ChatAccounts::accountChanged, [&out, &accounts, &app, p](ChatPlatform) {
 			if (accounts.account(p).loggedIn()) {

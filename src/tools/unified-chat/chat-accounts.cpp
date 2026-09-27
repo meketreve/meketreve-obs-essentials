@@ -216,13 +216,19 @@ void ChatAccounts::cancelLogin()
 {
 	m_devicePoll.stop();
 	m_deviceCode.clear();
+	closeCallbackServers();
+	m_authVerifier.clear();
+	m_authState.clear();
+}
+
+void ChatAccounts::closeCallbackServers()
+{
+	m_callbackGeneration++;
 	for (QTcpServer *s : m_callbackServers) {
 		s->close();
 		s->deleteLater();
 	}
 	m_callbackServers.clear();
-	m_authVerifier.clear();
-	m_authState.clear();
 }
 
 void ChatAccounts::post(const QUrl &url, const QByteArray &form, Done done)
@@ -379,14 +385,25 @@ void ChatAccounts::onAuthCallback()
 					      "Content-Length: " +
 					      QByteArray::number(isCallback ? page.size() : 0) + "\r\n\r\n" +
 					      (isCallback ? page : QByteArray()));
+				/* Delete only once the page is out: deleting right away
+				 * dropped it, the browser saw an empty reply and retried. */
+				connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
 				socket->disconnectFromHost();
-				socket->deleteLater();
 				if (!isCallback || m_authState.isEmpty())
 					return;
 
 				const QByteArray verifier = m_authVerifier;
 				const bool stateOk = state.toLatin1() == m_authState;
-				cancelLogin();
+				/* Done with the code, but browsers may load the redirect twice
+				 * (Kick redirects from script): keep answering "you can close
+				 * this tab" for a while instead of refusing the connection. */
+				m_authVerifier.clear();
+				m_authState.clear();
+				QTimer::singleShot(kCallbackLingerMs, this,
+						   [this, generation = m_callbackGeneration]() {
+							   if (generation == m_callbackGeneration)
+								   closeCallbackServers();
+						   });
 				if (!denied.isEmpty() || code.isEmpty() || !stateOk) {
 					emit loginFailed(p, !denied.isEmpty() ? denied
 							    : stateOk         ? QStringLiteral("no code in the answer")
