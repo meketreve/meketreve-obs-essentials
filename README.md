@@ -177,12 +177,19 @@ sending.
     URLs, paste its *Client ID* and *Client Secret* (the Secret field is
     optional on Twitch) and click **Log in**: the browser opens Twitch's
     login and comes back to OBS, no code to type.
-- **Kick:** only apps with a secret can log in, and a plugin cannot ship a
-  secret, so you create your own app once (free): go to
-  [kick.com/settings/developer](https://kick.com/settings/developer) → create an app with Redirect URL `http://localhost:53682/callback` and the
-  scopes *user:read, channel:read, chat:write, moderation:ban,
-  moderation:chat_message:manage*. Paste its *Client ID* and *Client Secret*
-  and click **Log in**; the browser opens Kick's login and comes back to OBS.
+- **Kick:** nothing to set up either. Click **Log in** in Unified Chat → Settings
+  → Kick; the browser opens Kick's login and comes back to OBS. Kick has no
+  public apps (every token request needs the app's secret), so the plugin's
+  Kick app keeps its secret on the project's server
+  ([`server/kick-oauth`](server/kick-oauth)): the plugin logs in with PKCE and
+  sends only the one-time code (or the refresh token) there, the server adds
+  the secret, asks Kick and returns the answer. It logs nothing it receives.
+  - **Want your own Kick app instead?** At
+    [kick.com/settings/developer](https://kick.com/settings/developer) create
+    an app with Redirect URL `http://localhost:53682/callback` and the scopes
+    *user:read, channel:read, chat:write, moderation:ban,
+    moderation:chat_message:manage*; paste its *Client ID* and *Client
+    Secret* and the plugin talks to Kick directly.
 
 Tokens are kept as plain text in the plugin's config folder
 (`chat-accounts.json`, readable only by your user). Use **Log out** to revoke

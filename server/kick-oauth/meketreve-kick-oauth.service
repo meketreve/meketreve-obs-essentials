@@ -1,0 +1,27 @@
+[Unit]
+Description=Kick OAuth token exchange for Meketreve OBS Essentials
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/meketreve-kick-oauth/kick_token_proxy.py
+# KICK_CLIENT_ID and KICK_CLIENT_SECRET; root-only file, read by systemd.
+EnvironmentFile=/etc/meketreve-kick-oauth.env
+DynamicUser=yes
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

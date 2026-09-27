@@ -1,0 +1,13 @@
+# HTTPS (Let's Encrypt) in front of the token exchange. Replace the host name
+# with your own domain if you point one at this server.
+{$KICK_OAUTH_HOST:204-216-150-248.sslip.io} {
+	handle /kick/token {
+		reverse_proxy 127.0.0.1:8787
+	}
+	handle /health {
+		reverse_proxy 127.0.0.1:8787
+	}
+	handle {
+		respond "Meketreve OBS Essentials" 404
+	}
+}

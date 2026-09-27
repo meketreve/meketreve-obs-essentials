@@ -558,29 +558,30 @@ void UnifiedChatDock::addAccountRows(QFormLayout *form, QWidget *dialog)
 {
 	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
 		const PlatformInfo &info = kPlatformInfo[indexOf(p)];
-		/* An empty Client ID on Twitch means the plugin's own app. */
+		/* An empty Client ID means the plugin's own app. */
 		const QString defaultId = ChatAccounts::defaultClientId(p);
 		const QString currentId = m_accounts->account(p).clientId;
 		auto *clientId = new QLineEdit(currentId == defaultId ? QString() : currentId, dialog);
 		clientId->setPlaceholderText(defaultId.isEmpty() ? T("UnifiedChat.ClientId")
 								 : T("UnifiedChat.ClientIdDefault"));
-		/* Required on Kick; on Twitch only for a confidential app. */
-		const bool secretRequired = p == ChatPlatform::Kick;
+		/* A secret goes with a user's own Kick app (Kick has no public
+		 * clients); on Twitch only with a confidential app. */
+		const bool kick = p == ChatPlatform::Kick;
 		auto *secret = new QLineEdit(m_accounts->account(p).clientSecret, dialog);
 		secret->setEchoMode(QLineEdit::Password);
-		secret->setPlaceholderText(secretRequired ? T("UnifiedChat.ClientSecret")
-							  : T("UnifiedChat.ClientSecretOptional"));
+		secret->setPlaceholderText(T("UnifiedChat.ClientSecretOptional"));
 		auto *status = new QLabel(dialog);
 		auto *button = new QPushButton(dialog);
 
-		const auto refresh = [this, p, status, button, clientId, secret, secretRequired, defaultId]() {
+		const auto refresh = [this, p, status, button, clientId, secret, kick, defaultId]() {
 			const ChatAccount &a = m_accounts->account(p);
 			status->setText(a.loggedIn() ? T("UnifiedChat.LoggedInAs").arg(a.login)
 						     : T("UnifiedChat.LoggedOut"));
 			button->setText(a.loggedIn() ? T("UnifiedChat.LogOut") : T("UnifiedChat.LogIn"));
-			button->setEnabled(a.loggedIn() ||
-					   ((!defaultId.isEmpty() || !clientId->text().trimmed().isEmpty()) &&
-					    (!secretRequired || !secret->text().trimmed().isEmpty())));
+			const QString id = clientId->text().trimmed();
+			const bool ownKickApp = kick && !id.isEmpty() && id != defaultId;
+			button->setEnabled(a.loggedIn() || ((!defaultId.isEmpty() || !id.isEmpty()) &&
+							    (!ownKickApp || !secret->text().trimmed().isEmpty())));
 		};
 		refresh();
 		connect(clientId, &QLineEdit::textChanged, dialog, refresh);
@@ -595,7 +596,7 @@ void UnifiedChatDock::addAccountRows(QFormLayout *form, QWidget *dialog)
 				return;
 			}
 			m_accounts->setClient(p, clientId->text(), secret->text());
-			if (p == ChatPlatform::Kick)
+			if (p == ChatPlatform::Kick && !m_accounts->account(p).clientSecret.isEmpty())
 				QMessageBox::information(
 					dialog, T("UnifiedChat.LogIn"),
 					T("UnifiedChat.KickLoginHint").arg(ChatAccounts::kickRedirectUri()));

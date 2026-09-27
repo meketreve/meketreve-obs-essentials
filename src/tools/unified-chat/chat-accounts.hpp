@@ -76,7 +76,8 @@ public:
 	/* Same port as the old texuguito bot, so its Twitch app works as is. */
 	static constexpr quint16 kTwitchRedirectPort = 17563;
 	static QString twitchRedirectUri();
-	/* The plugin's public Twitch app, used while the user sets none. */
+	/* The plugin's own app (Twitch public, Kick through the token server),
+	 * used while the user sets none. */
 	static QString defaultClientId(ChatPlatform p);
 
 	ChatAccounts(const QString &storePath, QObject *parent = nullptr);
@@ -136,6 +137,7 @@ private:
 	void save();
 	void finishLogin(ChatPlatform p, const QJsonObject &token);
 	void fetchIdentity(ChatPlatform p);
+	QUrl tokenUrl(ChatPlatform p) const;
 	void pollTwitchDevice();
 	bool listenForCallback(quint16 port);
 	void onAuthCallback();

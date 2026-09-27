@@ -40,6 +40,10 @@ const char *const kTwitchScopes =
 	"user:read:chat user:write:chat moderator:manage:banned_users moderator:manage:chat_messages "
 	"moderator:read:followers moderator:read:chatters";
 const char *const kTwitchClientId = "r61r2wwuew4j0e8uohmwif5022r4bc";
+/* Kick has no public clients: the plugin's app keeps its secret on the
+ * project's server (server/kick-oauth), which adds it to token requests. */
+const char *const kKickClientId = "01M3G2KSP604PWBG4X8Y3JMNF2";
+const char *const kKickTokenProxy = "https://204-216-150-248.sslip.io/kick/token";
 const char *const kKickScopes = "user:read channel:read chat:write moderation:ban moderation:chat_message:manage";
 
 size_t slot(ChatPlatform p)
@@ -73,7 +77,7 @@ QString ChatAccounts::kickRedirectUri()
 
 QString ChatAccounts::defaultClientId(ChatPlatform p)
 {
-	return p == ChatPlatform::Twitch ? QString::fromLatin1(kTwitchClientId) : QString();
+	return QString::fromLatin1(p == ChatPlatform::Twitch ? kTwitchClientId : kKickClientId);
 }
 
 QString ChatAccounts::twitchRedirectUri()
@@ -107,8 +111,19 @@ bool ChatAccounts::canLogIn(ChatPlatform p) const
 {
 	const ChatAccount &a = account(p);
 	if (p == ChatPlatform::Kick)
-		return !a.clientId.isEmpty() && !a.clientSecret.isEmpty();
+		return !a.clientId.isEmpty() && (!a.clientSecret.isEmpty() || a.clientId == defaultClientId(p));
 	return p == ChatPlatform::Twitch && !a.clientId.isEmpty();
+}
+
+QUrl ChatAccounts::tokenUrl(ChatPlatform p) const
+{
+	if (p == ChatPlatform::Twitch)
+		return QUrl(QStringLiteral("https://id.twitch.tv/oauth2/token"));
+	/* The plugin's own Kick app goes through the server that holds its secret. */
+	const ChatAccount &a = account(p);
+	if (a.clientSecret.isEmpty() && a.clientId == defaultClientId(p))
+		return QUrl(QString::fromLatin1(kKickTokenProxy));
+	return QUrl(QStringLiteral("https://id.kick.com/oauth/token"));
 }
 
 bool ChatAccounts::usesRedirect(ChatPlatform p) const
@@ -381,16 +396,15 @@ void ChatAccounts::onAuthCallback()
 				const ChatAccount &a = account(p);
 				QList<QPair<QString, QString>> form{{QStringLiteral("code"), code},
 								    {QStringLiteral("client_id"), a.clientId},
-								    {QStringLiteral("client_secret"), a.clientSecret},
 								    {QStringLiteral("redirect_uri"),
 								     kick ? kickRedirectUri() : twitchRedirectUri()},
 								    {QStringLiteral("grant_type"),
 								     QStringLiteral("authorization_code")}};
+				if (!a.clientSecret.isEmpty())
+					form.append({QStringLiteral("client_secret"), a.clientSecret});
 				if (kick)
 					form.append({QStringLiteral("code_verifier"), QString::fromLatin1(verifier)});
-				post(QUrl(kick ? QStringLiteral("https://id.kick.com/oauth/token")
-					       : QStringLiteral("https://id.twitch.tv/oauth2/token")),
-				     OAuthUtil::formBody(form),
+				post(tokenUrl(p), OAuthUtil::formBody(form),
 				     [this, p](int, const QJsonObject &body, const QString &error) {
 					     if (!error.isEmpty())
 						     emit loginFailed(p, error);
@@ -455,12 +469,12 @@ void ChatAccounts::refresh(ChatPlatform p, std::function<void(bool)> done)
 	QList<QPair<QString, QString>> form{{QStringLiteral("grant_type"), QStringLiteral("refresh_token")},
 					    {QStringLiteral("refresh_token"), a.refreshToken},
 					    {QStringLiteral("client_id"), a.clientId}};
-	/* Kick always has a secret; Twitch only for a confidential app. */
+	/* A user's own Kick app, or a confidential Twitch app, sends its secret;
+	 * the plugin's Kick app gets it added by the token server. */
 	if (!a.clientSecret.isEmpty())
 		form.append({QStringLiteral("client_secret"), a.clientSecret});
-	post(QUrl(p == ChatPlatform::Twitch ? QStringLiteral("https://id.twitch.tv/oauth2/token")
-					    : QStringLiteral("https://id.kick.com/oauth/token")),
-	     OAuthUtil::formBody(form), [this, p, done](int, const QJsonObject &body, const QString &error) {
+	post(tokenUrl(p), OAuthUtil::formBody(form),
+	     [this, p, done](int, const QJsonObject &body, const QString &error) {
 		     if (!error.isEmpty() || body.value(QStringLiteral("access_token")).toString().isEmpty()) {
 			     /* The refresh token is dead too: the user must log in again. */
 			     ChatAccount &a = acc(p);
