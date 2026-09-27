@@ -300,10 +300,12 @@ void TexuguitoDock::refreshStatus()
 							     .arg(T("Texuguito.NoChannels").toHtmlEscaped()));
 
 	QStringList parts;
-	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::Kick}) {
+	for (ChatPlatform p : ChatAccounts::loginPlatforms()) {
 		const bool ok = m_chat->accounts()->account(p).loggedIn() && !m_chat->target(p).trimmed().isEmpty();
-		parts.append(QStringLiteral("%1 %2").arg(p == ChatPlatform::Twitch ? QStringLiteral("Twitch")
-										   : QStringLiteral("Kick"),
+		const char *name = p == ChatPlatform::Twitch    ? "Twitch"
+				   : p == ChatPlatform::YouTube ? "YouTube"
+								: "Kick";
+		parts.append(QStringLiteral("%1 %2").arg(QLatin1String(name),
 							 ok ? QStringLiteral("✔") : QStringLiteral("✖")));
 	}
 	m_replies->setText(T("Texuguito.Replies").arg(parts.join(QStringLiteral(" · "))));

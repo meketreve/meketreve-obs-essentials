@@ -88,6 +88,10 @@ public:
 	/* Same port as the old texuguito bot, so its Twitch app works as is. */
 	static constexpr quint16 kTwitchRedirectPort = 17563;
 	static QString twitchRedirectUri();
+	/* Google "desktop app" clients accept any loopback port. */
+	static constexpr quint16 kYouTubeRedirectPort = 53683;
+	static QString youtubeRedirectUri();
+	static QString redirectUri(ChatPlatform p);
 	/* The plugin's own app (Twitch public, Kick through the token server),
 	 * used while the user sets none. */
 	static QString defaultClientId(ChatPlatform p);
@@ -96,7 +100,15 @@ public:
 	~ChatAccounts() override;
 
 	const ChatAccount &account(ChatPlatform p) const;
-	static bool supports(ChatPlatform p) { return p == ChatPlatform::Twitch || p == ChatPlatform::Kick; }
+	static bool supports(ChatPlatform p)
+	{
+		return p == ChatPlatform::Twitch || p == ChatPlatform::YouTube || p == ChatPlatform::Kick;
+	}
+	/* The platforms you can log in to, in the order the UI lists them. */
+	static std::array<ChatPlatform, 3> loginPlatforms()
+	{
+		return {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick};
+	}
 	bool canLogIn(ChatPlatform p) const;
 	/* Twitch with a client secret logs in through the browser redirect
 	 * instead of the device code. */
@@ -158,6 +170,10 @@ private:
 	void finishLogin(ChatPlatform p, const QJsonObject &token);
 	void fetchIdentity(ChatPlatform p);
 	QUrl tokenUrl(ChatPlatform p) const;
+	/* This account's live (or next) broadcast: video id and live chat id. */
+	void
+	youtubeBroadcast(std::function<void(const QString &videoId, const QString &chatId, const QString &error)> done);
+	void youtubeCategories(std::function<void(const QList<StreamCategory> &all, const QString &error)> done);
 	void pollTwitchDevice();
 	bool listenForCallback(quint16 port);
 	void closeCallbackServers();
@@ -175,7 +191,11 @@ private:
 
 	QString m_storePath;
 	QNetworkAccessManager m_net;
-	std::array<ChatAccount, 2> m_accounts;    /* Twitch, Kick */
+	std::array<ChatAccount, 3> m_accounts; /* Twitch, Kick, YouTube */
+	/* YouTube lifts a ban by the ban's id: user channel id -> ban id, for
+	 * bans made since OBS started. */
+	QHash<QString, QString> m_youtubeBans;
+	QList<StreamCategory> m_youtubeCategories;
 	QHash<QString, QString> m_broadcasterIds; /* "t:login" / "k:slug" -> id */
 
 	/* Twitch device flow in progress. */

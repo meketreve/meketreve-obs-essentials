@@ -93,8 +93,9 @@ int main(int argc, char **argv)
 	 * runs the login flow; for Kick and Twitch with a secret the browser
 	 * step is simulated by calling the local callback with a made-up code. */
 	if (platform.startsWith(QLatin1String("login-"))) {
-		const ChatPlatform p = platform == QLatin1String("login-kick") ? ChatPlatform::Kick
-									       : ChatPlatform::Twitch;
+		const ChatPlatform p = platform == QLatin1String("login-kick")      ? ChatPlatform::Kick
+				       : platform == QLatin1String("login-youtube") ? ChatPlatform::YouTube
+										    : ChatPlatform::Twitch;
 		ChatAccounts accounts(QDir::tempPath() + QStringLiteral("/chat-probe-accounts.json"));
 		accounts.setClient(p, args[2], args.size() > 3 ? args[3] : QString());
 		QTextStream out(stdout);
@@ -104,8 +105,8 @@ int main(int argc, char **argv)
 		QObject::connect(&accounts, &ChatAccounts::openBrowser, [&out, &net, p](const QUrl &url) {
 			out << "[browser] " << url.toString() << Qt::endl;
 			const QString state = QUrlQuery(url).queryItemValue(QStringLiteral("state"));
-			const QString callback = p == ChatPlatform::Kick ? ChatAccounts::kickRedirectUri()
-									 : ChatAccounts::twitchRedirectUri() + '/';
+			const QString callback = p == ChatPlatform::Twitch ? ChatAccounts::twitchRedirectUri() + '/'
+									   : ChatAccounts::redirectUri(p);
 			const QUrl back(callback + QStringLiteral("?code=fake-code&state=") + state);
 			net.get(QNetworkRequest(back));
 			/* Browsers may load the redirect twice: it must still answer. */

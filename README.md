@@ -64,8 +64,8 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
   `!falar` speaks Portuguese, `!speak` English and `!tts` the language of OBS.
 
 It reads every platform set up in Unified Chat. Replies go back to the
-platform the command came from when you are logged in there (Twitch and Kick,
-see [Chat login](#chat-login)); YouTube and TikTok viewers can use the
+platform the command came from when you are logged in there (Twitch, YouTube
+and Kick, see [Chat login](#chat-login)); TikTok viewers can use the
 commands, but the bot cannot answer them. With a Twitch login as the
 broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
@@ -158,8 +158,10 @@ Without logging in the chat is read-only and nothing is sent to any platform.
 #### Stream info
 
 **Docks → Stream info** sets the stream **title** and **category/game** on
-every logged-in platform at once (Twitch and Kick; YouTube and TikTok do not
-allow it through their APIs). It opens with what is live now; search a
+every logged-in platform at once (Twitch, YouTube and Kick; TikTok does not
+allow it through its API). On YouTube it applies to the live broadcast (or
+the next scheduled one) and the category is the video category: YouTube's
+game title cannot be set through the API. It opens with what is live now; search a
 category, pick it, and the same name is looked up on each platform (a
 platform without it keeps its category). Untick a platform to leave it out.
 It needs the Twitch `channel:manage:broadcast` and Kick `channel:write`
@@ -167,14 +169,17 @@ permissions: log out and in again once after updating.
 
 #### Chat login
 
-Logging in to Twitch and/or Kick adds a message box under the chat (send to
+Logging in to Twitch, YouTube and/or Kick adds a message box under the chat (send to
 one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
 ban, unban / lift timeout, delete message. On Twitch it also brings follows
 into Activity (you must be the broadcaster or a moderator), and the **Viewers**
 button lists who is in chat (broadcaster or moderator) and who is banned
 (broadcaster only), with timeout, ban and unban right there; Kick, YouTube and
-TikTok do not offer these lists. YouTube stays read-only and TikTok has no
-sending.
+TikTok do not offer these lists. On YouTube, sending and moderation go to your
+own live broadcast's chat and each costs 50 of the 10,000 daily API units
+(about 200 actions a day); reading the chat costs nothing. YouTube lifts a
+ban by its id, so unban works for bans made from OBS since it started.
+TikTok has no sending.
 
 - **Twitch:** nothing to set up. Click **Log in** in Unified Chat → Settings →
   Twitch; OBS shows a code and opens twitch.tv/activate, approve it there. The
@@ -187,6 +192,10 @@ sending.
     URLs, paste its *Client ID* and *Client Secret* (the Secret field is
     optional on Twitch) and click **Log in**: the browser opens Twitch's
     login and comes back to OBS, no code to type.
+- **YouTube:** nothing to set up. Click **Log in** in Unified Chat → Settings
+  → YouTube; the browser opens Google's login (it may warn that Google has
+  not verified the app yet: *Advanced → Go to…*) and comes back to OBS. The
+  plugin's Google app keeps its secret on the same server as Kick's.
 - **Kick:** nothing to set up either. Click **Log in** in Unified Chat → Settings
   → Kick; the browser opens Kick's login and comes back to OBS. Kick has no
   public apps (every token request needs the app's secret), so the plugin's

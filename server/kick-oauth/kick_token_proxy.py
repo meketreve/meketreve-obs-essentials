@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-"""Kick OAuth token exchange for Meketreve OBS Essentials.
+"""OAuth token exchange for Meketreve OBS Essentials (Kick and Google).
 
-Kick only issues tokens to requests that carry the app's client secret, and a
-plugin cannot hide one. The plugin does the authorization itself (PKCE, with
-the browser coming back to http://localhost:53682/callback) and sends the
-code, or a refresh token, here; this adds the client id and secret and
-forwards the request to Kick, and nowhere else.
+Kick and Google only issue tokens to requests that carry the app's client
+secret, and the plugin's source is public. The plugin does the authorization
+itself (PKCE, the browser coming back to a loopback address) and sends the
+code, or a refresh token, to /kick/token or /google/token; this adds that
+app's client id and secret and forwards the request to that provider's token
+endpoint, and nowhere else.
 
 Standard library only. Listens on 127.0.0.1 (Caddy in front does HTTPS).
 Configuration comes from the environment:
-  KICK_CLIENT_ID, KICK_CLIENT_SECRET   the app's credentials
-  LISTEN_PORT                          default 8787
-  RATE_PER_MINUTE                      requests per client IP, default 20
-Nothing it receives or returns (codes, tokens) is logged.
+  KICK_CLIENT_ID, KICK_CLIENT_SECRET       Kick app
+  GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   Google "desktop app" client (YouTube)
+  LISTEN_PORT                              default 8787
+  RATE_PER_MINUTE                          requests per client IP, default 20
+A provider without credentials answers 404. Nothing it receives or returns
+(codes, tokens) is logged.
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -25,12 +29,25 @@ import urllib.request
 from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-KICK_TOKEN_URL = "https://id.kick.com/oauth/token"
-REDIRECT_URI = "http://localhost:53682/callback"
 MAX_BODY = 8 * 1024
 
-CLIENT_ID = os.environ.get("KICK_CLIENT_ID", "")
-CLIENT_SECRET = os.environ.get("KICK_CLIENT_SECRET", "")
+# path -> token endpoint, credentials and the redirect URIs the plugin uses.
+PROVIDERS = {
+    "/kick/token": {
+        "token_url": "https://id.kick.com/oauth/token",
+        "client_id": os.environ.get("KICK_CLIENT_ID", ""),
+        "client_secret": os.environ.get("KICK_CLIENT_SECRET", ""),
+        "redirect": re.compile(r"http://localhost:53682/callback"),
+    },
+    "/google/token": {
+        "token_url": "https://oauth2.googleapis.com/token",
+        "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
+        "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+        # Desktop clients may use any loopback port.
+        "redirect": re.compile(r"http://(127\.0\.0\.1|localhost):\d{2,5}(/callback)?"),
+    },
+}
+PROVIDERS = {path: p for path, p in PROVIDERS.items() if p["client_id"] and p["client_secret"]}
 PORT = int(os.environ.get("LISTEN_PORT", "8787"))
 RATE = int(os.environ.get("RATE_PER_MINUTE", "20"))
 
@@ -53,31 +70,27 @@ def allowed(ip: str) -> bool:
         return True
 
 
-def upstream_form(fields: dict[str, str]) -> dict[str, str] | None:
-    """What goes to Kick, or None when the request is not one we forward."""
+def upstream_form(provider: dict, fields: dict[str, str]) -> dict[str, str] | None:
+    """What goes to the provider, or None when the request is not one we forward."""
     grant = fields.get("grant_type")
+    credentials = {"client_id": provider["client_id"], "client_secret": provider["client_secret"]}
     if grant == "authorization_code":
         if not fields.get("code") or not fields.get("code_verifier"):
             return None
-        if fields.get("redirect_uri") != REDIRECT_URI:
+        redirect = fields.get("redirect_uri", "")
+        if not provider["redirect"].fullmatch(redirect):
             return None
         return {
             "grant_type": grant,
             "code": fields["code"],
             "code_verifier": fields["code_verifier"],
-            "redirect_uri": REDIRECT_URI,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
+            "redirect_uri": redirect,
+            **credentials,
         }
     if grant == "refresh_token":
         if not fields.get("refresh_token"):
             return None
-        return {
-            "grant_type": grant,
-            "refresh_token": fields["refresh_token"],
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-        }
+        return {"grant_type": grant, "refresh_token": fields["refresh_token"], **credentials}
     return None
 
 
@@ -108,7 +121,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(404, {"error": "not_found"})
 
     def do_POST(self):
-        if self.path != "/kick/token":
+        provider = PROVIDERS.get(self.path)
+        if provider is None:
             self.reply(404, {"error": "not_found"})
             return
         if not allowed(self.client_ip()):
@@ -119,12 +133,12 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(400, {"error": "invalid_request"})
             return
         fields = {k: v[0] for k, v in urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8", "replace")).items()}
-        form = upstream_form(fields)
+        form = upstream_form(provider, fields)
         if form is None:
             self.reply(400, {"error": "invalid_request"})
             return
         req = urllib.request.Request(
-            KICK_TOKEN_URL,
+            provider["token_url"],
             data=urllib.parse.urlencode(form).encode(),
             headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json",
                      "User-Agent": "meketreve-obs-essentials-oauth"},
@@ -137,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(err.code, err.read() or b"{}")
         except (urllib.error.URLError, TimeoutError):
             self.reply(502, {"error": "upstream_unreachable"})
-        print(f"{grant_label(form)} -> done", file=sys.stderr, flush=True)
+        print(f"{self.path} {grant_label(form)} -> done", file=sys.stderr, flush=True)
 
 
 def grant_label(form: dict[str, str]) -> str:
@@ -145,10 +159,10 @@ def grant_label(form: dict[str, str]) -> str:
 
 
 def main() -> None:
-    if not CLIENT_ID or not CLIENT_SECRET:
-        sys.exit("KICK_CLIENT_ID and KICK_CLIENT_SECRET must be set")
+    if not PROVIDERS:
+        sys.exit("set KICK_CLIENT_ID/KICK_CLIENT_SECRET and/or GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"listening on 127.0.0.1:{PORT}", file=sys.stderr, flush=True)
+    print(f"listening on 127.0.0.1:{PORT} for {', '.join(sorted(PROVIDERS))}", file=sys.stderr, flush=True)
     server.serve_forever()
 
 

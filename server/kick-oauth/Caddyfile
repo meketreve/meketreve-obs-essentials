@@ -4,6 +4,9 @@
 	handle /kick/token {
 		reverse_proxy 127.0.0.1:8787
 	}
+	handle /google/token {
+		reverse_proxy 127.0.0.1:8787
+	}
 	handle /health {
 		reverse_proxy 127.0.0.1:8787
 	}
