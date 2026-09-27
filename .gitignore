@@ -30,3 +30,6 @@
 
 # Generated site
 /site/_site
+
+# Python bytecode
+__pycache__/
