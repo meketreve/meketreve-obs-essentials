@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR" class="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidade · Meketreve OBS Essentials</title>
+%%ICON%%
+<meta name="description" content="Política de privacidade do Meketreve OBS Essentials. Privacy policy of Meketreve OBS Essentials.">
+<style>
+%%STYLE%%
+.doc { max-width: 780px; }
+.doc h2 { font-size: 21px; margin: 26px 0 8px; }
+.doc p, .doc li { color: var(--fg); }
+.doc ul { margin: 6px 0 12px; }
+.updated { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <b><a href="index.html" style="color: inherit; text-decoration: none">Meketreve OBS Essentials</a></b>
+  <div class="lang" role="group" aria-label="Language">
+    <button id="btn-pt" aria-pressed="true">PT</button>
+    <button id="btn-en" aria-pressed="false">EN</button>
+  </div>
+</header>
+
+<main class="doc">
+
+<div lang="pt-BR">
+<h1>Política de privacidade</h1>
+<p class="updated">Última atualização: 27 de setembro de 2026</p>
+
+<p>O <b>Meketreve OBS Essentials</b> é um plugin gratuito e de código aberto para o OBS Studio (<a href="https://github.com/meketreve/meketreve-obs-essentials">código-fonte</a>). Ele roda no seu computador, dentro do OBS. Esta política explica que dados o plugin acessa, para quê, onde eles ficam e com quem são compartilhados.</p>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Não temos contas de usuário, anúncios, análises nem rastreamento.</li>
+  <li>Não vendemos, alugamos nem compartilhamos dados de ninguém.</li>
+  <li>Os logins nas plataformas (Twitch, YouTube, Kick) ficam salvos só no seu computador.</li>
+  <li>O plugin só age nas suas contas quando você usa um recurso dele (enviar mensagem, moderar, mudar o título da live).</li>
+</ul>
+
+<h2>Dados do YouTube e do Google</h2>
+<p>Se você escolher <b>Entrar</b> no YouTube em Chat Unificado → Configurar, o plugin pede ao Google a permissão <code>https://www.googleapis.com/auth/youtube</code> (gerenciar a sua conta do YouTube). Com ela, e só quando você usa o recurso correspondente, o plugin:</p>
+<ul>
+  <li><b>lê o ID e o nome do seu canal</b>, para mostrar em qual conta você entrou e para o bot não responder às próprias mensagens;</li>
+  <li><b>lê a sua transmissão ao vivo (ou a próxima agendada)</b>: ID, título, categoria e o ID do chat ao vivo, para saber onde enviar mensagens e o que mostrar no painel Informações da live;</li>
+  <li><b>muda o título e a categoria</b> dessa transmissão quando você clica em Atualizar no painel Informações da live (o resto da descrição do vídeo é mantido como está);</li>
+  <li><b>envia mensagens</b> no chat da sua transmissão quando você escreve pela caixa do Chat Unificado, ou quando o bot Texuguito, que você ligou, responde a um comando;</li>
+  <li><b>silencia, bane, desbane e apaga mensagens</b> no chat da sua transmissão quando você escolhe essas ações no menu do nome de alguém.</li>
+</ul>
+<p>O plugin não lê os seus vídeos, inscrições, histórico, e-mail, contatos nem nenhum outro dado da sua conta Google, e não publica nada sem uma ação sua ou do bot que você configurou. A leitura das mensagens do chat é feita pela página pública do chat ao vivo do YouTube, sem usar o seu login.</p>
+<p>O uso e a transferência, para qualquer outro app, de informações recebidas das APIs do Google seguem a <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de dados do usuário dos serviços de API do Google</a>, incluindo os requisitos de Uso limitado. Ao usar os recursos do YouTube você também concorda com os <a href="https://www.youtube.com/t/terms">Termos de Serviço do YouTube</a> e a <a href="https://policies.google.com/privacy">Política de Privacidade do Google</a>.</p>
+
+<h2>Twitch e Kick</h2>
+<p>Da mesma forma, ao entrar na Twitch ou no Kick o plugin lê o seu nome e ID de usuário, lê e muda o título e a categoria da sua transmissão, envia mensagens, modera o chat e, na Twitch, lê a lista de quem está no chat, a lista de banidos e os novos seguidores, sempre para mostrar no OBS ou fazer o que você pediu.</p>
+
+<h2>Onde os dados ficam</h2>
+<ul>
+  <li><b>Tokens de acesso</b> (os logins) ficam num arquivo na pasta de configuração do plugin, no seu computador, legível só pelo seu usuário do sistema. Nós não recebemos nem guardamos esses tokens.</li>
+  <li>Mensagens do chat, pontos e avatares do bot Texuguito ficam na mesma pasta, no seu computador.</li>
+  <li>Nada disso é enviado para servidores nossos.</li>
+</ul>
+
+<h2>O servidor de troca de login</h2>
+<p>O Google e o Kick só entregam o login a pedidos que levem a chave secreta do app, e o código do plugin é público. Por isso, na hora de entrar (e ao renovar o login), o plugin envia o código de autorização de uso único, ou o token de renovação, ao nosso servidor (<code>204-216-150-248.sslip.io</code>). Ele acrescenta a chave do app, repassa o pedido ao Google ou ao Kick e devolve a resposta ao seu OBS. Esse servidor <b>não grava nem registra</b> códigos, tokens ou qualquer dado da sua conta; ele só guarda, por um minuto e na memória, quantos pedidos cada endereço de IP fez, para limitar abusos. O <a href="https://github.com/meketreve/meketreve-obs-essentials/tree/main/server/kick-oauth">código do servidor</a> é público.</p>
+
+<h2>Outros serviços usados pelo plugin</h2>
+<ul>
+  <li><b>Texto para voz</b> (<code>!falar</code>, <code>!speak</code>, <code>!tts</code>): o texto da mensagem é enviado ao serviço de voz do Google Tradutor para gerar o áudio.</li>
+  <li><b>Chat do TikTok</b>: a conexão é assinada pelo serviço Euler Stream, que recebe o nome do canal do TikTok que você configurou.</li>
+  <li><b>Atualizações</b>: ao abrir o OBS, o plugin consulta a página de releases do projeto no GitHub para ver se há versão nova.</li>
+</ul>
+
+<h2>Como remover o acesso</h2>
+<ul>
+  <li>Em Chat Unificado → Configurar, clique <b>Sair</b> na plataforma: o plugin apaga o login do seu computador e, no YouTube e na Twitch, pede à plataforma para revogar o token.</li>
+  <li>Você também pode revogar a qualquer momento em <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> (Google), nas conexões da sua conta da Twitch ou nas configurações do Kick.</li>
+  <li>Desinstalar o plugin e apagar a pasta de configuração dele remove todos os dados locais.</li>
+</ul>
+
+<h2>Crianças</h2>
+<p>O plugin é uma ferramenta para quem faz transmissões e não é voltado a menores de 13 anos.</p>
+
+<h2>Mudanças e contato</h2>
+<p>Mudanças nesta política aparecem nesta página, com a data acima. Dúvidas ou pedidos: abra uma <a href="https://github.com/meketreve/meketreve-obs-essentials/issues">issue no GitHub</a>.</p>
+</div>
+
+<div lang="en">
+<h1>Privacy policy</h1>
+<p class="updated">Last updated: September 27, 2026</p>
+
+<p><b>Meketreve OBS Essentials</b> is a free, open-source plugin for OBS Studio (<a href="https://github.com/meketreve/meketreve-obs-essentials">source code</a>). It runs on your computer, inside OBS. This policy explains what data the plugin accesses, what for, where it is kept and who it is shared with.</p>
+
+<h2>Summary</h2>
+<ul>
+  <li>We have no user accounts, ads, analytics or tracking.</li>
+  <li>We do not sell, rent or share anyone's data.</li>
+  <li>Your platform logins (Twitch, YouTube, Kick) are stored only on your computer.</li>
+  <li>The plugin only acts on your accounts when you use one of its features (sending a message, moderating, changing the stream title).</li>
+</ul>
+
+<h2>YouTube and Google data</h2>
+<p>If you choose <b>Log in</b> for YouTube under Unified Chat → Settings, the plugin asks Google for the <code>https://www.googleapis.com/auth/youtube</code> permission (manage your YouTube account). With it, and only when you use the matching feature, the plugin:</p>
+<ul>
+  <li><b>reads your channel ID and name</b>, to show which account you are logged in with and so the bot does not answer its own messages;</li>
+  <li><b>reads your live broadcast (or the next scheduled one)</b>: its ID, title, category and live chat ID, to know where to send messages and what to show in the Stream info dock;</li>
+  <li><b>changes that broadcast's title and category</b> when you click Update in the Stream info dock (the rest of the video's description is kept as it is);</li>
+  <li><b>sends messages</b> to your broadcast's chat when you type in the Unified Chat box, or when the Texuguito bot, which you turned on, answers a command;</li>
+  <li><b>times out, bans, unbans and deletes messages</b> in your broadcast's chat when you pick those actions from someone's name menu.</li>
+</ul>
+<p>The plugin does not read your videos, subscriptions, history, email, contacts or any other Google account data, and it posts nothing without an action from you or from the bot you set up. Chat messages are read from YouTube's public live chat page, without your login.</p>
+<p>Meketreve OBS Essentials' use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. By using the YouTube features you also agree to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a> and the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>
+
+<h2>Twitch and Kick</h2>
+<p>In the same way, when you log in to Twitch or Kick the plugin reads your user name and ID, reads and changes your stream's title and category, sends messages, moderates the chat and, on Twitch, reads the list of people in chat, the ban list and new followers, always to show them in OBS or to do what you asked.</p>
+
+<h2>Where the data stays</h2>
+<ul>
+  <li><b>Access tokens</b> (the logins) are kept in a file in the plugin's configuration folder on your computer, readable only by your system user. We never receive or store these tokens.</li>
+  <li>Chat messages and the Texuguito bot's points and avatars are kept in the same folder, on your computer.</li>
+  <li>None of it is sent to our servers.</li>
+</ul>
+
+<h2>The login exchange server</h2>
+<p>Google and Kick only hand out a login to requests that carry the app's secret key, and the plugin's code is public. So when you log in (and when the login is renewed) the plugin sends the one-time authorization code, or the refresh token, to our server (<code>204-216-150-248.sslip.io</code>). It adds the app's key, forwards the request to Google or Kick and returns the answer to your OBS. The server <b>does not store or log</b> codes, tokens or any account data; it only keeps in memory, for one minute, how many requests each IP address made, to limit abuse. The <a href="https://github.com/meketreve/meketreve-obs-essentials/tree/main/server/kick-oauth">server's code</a> is public.</p>
+
+<h2>Other services the plugin uses</h2>
+<ul>
+  <li><b>Text to speech</b> (<code>!falar</code>, <code>!speak</code>, <code>!tts</code>): the message text is sent to Google Translate's speech service to make the audio.</li>
+  <li><b>TikTok chat</b>: the connection is signed by the Euler Stream service, which receives the TikTok channel name you set.</li>
+  <li><b>Updates</b>: when OBS starts, the plugin checks the project's releases on GitHub for a newer version.</li>
+</ul>
+
+<h2>How to remove access</h2>
+<ul>
+  <li>Under Unified Chat → Settings, click <b>Log out</b> for the platform: the plugin deletes the login from your computer and, on YouTube and Twitch, asks the platform to revoke the token.</li>
+  <li>You can also revoke it at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> (Google), in your Twitch account's connections or in Kick's settings.</li>
+  <li>Uninstalling the plugin and deleting its configuration folder removes all local data.</li>
+</ul>
+
+<h2>Children</h2>
+<p>The plugin is a tool for streamers and is not aimed at children under 13.</p>
+
+<h2>Changes and contact</h2>
+<p>Changes to this policy appear on this page, with the date above. Questions or requests: open an <a href="https://github.com/meketreve/meketreve-obs-essentials/issues">issue on GitHub</a>.</p>
+</div>
+
+</main>
+
+<footer>
+  <p><a href="index.html">Meketreve OBS Essentials</a></p>
+</footer>
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  function setLang(lang) {
+    root.className = lang === 'en' ? 'en' : 'pt';
+    root.lang = lang === 'en' ? 'en' : 'pt-BR';
+    document.title = (lang === 'en' ? 'Privacy policy' : 'Política de privacidade') + ' · Meketreve OBS Essentials';
+    document.getElementById('btn-pt').setAttribute('aria-pressed', String(lang !== 'en'));
+    document.getElementById('btn-en').setAttribute('aria-pressed', String(lang === 'en'));
+    try { localStorage.setItem('lang', lang); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('lang'); } catch (e) {}
+  var asked = (location.hash || '').replace('#', '');
+  setLang(asked === 'en' || asked === 'pt' ? asked : (saved || (navigator.language && navigator.language.indexOf('pt') === 0 ? 'pt' : 'en')));
+  document.getElementById('btn-pt').onclick = function () { setLang('pt'); };
+  document.getElementById('btn-en').onclick = function () { setLang('en'); };
+})();
+</script>
+</body>
+</html>

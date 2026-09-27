@@ -110,6 +110,14 @@ def commands_page(lang: str) -> str:
     return page
 
 
+def privacy_page() -> str:
+    index = (HERE / "index.template.html").read_text(encoding="utf-8")
+    style = index[index.index("<style>") + len("<style>") : index.index("</style>")].strip("\n")
+    icon = next(line for line in index.splitlines() if line.startswith('<link rel="icon"'))
+    page = (HERE / "privacy.template.html").read_text(encoding="utf-8")
+    return page.replace("%%STYLE%%", style).replace("%%ICON%%", icon)
+
+
 def main() -> None:
     out = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "_site"
     cards = [
@@ -123,6 +131,7 @@ def main() -> None:
     (out / "index.html").write_text(page, encoding="utf-8")
     (out / "comandos.html").write_text(commands_page("pt"), encoding="utf-8")
     (out / "commands.html").write_text(commands_page("en"), encoding="utf-8")
+    (out / "privacy.html").write_text(privacy_page(), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     print(f"site written to {out}")
 
