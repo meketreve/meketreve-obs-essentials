@@ -170,9 +170,11 @@ private:
 	void finishLogin(ChatPlatform p, const QJsonObject &token);
 	void fetchIdentity(ChatPlatform p);
 	QUrl tokenUrl(ChatPlatform p) const;
-	/* This account's live (or next) broadcast: video id and live chat id. */
+	/* This account's live broadcast (or, with orUpcoming, the next one):
+	 * video id and live chat id. */
 	void
-	youtubeBroadcast(std::function<void(const QString &videoId, const QString &chatId, const QString &error)> done);
+	youtubeBroadcast(bool orUpcoming,
+			 std::function<void(const QString &videoId, const QString &chatId, const QString &error)> done);
 	void youtubeCategories(std::function<void(const QList<StreamCategory> &all, const QString &error)> done);
 	void pollTwitchDevice();
 	bool listenForCallback(quint16 port);

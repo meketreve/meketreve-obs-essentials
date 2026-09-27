@@ -672,10 +672,13 @@ void ChatAccounts::withBroadcaster(ChatPlatform p, const QString &channel, std::
 	    });
 }
 
-void ChatAccounts::youtubeBroadcast(std::function<void(const QString &, const QString &, const QString &)> done)
+void ChatAccounts::youtubeBroadcast(bool orUpcoming,
+				    std::function<void(const QString &, const QString &, const QString &)> done)
 {
-	/* The stream being run from this account: live now, else the next one
-	 * (the always-there "stream now" broadcast shows up as upcoming). */
+	/* The stream being run from this account: live now, else (for title and
+	 * category, which you set before going live) the next one; the
+	 * always-there "stream now" broadcast shows up as upcoming. Chat goes
+	 * only to a live one: an upcoming broadcast's chat is seen by nobody. */
 	const auto lookFor = [this, done](const QString &status, std::function<void()> otherwise) {
 		api(ChatPlatform::YouTube, "GET",
 		    youtubeUrl(QStringLiteral("liveBroadcasts"),
@@ -701,7 +704,11 @@ void ChatAccounts::youtubeBroadcast(std::function<void(const QString &, const QS
 				 QString());
 		    });
 	};
-	lookFor(QStringLiteral("active"), [lookFor, done]() {
+	lookFor(QStringLiteral("active"), [lookFor, done, orUpcoming]() {
+		if (!orUpcoming) {
+			done(QString(), QString(), QStringLiteral("you are not live on YouTube right now"));
+			return;
+		}
 		lookFor(QStringLiteral("upcoming"), [done]() {
 			done(QString(), QString(),
 			     QStringLiteral("no live or upcoming stream on this YouTube channel"));
@@ -741,7 +748,7 @@ void ChatAccounts::sendMessage(ChatPlatform p, const QString &channel, const QSt
 {
 	if (p == ChatPlatform::YouTube) {
 		/* Into this account's own live chat, whatever channel the dock reads. */
-		youtubeBroadcast([this, text](const QString &, const QString &chatId, const QString &error) {
+		youtubeBroadcast(false, [this, text](const QString &, const QString &chatId, const QString &error) {
 			if (!error.isEmpty() || chatId.isEmpty()) {
 				emit actionFailed(ChatPlatform::YouTube,
 						  error.isEmpty() ? QStringLiteral("no live chat") : error);
@@ -798,8 +805,8 @@ void ChatAccounts::timeoutUser(ChatPlatform p, const QString &channel, const QSt
 			       ActionDone done)
 {
 	if (p == ChatPlatform::YouTube) {
-		youtubeBroadcast([this, userId, seconds, done](const QString &, const QString &chatId,
-							       const QString &error) {
+		youtubeBroadcast(false, [this, userId, seconds, done](const QString &, const QString &chatId,
+								      const QString &error) {
 			if (!error.isEmpty() || chatId.isEmpty()) {
 				const QString e = error.isEmpty() ? QStringLiteral("no live chat") : error;
 				emit actionFailed(ChatPlatform::YouTube, e);
@@ -1010,7 +1017,7 @@ void ChatAccounts::streamInfo(ChatPlatform p, std::function<void(const StreamInf
 {
 	/* Always the logged-in account's own channel: that is the stream you run. */
 	if (p == ChatPlatform::YouTube) {
-		youtubeBroadcast([this, done](const QString &videoId, const QString &, const QString &error) {
+		youtubeBroadcast(true, [this, done](const QString &videoId, const QString &, const QString &error) {
 			if (!error.isEmpty()) {
 				done({}, error);
 				return;
@@ -1102,8 +1109,8 @@ void ChatAccounts::updateStreamInfo(ChatPlatform p, const QString &title, const 
 	if (p == ChatPlatform::YouTube) {
 		/* videos.update replaces the whole snippet: send back what is there,
 		 * with the new title and category. */
-		youtubeBroadcast([this, title, categoryId, done](const QString &videoId, const QString &,
-								 const QString &error) {
+		youtubeBroadcast(true, [this, title, categoryId, done](const QString &videoId, const QString &,
+								       const QString &error) {
 			if (!error.isEmpty()) {
 				done(error);
 				return;
