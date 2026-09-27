@@ -416,6 +416,48 @@ private slots:
 		QCOMPARE(BotData::hatNames(false), BotData::hats());
 	}
 
+	void sameNameOnTwoPlatformsIsOneAvatar()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+		const auto drawnNames = [&bot]() {
+			QStringList names;
+			for (const QJsonValue v : bot.snapshot().value(QStringLiteral("viewers")).toArray())
+				names.append(v.toObject().value(QStringLiteral("username")).toString());
+			names.sort();
+			return names;
+		};
+
+		/* Twitch Ana is in the viewer list (quiet); Kick Ana chats afterwards. */
+		bot.setTwitchChatters({QStringLiteral("ana")});
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("oi do kick"), ChatPlatform::Kick));
+		bot.handleMessage(msg(QStringLiteral("Bia"), QStringLiteral("oi"), ChatPlatform::Kick));
+		QCOMPARE(drawnNames(), (QStringList{QStringLiteral("ana"), QStringLiteral("kick:bia")}));
+		/* No "joined" was ever sent for the second Ana. */
+		for (const QList<QVariant> &args : overlay)
+			QVERIFY(args.at(0).toJsonObject().value(QStringLiteral("username")).toString() !=
+				QLatin1String("kick:ana"));
+
+		/* A dance from the Kick Ana moves the one avatar there is. */
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!dança"), ChatPlatform::Kick));
+		const QJsonObject last = overlay.last().at(0).toJsonObject();
+		QCOMPARE(last.value(QStringLiteral("username")).toString(), QStringLiteral("ana"));
+		QVERIFY(last.value(QStringLiteral("viewer"))
+				.toObject()
+				.value(QStringLiteral("dance_remaining"))
+				.toDouble() > 0);
+
+		/* When the Twitch Ana leaves, the Kick one takes the avatar over. */
+		bot.setTwitchChatters({});
+		QCOMPARE(drawnNames(), (QStringList{QStringLiteral("kick:ana"), QStringLiteral("kick:bia")}));
+		QCOMPARE(overlay.at(overlay.size() - 2).at(0).toJsonObject().value(QStringLiteral("type")).toString(),
+			 QStringLiteral("left"));
+		QCOMPARE(overlay.last().at(0).toJsonObject().value(QStringLiteral("username")).toString(),
+			 QStringLiteral("kick:ana"));
+	}
+
 	void raffle()
 	{
 		QTemporaryDir dir;

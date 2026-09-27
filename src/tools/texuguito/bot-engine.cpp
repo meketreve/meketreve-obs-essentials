@@ -165,7 +165,12 @@ void BotEngine::say(ChatPlatform platform, const QString &text)
 QJsonObject BotEngine::viewerPayload(const QString &key)
 {
 	const Viewer &v = m_viewers.getOrCreate(key);
-	const Status status = m_status.value(key);
+	Status status = m_status.value(key);
+	/* !dança or a gift from the same name on another platform animates this avatar. */
+	for (const QString &twin : presentTwins(baseName(key))) {
+		status.dancingUntil = std::max(status.dancingUntil, m_status.value(twin).dancingUntil);
+		status.cheerUntil = std::max(status.cheerUntil, m_status.value(twin).cheerUntil);
+	}
 	const qint64 now = m_clock.elapsed();
 	const auto remaining = [now](qint64 until) {
 		return std::max<qint64>(0, until - now) / 1000.0;
@@ -189,12 +194,27 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 			   {QStringLiteral("cheer_remaining"), remaining(status.cheerUntil)}};
 }
 
-void BotEngine::viewerEvent(const QString &type, const QString &key)
+QString BotEngine::baseName(const QString &key)
 {
-	/* The overlay only knows present viewers; an update for an absent one
-	 * would draw an avatar that never gets a "left". */
-	if (type != QLatin1String("left") && !m_status.value(key).present)
-		return;
+	return key.mid(key.indexOf(QLatin1Char(':')) + 1);
+}
+
+QStringList BotEngine::presentTwins(const QString &base) const
+{
+	QList<std::pair<qint64, QString>> found;
+	for (auto it = m_status.constBegin(); it != m_status.constEnd(); ++it) {
+		if (it->present && baseName(it.key()) == base)
+			found.append({it->presentSince, it.key()});
+	}
+	std::sort(found.begin(), found.end());
+	QStringList keys;
+	for (const auto &f : found)
+		keys.append(f.second);
+	return keys;
+}
+
+void BotEngine::emitAvatar(const QString &type, const QString &key)
+{
 	emit overlayMessage(
 		QJsonObject{{QStringLiteral("type"), type},
 			    {QStringLiteral("username"), key},
@@ -202,13 +222,38 @@ void BotEngine::viewerEvent(const QString &type, const QString &key)
 			     type == QLatin1String("left") ? QJsonValue() : QJsonValue(viewerPayload(key))}});
 }
 
+void BotEngine::syncAvatar(const QString &key)
+{
+	const QString base = baseName(key);
+	const QStringList twins = presentTwins(base);
+	const QString wanted = twins.isEmpty() ? QString() : twins.first();
+	QString drawn;
+	for (const QString &k : std::as_const(m_drawn)) {
+		if (baseName(k) == base) {
+			drawn = k;
+			break;
+		}
+	}
+	if (drawn == wanted) {
+		if (!wanted.isEmpty())
+			emitAvatar(QStringLiteral("updated"), wanted);
+		return;
+	}
+	if (!drawn.isEmpty()) {
+		m_drawn.remove(drawn);
+		emitAvatar(QStringLiteral("left"), drawn);
+	}
+	if (!wanted.isEmpty()) {
+		m_drawn.insert(wanted);
+		emitAvatar(QStringLiteral("joined"), wanted);
+	}
+}
+
 QJsonObject BotEngine::snapshot()
 {
 	QJsonArray present;
-	for (auto it = m_status.constBegin(); it != m_status.constEnd(); ++it) {
-		if (it->present)
-			present.append(viewerPayload(it.key()));
-	}
+	for (const QString &key : std::as_const(m_drawn))
+		present.append(viewerPayload(key));
 	return QJsonObject{{QStringLiteral("type"), QStringLiteral("snapshot")}, {QStringLiteral("viewers"), present}};
 }
 
@@ -221,7 +266,9 @@ void BotEngine::refreshPresence()
 		if (present == s.present)
 			continue;
 		s.present = present;
-		viewerEvent(present ? QStringLiteral("joined") : QStringLiteral("left"), it.key());
+		if (present)
+			s.presentSince = now;
+		syncAvatar(it.key());
 	}
 }
 
@@ -262,7 +309,7 @@ void BotEngine::handleCheer(ChatPlatform platform, const QString &user)
 	Status &s = m_status[key];
 	s.platform = platform;
 	s.cheerUntil = m_clock.elapsed() + kCheerMs;
-	viewerEvent(QStringLiteral("updated"), key);
+	syncAvatar(key);
 }
 
 void BotEngine::handleMessage(const BotMessage &msg)
@@ -277,8 +324,10 @@ void BotEngine::handleMessage(const BotMessage &msg)
 	s.isSub = msg.isSub;
 	s.isBroadcaster = msg.isBroadcaster;
 	s.lastSeen = std::max<qint64>(1, m_clock.elapsed());
+	if (!s.present)
+		s.presentSince = s.lastSeen;
 	s.present = true;
-	viewerEvent(QStringLiteral("updated"), key);
+	syncAvatar(key);
 
 	const auto [name, args] = BotText::parseInvocation(msg.text, msg.isReply);
 	if (name.isEmpty())
@@ -463,7 +512,7 @@ void BotEngine::playTts(const BotMessage &msg, const QString &key, const QString
 void BotEngine::registerCommands()
 {
 	const auto updated = [this](const QString &key) {
-		viewerEvent(QStringLiteral("updated"), key);
+		syncAvatar(key);
 	};
 
 	m_commands = {

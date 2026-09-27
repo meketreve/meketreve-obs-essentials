@@ -126,6 +126,7 @@ private:
 		bool present = false;
 		bool inChatters = false;
 		qint64 lastSeen = 0;
+		qint64 presentSince = 0; /* who got the avatar first among same-name viewers */
 		qint64 dancingUntil = 0;
 		qint64 cheerUntil = 0;
 	};
@@ -142,7 +143,13 @@ private:
 	void say(ChatPlatform platform, const QString &text);
 	QString t(const char *key) const { return m_text ? m_text(key) : QString::fromLatin1(key); }
 	bool english() const { return t("Texuguito.Bot.Language") == QLatin1String("en"); }
-	void viewerEvent(const QString &type, const QString &key);
+	/* One avatar per name: the same name on two platforms (ana and
+	 * kick:ana) is drawn once, by whoever showed up first; the other takes
+	 * over when that one leaves. Call after any change to key's status. */
+	void syncAvatar(const QString &key);
+	void emitAvatar(const QString &type, const QString &key);
+	static QString baseName(const QString &key);
+	QStringList presentTwins(const QString &base) const;
 	QJsonObject viewerPayload(const QString &key);
 	QString displayName(const QString &key);
 	bool privileged(const BotMessage &msg) const { return msg.isMod || msg.isBroadcaster; }
@@ -155,6 +162,7 @@ private:
 	CustomCommandStore m_custom;
 	Raffle m_raffle;
 	QHash<QString, Status> m_status;
+	QSet<QString> m_drawn; /* keys the overlay currently shows */
 	QList<Command> m_commands;
 	std::map<QString, AudioClip> m_clips;
 	QString m_audioDir;
