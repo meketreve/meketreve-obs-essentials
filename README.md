@@ -155,6 +155,16 @@ off in Settings). TikTok likes are off by default. Twitch follows need a login
 
 Without logging in the chat is read-only and nothing is sent to any platform.
 
+#### Stream info
+
+**Docks → Stream info** sets the stream **title** and **category/game** on
+every logged-in platform at once (Twitch and Kick; YouTube and TikTok do not
+allow it through their APIs). It opens with what is live now; search a
+category, pick it, and the same name is looked up on each platform (a
+platform without it keeps its category). Untick a platform to leave it out.
+It needs the Twitch `channel:manage:broadcast` and Kick `channel:write`
+permissions: log out and in again once after updating.
+
 #### Chat login
 
 Logging in to Twitch and/or Kick adds a message box under the chat (send to

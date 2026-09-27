@@ -38,13 +38,14 @@ namespace {
 
 const char *const kTwitchScopes =
 	"user:read:chat user:write:chat moderator:manage:banned_users moderator:manage:chat_messages "
-	"moderator:read:followers moderator:read:chatters";
+	"moderator:read:followers moderator:read:chatters channel:manage:broadcast";
 const char *const kTwitchClientId = "r61r2wwuew4j0e8uohmwif5022r4bc";
 /* Kick has no public clients: the plugin's app keeps its secret on the
  * project's server (server/kick-oauth), which adds it to token requests. */
 const char *const kKickClientId = "01M3G2KSP604PWBG4X8Y3JMNF2";
 const char *const kKickTokenProxy = "https://204-216-150-248.sslip.io/kick/token";
-const char *const kKickScopes = "user:read channel:read chat:write moderation:ban moderation:chat_message:manage";
+const char *const kKickScopes =
+	"user:read channel:read channel:write chat:write moderation:ban moderation:chat_message:manage";
 
 size_t slot(ChatPlatform p)
 {
@@ -777,6 +778,78 @@ void ChatAccounts::twitchBanList(const QString &channel, UsersDone done)
 			done(users, error);
 		});
 	});
+}
+
+void ChatAccounts::streamInfo(ChatPlatform p, std::function<void(const StreamInfo &, const QString &)> done)
+{
+	/* Always the logged-in account's own channel: that is the stream you run. */
+	if (p == ChatPlatform::Twitch) {
+		QUrl url(QStringLiteral("https://api.twitch.tv/helix/channels"));
+		url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), account(p).userId}});
+		api(p, "GET", url, QJsonObject(), [done](int, const QJsonObject &body, const QString &error) {
+			const QJsonObject c = body.value(QStringLiteral("data")).toArray().at(0).toObject();
+			done({c.value(QStringLiteral("title")).toString(),
+			      c.value(QStringLiteral("game_id")).toString(),
+			      c.value(QStringLiteral("game_name")).toString()},
+			     error);
+		});
+		return;
+	}
+	/* Without a slug or id Kick answers with the token owner's channel. */
+	api(p, "GET", QUrl(QStringLiteral("https://api.kick.com/public/v1/channels")), QJsonObject(),
+	    [done](int, const QJsonObject &body, const QString &error) {
+		    const QJsonObject c = body.value(QStringLiteral("data")).toArray().at(0).toObject();
+		    const QJsonObject cat = c.value(QStringLiteral("category")).toObject();
+		    const qint64 id = cat.value(QStringLiteral("id")).toInteger();
+		    done({c.value(QStringLiteral("stream_title")).toString(), id > 0 ? QString::number(id) : QString(),
+			  cat.value(QStringLiteral("name")).toString()},
+			 error);
+	    });
+}
+
+void ChatAccounts::searchCategories(ChatPlatform p, const QString &query,
+				    std::function<void(const QList<StreamCategory> &, const QString &)> done)
+{
+	QUrl url(p == ChatPlatform::Twitch ? QStringLiteral("https://api.twitch.tv/helix/search/categories")
+					   : QStringLiteral("https://api.kick.com/public/v2/categories"));
+	url.setQuery(
+		p == ChatPlatform::Twitch
+			? QUrlQuery{{QStringLiteral("query"), query}, {QStringLiteral("first"), QStringLiteral("25")}}
+			: QUrlQuery{{QStringLiteral("name"), query}, {QStringLiteral("limit"), QStringLiteral("25")}});
+	api(p, "GET", url, QJsonObject(), [done](int, const QJsonObject &body, const QString &error) {
+		QList<StreamCategory> found;
+		for (const QJsonValue v : body.value(QStringLiteral("data")).toArray()) {
+			const QJsonObject o = v.toObject();
+			const QJsonValue id = o.value(QStringLiteral("id"));
+			found.append({id.isString() ? id.toString() : QString::number(id.toInteger()),
+				      o.value(QStringLiteral("name")).toString()});
+		}
+		done(found, error);
+	});
+}
+
+void ChatAccounts::updateStreamInfo(ChatPlatform p, const QString &title, const QString &categoryId, ActionDone done)
+{
+	const auto report = [done](int, const QJsonObject &, const QString &error) {
+		done(error);
+	};
+	if (p == ChatPlatform::Twitch) {
+		QUrl url(QStringLiteral("https://api.twitch.tv/helix/channels"));
+		url.setQuery(QUrlQuery{{QStringLiteral("broadcaster_id"), account(p).userId}});
+		QJsonObject body;
+		if (!title.isEmpty())
+			body.insert(QStringLiteral("title"), title);
+		if (!categoryId.isEmpty())
+			body.insert(QStringLiteral("game_id"), categoryId);
+		api(p, "PATCH", url, body, report);
+		return;
+	}
+	QJsonObject body;
+	if (!title.isEmpty())
+		body.insert(QStringLiteral("stream_title"), title);
+	if (!categoryId.isEmpty())
+		body.insert(QStringLiteral("category_id"), categoryId.toLongLong());
+	api(p, "PATCH", QUrl(QStringLiteral("https://api.kick.com/public/v1/channels")), body, report);
 }
 
 void ChatAccounts::twitchChatters(const QString &channel,

@@ -137,6 +137,8 @@ target_sources(
     src/tools/updater/update-logic.hpp
     src/tools/updater/updater.cpp
     src/tools/updater/updater.h
+    src/tools/unified-chat/stream-info-dock.cpp
+    src/tools/unified-chat/stream-info-dock.hpp
     src/tools/unified-chat/viewers-dialog.cpp
     src/tools/unified-chat/viewers-dialog.hpp
     src/tools/unified-chat/ws-client.cpp

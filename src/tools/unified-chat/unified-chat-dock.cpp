@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 #include "chat-accounts.hpp"
+#include "stream-info-dock.hpp"
 #include "viewers-dialog.hpp"
 
 #include "../unified-chat.h"
@@ -68,6 +69,7 @@ namespace {
 
 constexpr const char *kDockId = "meketreve-unified-chat";
 constexpr const char *kActivityDockId = "meketreve-activity";
+constexpr const char *kStreamInfoDockId = "meketreve-stream-info";
 constexpr const char *kConfigFile = "unified-chat.json";
 constexpr const char *kAccountsFile = "chat-accounts.json";
 constexpr int kRecentMessages = 500;
@@ -872,6 +874,11 @@ void unified_chat_register(void)
 		QObject::connect(dock, &UnifiedChatDock::activity, activity, &ActivityDock::addEvent);
 	else
 		delete activity;
+
+	/* Title and category for every logged-in platform at once. */
+	auto *streamInfo = new StreamInfoDock(dock->accounts(), main);
+	if (!obs_frontend_add_dock_by_id(kStreamInfoDockId, obs_module_text("StreamInfo.Title"), streamInfo))
+		delete streamInfo;
 
 	configShareAddSection({QStringLiteral("chat"), "Config.Section.Chat",
 			       []() { return g_dock ? QJsonValue(g_dock->exportChannels()) : QJsonValue(); },

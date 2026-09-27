@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * channels. */
 
 #include "unified-chat-dock.hpp"
+#include "stream-info-dock.hpp"
 #include "viewers-dialog.hpp"
 #include "config-share.hpp"
 #include "outputs-dock.hpp"
@@ -100,7 +101,7 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|chat-settings|activity|viewers|viewers-bans|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|chat-settings|activity|viewers|viewers-bans|stream-info|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
@@ -196,6 +197,10 @@ int main(int argc, char **argv)
 			{ChatPlatform::Kick, QStringLiteral("kicker"), QString(), QStringLiteral("salve"), QString()});
 		widget = box;
 		box->resize(900, 560);
+	} else if (args[1] == QLatin1String("stream-info")) {
+		chat = new UnifiedChatDock();
+		widget = new StreamInfoDock(chat->accounts());
+		widget->resize(380, 460);
 	} else if (args[1].startsWith(QLatin1String("viewers"))) {
 		/* The viewers window with made-up lists (no login needed). */
 		chat = new UnifiedChatDock();

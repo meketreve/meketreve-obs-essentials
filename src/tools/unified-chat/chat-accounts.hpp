@@ -52,6 +52,18 @@ struct ChatAccount {
 	bool loggedIn() const { return !accessToken.isEmpty(); }
 };
 
+/* What a channel is streaming: title and category ("game" on Twitch). */
+struct StreamInfo {
+	QString title;
+	QString categoryId;
+	QString categoryName;
+};
+
+struct StreamCategory {
+	QString id;
+	QString name;
+};
+
 /* Someone in a Twitch channel's chat or ban list. */
 struct ChatUser {
 	QString id;
@@ -117,6 +129,14 @@ public:
 	using UsersDone = std::function<void(const QList<ChatUser> &users, const QString &error)>;
 	void twitchChatterList(const QString &channel, UsersDone done);
 	void twitchBanList(const QString &channel, UsersDone done);
+
+	/* The logged-in account's own stream title and category (Twitch
+	 * channel:manage:broadcast, Kick channel:write to change them). Empty
+	 * title or category id = leave that one as it is. */
+	void streamInfo(ChatPlatform p, std::function<void(const StreamInfo &info, const QString &error)> done);
+	void searchCategories(ChatPlatform p, const QString &query,
+			      std::function<void(const QList<StreamCategory> &found, const QString &error)> done);
+	void updateStreamInfo(ChatPlatform p, const QString &title, const QString &categoryId, ActionDone done);
 
 	/* Twitch follows need a moderator token: subscribe over EventSub. */
 	void watchTwitchFollows(const QString &channel);
