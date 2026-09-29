@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-html.hpp"
 
 #include <QList>
+#include <QRegularExpression>
+#include <QUrl>
 
 namespace {
 
@@ -66,7 +68,7 @@ bool isEmojiCodePoint(char32_t cp)
 
 namespace {
 
-/* Text with emoji marked. */
+/* Plain text (no emotes, no links) with emoji marked. */
 QString emojiHtml(const QString &text)
 {
 	const QList<char32_t> cps = codePoints(text);
@@ -103,9 +105,64 @@ QString emojiHtml(const QString &text)
 	return html + fromCodePoints(cps, plainStart, cps.size()).toHtmlEscaped();
 }
 
+/* Text between emotes: links, then emoji. */
+QString textHtml(const QString &text)
+{
+	static const QRegularExpression linkRe(QStringLiteral("(?:https?://|www\\.)[^\\s<>\"]+"),
+					       QRegularExpression::CaseInsensitiveOption);
+	QString html;
+	qsizetype last = 0;
+	QRegularExpressionMatchIterator it = linkRe.globalMatch(text);
+	while (it.hasNext()) {
+		const QRegularExpressionMatch m = it.next();
+		QString link = m.captured();
+		/* Punctuation right after a link belongs to the sentence. */
+		while (!link.isEmpty()) {
+			const QChar c = link.back();
+			const bool unbalanced = (c == QLatin1Char(')') && link.count(QLatin1Char('(')) < link.count(c));
+			if (QStringLiteral(".,;:!?'\"]}").contains(c) || unbalanced)
+				link.chop(1);
+			else
+				break;
+		}
+		const QString target = linkTarget(link);
+		if (target.isEmpty())
+			continue;
+		html += emojiHtml(text.mid(last, m.capturedStart() - last));
+		html += QStringLiteral("<a href=\"%1\" style=\"color:#4FC3F7;text-decoration:underline\">%2</a>")
+				.arg(target.toHtmlEscaped(), link.toHtmlEscaped());
+		last = m.capturedStart() + link.size();
+	}
+	return html + emojiHtml(text.mid(last));
+}
+
 } // namespace
 
-QString chatHtml(const QString &text)
+QString linkTarget(const QString &linkText)
 {
-	return emojiHtml(text);
+	QString s = linkText;
+	if (s.startsWith(QLatin1String("www."), Qt::CaseInsensitive))
+		s.prepend(QStringLiteral("https://"));
+	const QUrl url(s, QUrl::StrictMode);
+	if (!url.isValid() || url.host().isEmpty() ||
+	    (url.scheme() != QLatin1String("http") && url.scheme() != QLatin1String("https")))
+		return QString();
+	return QString::fromUtf8(url.toEncoded());
+}
+
+QString chatHtml(const QString &text, const QList<ChatEmote> &emotes, int emoteHeight)
+{
+	QString html;
+	qsizetype last = 0;
+	for (const ChatEmote &e : emotes) {
+		if (e.start < last || e.length <= 0 || e.start + e.length > text.size() || e.url.isEmpty())
+			continue;
+		html += textHtml(text.mid(last, e.start - last));
+		html += QStringLiteral("<img src=\"%1\" height=\"%2\" alt=\"%3\" style=\"vertical-align:middle\">")
+				.arg(e.url.toHtmlEscaped())
+				.arg(emoteHeight)
+				.arg(text.mid(e.start, e.length).toHtmlEscaped());
+		last = e.start + e.length;
+	}
+	return html + textHtml(text.mid(last));
 }

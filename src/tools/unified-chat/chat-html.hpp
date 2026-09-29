@@ -17,13 +17,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #pragma once
 
+#include "chat-connector.hpp"
+
 #include <QString>
 
-/* Chat text as HTML for the chat views: escaped, with every emoji sequence
- * wrapped in a span that asks for the color emoji font by name. Qt (6.4 on
- * Linux at least) otherwise falls back to a black-and-white font for some
- * emoji and draws skin tones and flags as boxes or letters. */
-QString chatHtml(const QString &text);
+/* Chat text as HTML for the chat views: escaped; emotes as <img> of their
+ * URL (ChatView downloads them); http(s) and www. links as <a>; and every
+ * emoji sequence wrapped in a span that asks for the color emoji font by
+ * name. Qt (6.4 on Linux at least) otherwise falls back to a black-and-white
+ * font for some emoji and draws skin tones and flags as boxes or letters. */
+QString chatHtml(const QString &text, const QList<ChatEmote> &emotes = {}, int emoteHeight = 28);
 
 /* Exposed for tests. */
 bool isEmojiCodePoint(char32_t cp);
+/* The link a clicked "https://..." or "www...." piece of chat opens. */
+QString linkTarget(const QString &linkText);

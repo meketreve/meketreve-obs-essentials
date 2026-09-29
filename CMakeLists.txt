@@ -126,6 +126,10 @@ target_sources(
     src/tools/unified-chat/chat-connector.hpp
     src/tools/unified-chat/chat-html.cpp
     src/tools/unified-chat/chat-html.hpp
+    src/tools/unified-chat/chat-view.cpp
+    src/tools/unified-chat/chat-view.hpp
+    src/tools/unified-chat/emote-sets.cpp
+    src/tools/unified-chat/emote-sets.hpp
     src/tools/unified-chat/irc-message.cpp
     src/tools/unified-chat/irc-message.hpp
     src/tools/unified-chat/kick-chat.cpp

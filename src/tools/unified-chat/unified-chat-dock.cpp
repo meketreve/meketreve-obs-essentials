@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "unified-chat-dock.hpp"
 #include "chat-html.hpp"
+#include "chat-view.hpp"
+#include "emote-sets.hpp"
 
 #include "kick-chat.hpp"
 #include "tiktok-chat.hpp"
@@ -192,7 +194,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	bar->addWidget(settings);
 	layout->addLayout(bar);
 
-	m_view = new QTextBrowser(this);
+	m_view = new ChatView(this);
 	m_view->setOpenLinks(false);
 	m_view->document()->setMaximumBlockCount(kMaxLines);
 	/* Author names are links that open the moderation menu. */
@@ -224,6 +226,8 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	connect(m_accounts, &ChatAccounts::actionFailed, this, [this](ChatPlatform p, const QString &error) {
 		appendSystemLine(p, T("UnifiedChat.ActionFailed").arg(error));
 	});
+	m_emotes = new EmoteSets(&m_net, this);
+	m_emotes->loadGlobal();
 	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::appendMessage);
 	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::incoming);
 	connect(m_accounts, &ChatAccounts::openBrowser, this, [](const QUrl &url) { QDesktopServices::openUrl(url); });
@@ -476,8 +480,18 @@ void UnifiedChatDock::setTarget(ChatPlatform platform, const QString &value)
 		showPlaceholder();
 }
 
-void UnifiedChatDock::appendMessage(const ChatMessage &msg)
+void UnifiedChatDock::addEmotes(ChatMessage &msg)
 {
+	if (msg.platform == ChatPlatform::Twitch)
+		m_emotes->setTwitchChannel(msg.channelId);
+	if (msg.platform == ChatPlatform::Twitch || msg.platform == ChatPlatform::Kick)
+		msg.emotes = m_emotes->find(msg.text, msg.emotes);
+}
+
+void UnifiedChatDock::appendMessage(const ChatMessage &incoming)
+{
+	ChatMessage msg = incoming;
+	addEmotes(msg);
 
 	if (msg.event != ChatEvent::None) {
 		if (msg.event == ChatEvent::Like && !m_activityLikes)
@@ -527,7 +541,7 @@ void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 							       .arg(remember(msg))
 							       .arg(color, name)
 						     : name,
-					     chatHtml(msg.text));
+					     chatHtml(msg.text, msg.emotes, m_view->emoteHeight()));
 
 	m_view->append(html);
 	if (atBottom)
@@ -551,7 +565,7 @@ void UnifiedChatDock::appendEventLine(const ChatMessage &msg, const QString &des
 			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
 			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(description));
 	if (!msg.text.isEmpty())
-		html += QStringLiteral(": %1").arg(chatHtml(msg.text));
+		html += QStringLiteral(": %1").arg(chatHtml(msg.text, msg.emotes, m_view->emoteHeight()));
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());
@@ -801,7 +815,7 @@ ActivityDock::ActivityDock(QWidget *parent) : QWidget(parent)
 	bar->addWidget(clear);
 	layout->addLayout(bar);
 
-	m_view = new QTextBrowser(this);
+	m_view = new ChatView(this);
 	m_view->setOpenLinks(false);
 	m_view->document()->setMaximumBlockCount(kMaxLines);
 	layout->addWidget(m_view);
@@ -851,7 +865,8 @@ void ActivityDock::addEvent(const ChatMessage &msg, const QString &description)
 			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
 			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(line));
 	if (!msg.text.isEmpty())
-		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>").arg(chatHtml(msg.text));
+		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>")
+				.arg(chatHtml(msg.text, msg.emotes, m_view->emoteHeight()));
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());

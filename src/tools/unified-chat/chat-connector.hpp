@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 #include <QNetworkAccessManager>
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -28,6 +29,13 @@ enum class ChatPlatform { Twitch, YouTube, Kick, TikTok };
 /* Things that happen in a live besides chat. Connectors only fill in the
  * data; the dock turns it into translated text. */
 enum class ChatEvent { None, Sub, GiftSub, Raid, Bits, Follow, Donation, Membership, Gift, Like, Share };
+
+/* An emote picture inside a message: text.mid(start, length) is its name. */
+struct ChatEmote {
+	qsizetype start = 0;
+	qsizetype length = 0;
+	QString url;
+};
 
 struct ChatMessage {
 	ChatPlatform platform;
@@ -43,7 +51,9 @@ struct ChatMessage {
 	bool isMod = false;
 	bool isSub = false;
 	bool isBroadcaster = false;
-	bool isReply = false; /* Twitch "Reply": the text starts with "@user " */
+	bool isReply = false;    /* Twitch "Reply": the text starts with "@user " */
+	QList<ChatEmote> emotes; /* platform emotes, sorted by start */
+	QString channelId;       /* Twitch room id (for BTTV/7TV channel emotes) */
 };
 
 enum class ConnectorState { Idle, Connecting, Connected, Offline, Error };

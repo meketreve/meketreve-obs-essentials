@@ -15,6 +15,8 @@ target_sources(
     ${_chat}/chat-connector.hpp
     ${_chat}/chat-html.cpp
     ${_chat}/chat-html.hpp
+    ${_chat}/emote-sets.cpp
+    ${_chat}/emote-sets.hpp
     ${_chat}/irc-message.cpp
     ${_chat}/irc-message.hpp
     ${_chat}/kick-chat.cpp
@@ -51,6 +53,8 @@ add_executable(
   ${_chat}/stream-info-dock.hpp
   ${_chat}/viewers-dialog.cpp
   ${_chat}/viewers-dialog.hpp
+  ${_chat}/chat-view.cpp
+  ${_chat}/chat-view.hpp
   ${_config}/config-codec.cpp
   ${_config}/config-share.cpp
   ${CMAKE_SOURCE_DIR}/src/tools/outputs/output-store.cpp

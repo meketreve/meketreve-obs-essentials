@@ -32,15 +32,27 @@ namespace {
 const char *const kPusherUrl =
 	"wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false";
 
-QString stripEmotes(const QString &text)
-{
-	static const QRegularExpression emoteRe(QStringLiteral("\\[emote:\\d+:([^\\]]+)\\]"));
-	QString out = text;
-	out.replace(emoteRe, QStringLiteral("\\1"));
-	return out;
-}
-
 } // namespace
+
+QString KickChat::parseEmotes(const QString &content, QList<ChatEmote> &emotes)
+{
+	static const QRegularExpression emoteRe(QStringLiteral("\\[emote:(\\d+):([^\\]]+)\\]"));
+	QString out;
+	qsizetype last = 0;
+	QRegularExpressionMatchIterator it = emoteRe.globalMatch(content);
+	while (it.hasNext()) {
+		const QRegularExpressionMatch m = it.next();
+		out += content.mid(last, m.capturedStart() - last);
+		ChatEmote e;
+		e.start = out.size();
+		e.length = m.capturedLength(2);
+		e.url = QStringLiteral("https://files.kick.com/emotes/%1/fullsize").arg(m.captured(1));
+		emotes.append(e);
+		out += m.captured(2);
+		last = m.capturedEnd();
+	}
+	return out + content.mid(last);
+}
 
 KickChat::KickChat(QNetworkAccessManager *net, QObject *parent) : ChatConnector(ChatPlatform::Kick, net, parent)
 {
@@ -168,7 +180,8 @@ void KickChat::handleEvent(const QByteArray &data)
 		ChatMessage chat{
 			ChatPlatform::Kick, sender.value(QStringLiteral("username")).toString(),
 			sender.value(QStringLiteral("identity")).toObject().value(QStringLiteral("color")).toString(),
-			stripEmotes(str("content")), QString()};
+			QString(), QString()};
+		chat.text = parseEmotes(str("content"), chat.emotes);
 		chat.id = str("id");
 		chat.userId = QString::number(sender.value(QStringLiteral("id")).toInteger());
 		for (const QJsonValue badge :

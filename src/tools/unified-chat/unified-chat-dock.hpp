@@ -35,7 +35,8 @@ class QFormLayout;
 class QUrl;
 class QLineEdit;
 class QLabel;
-class QTextBrowser;
+class ChatView;
+class EmoteSets;
 class ViewersDialog;
 
 /* Subs, gifts, raids, follows... from every platform, one line each. */
@@ -50,7 +51,7 @@ public:
 private:
 	void showPlaceholder();
 
-	QTextBrowser *m_view = nullptr;
+	ChatView *m_view = nullptr;
 	bool m_hasEvents = false;
 	/* TikTok sends a like event per tap burst; merge a user's bursts. */
 	QString m_lastLikeKey;
@@ -102,6 +103,8 @@ private:
 	void openSettings();
 	void openViewers();
 	void appendEventLine(const ChatMessage &msg, const QString &description);
+	/* Adds BTTV/7TV emotes to what the platform already marked. */
+	void addEmotes(ChatMessage &msg);
 	void appendSystemLine(ChatPlatform platform, const QString &text);
 	bool canModerate(const ChatMessage &msg) const;
 	quint64 remember(const ChatMessage &msg);
@@ -113,10 +116,11 @@ private:
 	void updateStatus(ChatPlatform platform, ConnectorState state, const QString &detail);
 
 	QNetworkAccessManager m_net;
+	EmoteSets *m_emotes = nullptr;
 	std::array<ChatConnector *, kPlatforms> m_connectors{};
 	std::array<QLabel *, kPlatforms> m_status{};
 	std::array<QString, kPlatforms> m_targets;
-	QTextBrowser *m_view = nullptr;
+	ChatView *m_view = nullptr;
 	bool m_hasMessages = false;
 	ChatAccounts *m_accounts = nullptr;
 	QWidget *m_sendBar = nullptr;

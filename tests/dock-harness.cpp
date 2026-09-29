@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * directory next to the binary), so a unified-chat.json there picks the
  * channels. */
 
+#include "kick-chat.hpp"
 #include "unified-chat-dock.hpp"
 #include "stream-info-dock.hpp"
 #include "viewers-dialog.hpp"
@@ -188,6 +189,21 @@ int main(int argc, char **argv)
 			 QString::fromUtf8("oi \xF0\x9F\x98\x80\xF0\x9F\x94\xA5\xE2\x9D\xA4\xEF\xB8\x8F "
 					   "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD \xF0\x9F\x87\xA7\xF0\x9F\x87\xB7 ok"),
 			 QString()});
+		/* Emotes and a link, once the BTTV/7TV global lists have loaded. */
+		QTimer::singleShot(2500, chat, [chat]() {
+			ChatMessage m{
+				ChatPlatform::Twitch, QStringLiteral("emotes"), QStringLiteral("#9146FF"),
+				QStringLiteral(
+					"Kappa PepePls CiGrip veja https://meketreve.github.io/meketreve-obs-essentials/"),
+				QString()};
+			m.emotes = {
+				{0, 5, QStringLiteral("https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0")}};
+			chat->appendMessage(m);
+			ChatMessage k{ChatPlatform::Kick, QStringLiteral("kickemote"), QString(), QString(), QString()};
+			k.text = KickChat::parseEmotes(QStringLiteral("salve [emote:37226:KEKW] www.kick.com"),
+						       k.emotes);
+			chat->appendMessage(k);
+		});
 		ev(ChatPlatform::Twitch, ChatEvent::Sub, "Resubber", 5, "Tier 1", "five months!");
 		ev(ChatPlatform::Twitch, ChatEvent::GiftSub, "Santa", 20, "Tier 1", "");
 		ev(ChatPlatform::Twitch, ChatEvent::Bits, "Cheerer", 100, "", "Cheer100 gg");

@@ -186,6 +186,12 @@ shares from every platform; they are also highlighted in the chat (turn that
 off in Settings). TikTok likes are off by default. Twitch follows need a login
 (see below); Kick follows arrive on their own.
 
+Emotes show as pictures: Twitch and Kick emotes, plus the global and channel
+emotes of [BetterTTV](https://betterttv.com) and [7TV](https://7tv.app) on
+Twitch (global ones on Kick too; animated emotes show their first frame).
+Emoji use the color emoji font, and links (`https://…`, `www.…`) open in your
+web browser when clicked.
+
 Without logging in the chat is read-only and nothing is sent to any platform.
 
 #### Stream info

@@ -31,6 +31,9 @@ public:
 	TwitchChat(QNetworkAccessManager *net, QObject *parent);
 
 	static QString normalizeChannel(const QString &input);
+	/* The IRC "emotes" tag ("25:0-4,6-10/1902:12-16", positions in code
+	 * points) as pictures over the UTF-16 text. */
+	static QList<ChatEmote> parseEmotes(const QString &tag, const QString &text);
 
 	/* One IRC line from the server; public so tests can feed it. */
 	void handleLine(const QByteArray &line);

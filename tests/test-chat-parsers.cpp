@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "chat-html.hpp"
+#include "emote-sets.hpp"
 #include "irc-message.hpp"
 #include "kick-chat.hpp"
 #include "oauth-util.hpp"
@@ -56,6 +57,103 @@ class TestChatParsers : public QObject {
 	Q_OBJECT
 
 private slots:
+	void twitchAndKickEmotes()
+	{
+		/* Positions are code points: the emoji before Kappa is two UTF-16 units. */
+		const QString text = QString::fromUtf8("\xF0\x9F\x98\x80 Kappa oi Kappa");
+		const QList<ChatEmote> e = TwitchChat::parseEmotes(QStringLiteral("25:2-6,11-15"), text);
+		QCOMPARE(e.size(), 2);
+		QCOMPARE(text.mid(e[0].start, e[0].length), QStringLiteral("Kappa"));
+		QCOMPARE(text.mid(e[1].start, e[1].length), QStringLiteral("Kappa"));
+		QCOMPARE(e[0].url, QStringLiteral("https://static-cdn.jtvnw.net/emoticons/v2/25/static/dark/2.0"));
+		QVERIFY(TwitchChat::parseEmotes(QStringLiteral("25:2-99"), text).isEmpty());
+		QVERIFY(TwitchChat::parseEmotes(QString(), text).isEmpty());
+
+		qRegisterMetaType<ChatMessage>();
+		TwitchChat twitch(nullptr, nullptr);
+		QSignalSpy spy(&twitch, &ChatConnector::messageReceived);
+		twitch.handleLine("@emotes=25:0-4;room-id=71092938;display-name=Ana :ana!ana@ana.tmi.twitch.tv PRIVMSG "
+				  "#xqc :Kappa hi");
+		QCOMPARE(spy.size(), 1);
+		const ChatMessage msg = spy[0][0].value<ChatMessage>();
+		QCOMPARE(msg.channelId, QStringLiteral("71092938"));
+		QCOMPARE(msg.emotes.size(), 1);
+
+		QList<ChatEmote> kick;
+		const QString kickText =
+			KickChat::parseEmotes(QStringLiteral("oi [emote:37226:KEKW] e [emote:1:x]"), kick);
+		QCOMPARE(kickText, QStringLiteral("oi KEKW e x"));
+		QCOMPARE(kick.size(), 2);
+		QCOMPARE(kickText.mid(kick[0].start, kick[0].length), QStringLiteral("KEKW"));
+		QCOMPARE(kick[0].url, QStringLiteral("https://files.kick.com/emotes/37226/fullsize"));
+		QCOMPARE(kickText.mid(kick[1].start, kick[1].length), QStringLiteral("x"));
+	}
+
+	void thirdPartyEmotes()
+	{
+		const QJsonArray bttv{QJsonObject{{QStringLiteral("id"), QStringLiteral("5590b223b344e2c42a9e28e3")},
+						  {QStringLiteral("code"), QStringLiteral("monkaS")}},
+				      QJsonObject{{QStringLiteral("id"), QStringLiteral("x")}}};
+		const QHash<QString, QString> b = EmoteSets::parseBttv(bttv);
+		QCOMPARE(b.size(), 1);
+		QCOMPARE(b.value(QStringLiteral("monkaS")),
+			 QStringLiteral("https://cdn.betterttv.net/emote/5590b223b344e2c42a9e28e3/2x"));
+
+		const auto seven = [](const char *name, const char *id, QStringList files) {
+			QJsonArray list;
+			for (const QString &f : files)
+				list.append(QJsonObject{{QStringLiteral("name"), f}});
+			const QJsonObject host{{QStringLiteral("url"),
+						QStringLiteral("//cdn.7tv.app/emote/") + QLatin1String(id)},
+					       {QStringLiteral("files"), list}};
+			return QJsonObject{{QStringLiteral("name"), QLatin1String(name)},
+					   {QStringLiteral("data"), QJsonObject{{QStringLiteral("host"), host}}}};
+		};
+		const QJsonArray seventv{seven("Still", "A", {QStringLiteral("2x.webp"), QStringLiteral("2x.png")}),
+					 seven("Moving", "B", {QStringLiteral("2x.webp"), QStringLiteral("2x.gif")}),
+					 seven("Nothing", "C", {QStringLiteral("2x.avif")})};
+		const QHash<QString, QString> s = EmoteSets::parse7tv(seventv);
+		QCOMPARE(s.value(QStringLiteral("Still")), QStringLiteral("https://cdn.7tv.app/emote/A/2x.png"));
+		QCOMPARE(s.value(QStringLiteral("Moving")), QStringLiteral("https://cdn.7tv.app/emote/B/2x.gif"));
+		QVERIFY(!s.contains(QStringLiteral("Nothing")));
+
+		EmoteSets sets(nullptr);
+		sets.setSet(3, {{QStringLiteral("monkaS"), QStringLiteral("global-bttv")},
+				{QStringLiteral("Kappa"), QStringLiteral("bttv-kappa")}});
+		sets.setSet(0, {{QStringLiteral("monkaS"), QStringLiteral("channel-7tv")}});
+		const QString text = QStringLiteral("Kappa monkaS monkaSS  monkaS");
+		const QList<ChatEmote> taken{{0, 5, QStringLiteral("twitch-kappa")}};
+		const QList<ChatEmote> found = sets.find(text, taken);
+		QCOMPARE(found.size(), 3);
+		QCOMPARE(found[0].url, QStringLiteral("twitch-kappa")); /* the platform's own wins */
+		QCOMPARE(found[1].url, QStringLiteral("channel-7tv"));  /* channel beats global */
+		QCOMPARE(text.mid(found[2].start, found[2].length), QStringLiteral("monkaS"));
+		QCOMPARE(found[2].start, 22);
+	}
+
+	void linksAndEmotesInHtml()
+	{
+		QCOMPARE(linkTarget(QStringLiteral("www.site.com/a")), QStringLiteral("https://www.site.com/a"));
+		QCOMPARE(linkTarget(QStringLiteral("javascript:alert(1)")), QString());
+		QCOMPARE(linkTarget(QStringLiteral("https://")), QString());
+
+		const QString html = chatHtml(QStringLiteral("veja https://x.com/a?b=1&c=2. e (www.y.com)"));
+		QVERIFY(html.contains(QStringLiteral("<a href=\"https://x.com/a?b=1&amp;c=2\"")));
+		QVERIFY(html.contains(QStringLiteral(">https://x.com/a?b=1&amp;c=2</a>. e (")));
+		QVERIFY(html.contains(QStringLiteral("<a href=\"https://www.y.com\"")));
+		QVERIFY(html.endsWith(QStringLiteral("www.y.com</a>)")));
+		QVERIFY(chatHtml(QStringLiteral("https://pt.wikipedia.org/wiki/Foo_(bar)"))
+				.contains(QStringLiteral("Foo_(bar)</a>")));
+		QVERIFY(!chatHtml(QStringLiteral("<script>")).contains(QStringLiteral("<script")));
+
+		const QString withEmote =
+			chatHtml(QStringLiteral("oi Kappa <b>"), {{3, 5, QStringLiteral("https://e/1\"x")}}, 24);
+		QCOMPARE(withEmote, QStringLiteral("oi <img src=\"https://e/1&quot;x\" height=\"24\" alt=\"Kappa\" "
+						   "style=\"vertical-align:middle\"> &lt;b&gt;"));
+		/* Broken ranges are ignored instead of cutting the text. */
+		QCOMPARE(chatHtml(QStringLiteral("ab"), {{1, 9, QStringLiteral("https://e/1")}}), QStringLiteral("ab"));
+	}
+
 	void emojiGetsTheColorFont()
 	{
 		const QString open =

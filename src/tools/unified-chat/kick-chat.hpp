@@ -33,6 +33,8 @@ public:
 	KickChat(QNetworkAccessManager *net, QObject *parent);
 
 	static QString normalizeChannel(const QString &input);
+	/* "hi [emote:37226:KEKW]" -> "hi KEKW", with KEKW as a picture. */
+	static QString parseEmotes(const QString &content, QList<ChatEmote> &emotes);
 
 	/* One Pusher frame; public so tests can feed it. */
 	void handleEvent(const QByteArray &data);

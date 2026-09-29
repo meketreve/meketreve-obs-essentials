@@ -72,6 +72,40 @@ void TwitchChat::disconnectNow()
 	m_ws.close();
 }
 
+QList<ChatEmote> TwitchChat::parseEmotes(const QString &tag, const QString &text)
+{
+	/* UTF-16 offset of every code point. */
+	QList<qsizetype> offsets;
+	for (qsizetype i = 0; i < text.size(); i++) {
+		offsets.append(i);
+		if (text[i].isHighSurrogate() && i + 1 < text.size() && text[i + 1].isLowSurrogate())
+			i++;
+	}
+	offsets.append(text.size());
+
+	QList<ChatEmote> out;
+	for (const QString &emote : tag.split(QLatin1Char('/'), Qt::SkipEmptyParts)) {
+		const qsizetype colon = emote.indexOf(QLatin1Char(':'));
+		if (colon <= 0)
+			continue;
+		const QString id = emote.left(colon);
+		for (const QString &range : emote.mid(colon + 1).split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+			bool okA = false, okB = false;
+			const qsizetype from = range.section(QLatin1Char('-'), 0, 0).toLongLong(&okA);
+			const qsizetype to = range.section(QLatin1Char('-'), 1, 1).toLongLong(&okB);
+			if (!okA || !okB || from < 0 || to < from || to + 1 >= offsets.size())
+				continue;
+			ChatEmote e;
+			e.start = offsets[from];
+			e.length = offsets[to + 1] - e.start;
+			e.url = QStringLiteral("https://static-cdn.jtvnw.net/emoticons/v2/%1/static/dark/2.0").arg(id);
+			out.append(e);
+		}
+	}
+	std::sort(out.begin(), out.end(), [](const ChatEmote &a, const ChatEmote &b) { return a.start < b.start; });
+	return out;
+}
+
 void TwitchChat::handleLine(const QByteArray &line)
 {
 	IrcMessage irc;
@@ -102,6 +136,8 @@ void TwitchChat::handleLine(const QByteArray &line)
 				QString()};
 		msg.id = irc.tag("id");
 		msg.userId = irc.tag("user-id");
+		msg.channelId = irc.tag("room-id");
+		msg.emotes = parseEmotes(irc.tag("emotes"), text);
 		const QString badges = irc.tag("badges");
 		msg.isBroadcaster = badges.contains(QLatin1String("broadcaster/"));
 		msg.isMod = irc.tag("mod") == QLatin1String("1") || badges.contains(QLatin1String("moderator/"));
