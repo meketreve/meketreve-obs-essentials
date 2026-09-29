@@ -39,15 +39,9 @@ QList<DockPlacement> defaultDocks(const QString &fixedId)
 	return {};
 }
 
-TabsConfig TabsConfig::defaults(const QByteArray &currentState, const QString &myLayoutName)
+TabsConfig TabsConfig::defaults()
 {
 	TabsConfig cfg;
-	TabLayout mine;
-	mine.id = QStringLiteral("mine");
-	mine.name = myLayoutName;
-	mine.state = currentState;
-	cfg.tabs.append(mine);
-
 	TabLayout live;
 	live.id = QStringLiteral("live");
 	cfg.tabs.append(live);
@@ -56,7 +50,7 @@ TabsConfig TabsConfig::defaults(const QByteArray &currentState, const QString &m
 	build.id = QStringLiteral("build");
 	cfg.tabs.append(build);
 
-	cfg.current = mine.id;
+	cfg.current = live.id;
 	return cfg;
 }
 

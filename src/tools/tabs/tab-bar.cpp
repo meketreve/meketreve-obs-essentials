@@ -238,20 +238,13 @@ void TabsController::loadProfile()
 	}
 
 	if (!ok) {
-		/* First run on this profile: keep the current layout as "My layout". */
-		m_cfg = TabsConfig::defaults(QByteArray(), T("Tabs.MyLayout"));
+		/* First run on this profile: start on Live. Its layout is saved
+		 * once it has settled (applyDockList). */
+		m_cfg = TabsConfig::defaults();
 		m_loaded = true;
 		rebuildTabBar();
-		ensurePreviewVisible(m_cfg.tabs[0]);
-		/* The main window is still settling right after loading: size the
-		 * preview again once it has, then keep that as "My layout". */
-		QTimer::singleShot(500, this, &TabsController::fillCentralSpace);
-		QTimer::singleShot(1500, this, [this]() {
-			captureCurrent();
-			saveProfile();
-		});
-		obs_log(LOG_INFO, "[tabs] first run on this profile, current layout saved as \"%s\"",
-			T("Tabs.MyLayout").toUtf8().constData());
+		applyTab(static_cast<int>(m_cfg.indexOf(m_cfg.current)));
+		obs_log(LOG_INFO, "[tabs] first run on this profile, starting on Live");
 		return;
 	}
 
@@ -406,12 +399,18 @@ void TabsController::applyDockList(const QString &id, const QList<DockPlacement>
 			m_main->resizeDocks({side.first()},
 					    {side.first()->objectName() == QLatin1String(kChatDockId) ? 340 : 300},
 					    Qt::Horizontal);
-		/* The chat keeps the height; the dock below it (Texuguito) stays small.
-		 * Split the column's real height, or Qt scales both sizes down. */
-		if (side.size() == 2 && side.first()->objectName() == QLatin1String(kChatDockId)) {
-			const int column = side[0]->height() + side[1]->height();
-			m_main->resizeDocks(side, {std::max(200, column - kSideSecondHeight), kSideSecondHeight},
-					    Qt::Vertical);
+		/* The chat keeps the height; the docks below it (Texuguito, Alerts)
+		 * stay small. Split the column's real height, or Qt scales every
+		 * size down. */
+		if (side.size() >= 2 && side.first()->objectName() == QLatin1String(kChatDockId)) {
+			int column = 0;
+			for (QDockWidget *d : side)
+				column += d->height();
+			const int below = static_cast<int>(side.size() - 1);
+			QList<int> sizes{std::max(200, column - below * kSideSecondHeight)};
+			for (int i = 0; i < below; i++)
+				sizes.append(kSideSecondHeight);
+			m_main->resizeDocks(side, sizes, Qt::Vertical);
 		}
 		if (!bottom.isEmpty())
 			m_main->resizeDocks({bottom.first()}, {220}, Qt::Vertical);
@@ -543,7 +542,8 @@ void TabsController::setEnabled(bool enabled)
 		return;
 
 	if (!enabled) {
-		/* Go back to the layout from before the plugin, then hide the bar. */
+		/* Go back to the layout from before the plugin (the "My layout" tab
+		 * older versions saved, if it is still there), then hide the bar. */
 		if (m_loaded) {
 			captureCurrent();
 			const qsizetype mine = m_cfg.indexOf(QStringLiteral("mine"));

@@ -32,8 +32,8 @@ struct DockPlacement {
 };
 
 /* A tab is a named QMainWindow::saveState() snapshot. "live" and "build" are
- * fixed tabs with a built-in default layout; "mine" is the layout the user
- * had before the plugin was installed; everything else is user-made. */
+ * fixed tabs with a built-in default layout; everything else is user-made
+ * (older versions also saved the layout from before the plugin as "mine"). */
 struct TabLayout {
 	QString id;
 	QString name; /* empty for fixed tabs: the UI shows the translated name */
@@ -42,7 +42,7 @@ struct TabLayout {
 	bool previewShown = false;
 
 	bool isFixed() const { return id == QLatin1String("live") || id == QLatin1String("build"); }
-	bool isRemovable() const { return !isFixed() && id != QLatin1String("mine"); }
+	bool isRemovable() const { return !isFixed(); }
 };
 
 /* Built-in declarative layouts of the fixed tabs. */
@@ -54,9 +54,9 @@ struct TabsConfig {
 	QString current;
 	QList<TabLayout> tabs;
 
-	/* First run: "mine" holds the current layout, Live/Build start empty
-	 * and get their default layout the first time they are opened. */
-	static TabsConfig defaults(const QByteArray &currentState, const QString &myLayoutName);
+	/* First run: Live (current) and Build, both empty; each gets its
+	 * default layout the first time it is opened. */
+	static TabsConfig defaults();
 
 	qsizetype indexOf(const QString &id) const;
 	QString newCustomId() const;

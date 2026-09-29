@@ -26,11 +26,13 @@ required, though building locally on Linux is a one-liner (see
 
 A tab bar sits under the menu. Each tab remembers where every dock is:
 
-- **My layout** is the layout you had before installing the plugin, untouched.
 - **Live** shows the preview, Unified Chat with Texuguito and Alerts under it, the audio mixer and the controls.
 - **Build** shows the preview, scenes, sources, transitions and the mixer.
 - **+** makes a new tab from the current layout. Right-click a tab to rename or
   remove it, or to bring Live/Build back to their default layout.
+
+OBS opens on **Live** the first time. The *My layout* tab that older versions
+created from your layout before the plugin can be removed like any other tab.
 
 Layouts save on their own when you switch tabs and when OBS closes, and each
 profile keeps its own tabs. The preview becomes a dock (**Preview**) so tabs
@@ -155,7 +157,7 @@ dialog shows what the text contains and lets you pick what to apply; it also
 lists the built-in presets (*Chat only*, *Simple live*, *Multistream*).
 
 Stream keys, passwords and login tokens are never part of the text. Imported
-tabs are added next to yours (your own *My layout* is never overwritten); Live
+tabs are added next to yours (none of your own tabs is overwritten); Live
 and Build are replaced.
 
 The idea comes from [Aitum Stream Suite](https://github.com/Aitum/obs-aitum-stream-suite)

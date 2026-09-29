@@ -25,21 +25,26 @@ class TestLayoutStore : public QObject {
 	Q_OBJECT
 
 private slots:
-	void defaultsHaveMineLiveBuild()
+	void defaultsAreLiveAndBuild()
 	{
-		const TabsConfig cfg = TabsConfig::defaults("state", QStringLiteral("Meu layout"));
-		QCOMPARE(cfg.tabs.size(), 3);
-		QCOMPARE(cfg.current, QStringLiteral("mine"));
-		QCOMPARE(cfg.tabs[0].state, QByteArray("state"));
-		QVERIFY(!cfg.tabs[0].isRemovable());
+		const TabsConfig cfg = TabsConfig::defaults();
+		QCOMPARE(cfg.tabs.size(), 2);
+		QCOMPARE(cfg.current, QStringLiteral("live"));
+		QVERIFY(cfg.tabs[0].isFixed());
 		QVERIFY(cfg.tabs[1].isFixed());
-		QVERIFY(cfg.tabs[2].isFixed());
-		QVERIFY(cfg.tabs[1].state.isEmpty());
+		QVERIFY(!cfg.tabs[0].isRemovable());
+		QVERIFY(cfg.tabs[0].state.isEmpty());
+
+		/* A "My layout" saved by older versions can be removed now. */
+		TabLayout old;
+		old.id = QStringLiteral("mine");
+		QVERIFY(old.isRemovable());
 	}
 
 	void roundTrip()
 	{
-		TabsConfig cfg = TabsConfig::defaults(QByteArray("\x00\x01\xff", 3), QStringLiteral("Mine"));
+		TabsConfig cfg = TabsConfig::defaults();
+		cfg.tabs[0].state = QByteArray("\x00\x01\xff", 3);
 		TabLayout custom;
 		custom.id = cfg.newCustomId();
 		custom.name = QStringLiteral("Jogo");
@@ -50,18 +55,19 @@ private slots:
 
 		TabsConfig back;
 		QVERIFY(TabsConfig::fromJson(cfg.toJson(), back));
-		QCOMPARE(back.tabs.size(), 4);
+		QCOMPARE(back.tabs.size(), 3);
 		QCOMPARE(back.current, QStringLiteral("custom-1"));
 		QCOMPARE(back.tabs[0].state, QByteArray("\x00\x01\xff", 3));
-		QCOMPARE(back.tabs[3].name, QStringLiteral("Jogo"));
-		QVERIFY(back.tabs[3].previewShown);
-		QVERIFY(back.tabs[3].isRemovable());
+		QCOMPARE(back.tabs[2].name, QStringLiteral("Jogo"));
+		QVERIFY(back.tabs[2].previewShown);
+		QVERIFY(back.tabs[2].isRemovable());
 		QCOMPARE(back.newCustomId(), QStringLiteral("custom-2"));
 	}
 
 	void withoutStates()
 	{
-		const TabsConfig cfg = TabsConfig::defaults("state", QStringLiteral("Mine"));
+		TabsConfig cfg = TabsConfig::defaults();
+		cfg.tabs[0].state = "state";
 		const QJsonObject obj = cfg.toJson(false);
 		for (const QJsonValue v : obj.value(QStringLiteral("tabs")).toArray())
 			QVERIFY(!v.toObject().contains(QStringLiteral("state")));
