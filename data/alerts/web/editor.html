@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meketreve · Alerts</title>
+  <link rel="stylesheet" href="/static/alert-render.css" />
+  <link rel="stylesheet" href="/static/editor.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">M</span><span data-i18n="Editor.Title">Alertas</span></div>
+    <div class="save" id="saveState"></div>
+  </header>
+
+  <div class="error" id="fatal" hidden></div>
+
+  <div class="layout" id="app" hidden>
+    <nav class="types" id="nav"></nav>
+    <main class="form" id="form"></main>
+    <aside class="preview">
+      <div class="frame" id="frame">
+        <div class="scaler" id="scaler"><div class="ar-stage" id="pstage"></div></div>
+      </div>
+      <div class="preview-actions">
+        <button class="btn primary" id="previewBtn" data-i18n="Editor.Preview">Prévia</button>
+        <button class="btn" id="liveBtn" data-i18n="Editor.TestLive">Testar na live</button>
+      </div>
+      <p class="hint" id="liveHint" data-i18n="Editor.PreviewHint"></p>
+    </aside>
+  </div>
+
+  <dialog id="picker">
+    <form method="dialog" class="picker">
+      <header>
+        <h2 id="pickerTitle"></h2>
+        <button class="icon" value="cancel" aria-label="close">✕</button>
+      </header>
+      <div class="tabs" id="pickerTabs"></div>
+      <div class="picker-body" id="pickerBody"></div>
+      <footer>
+        <button class="btn" type="button" id="pickerNone"></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script src="/static/alert-render.js"></script>
+  <script src="/static/editor.js"></script>
+</body>
+</html>

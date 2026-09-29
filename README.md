@@ -17,6 +17,7 @@ required, though building locally on Linux is a one-liner (see
 | **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
 | **Texuguito** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
+| **Alerts** | Dock + overlay + web editor | Follows, subs, gift subs, bits, Super Chats, raids and TikTok/Kick gifts from every chat as on-screen alerts, set up in an editor that opens in your browser. |
 | **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, TikTok, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
 | **Vertical canvas** | Docks | A second 9:16 canvas with its own scenes, sources, preview, recording, backtrack and streaming. Port of Aitum Vertical Canvas. Needs OBS 32+. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
@@ -26,7 +27,7 @@ required, though building locally on Linux is a one-liner (see
 A tab bar sits under the menu. Each tab remembers where every dock is:
 
 - **My layout** is the layout you had before installing the plugin, untouched.
-- **Live** shows the preview, Unified Chat with Texuguito under it, the audio mixer and the controls.
+- **Live** shows the preview, Unified Chat with Texuguito and Alerts under it, the audio mixer and the controls.
 - **Build** shows the preview, scenes, sources, transitions and the mixer.
 - **+** makes a new tab from the current layout. Right-click a tab to rename or
   remove it, or to bring Live/Build back to their default layout.
@@ -72,6 +73,36 @@ elsewhere a viewer stays in the parade for 10 minutes after their last
 message. Coming from the Python bot? **Import old bot** copies its `data/`
 and `audios/` folders. Clips and TTS play through the Browser Source, so they
 show up in the OBS mixer.
+
+### Alerts
+
+Open **Docks → Alerts**. **Add to scene** creates a Browser Source the size of
+your canvas (`http://localhost:8902/alertas`); **Customize** opens the editor in
+your web browser. It runs on your own computer, and changes are saved and reach
+OBS as you make them.
+
+- **Events:** follow, sub, resub, gift sub (a gift of many shows once), bits,
+  Super Chat / Super Sticker, raid / host, YouTube member, TikTok and Kick
+  gifts, TikTok shares and likes (the last two are off by default). Each one
+  has its own on/off switch and a minimum (bits, months, viewers, amount paid,
+  TikTok diamonds…).
+- **Look:** text with `{name}` `{amount}` `{message}` `{detail}` `{platform}`
+  (or `{nome}` `{quantidade}` `{mensagem}` `{detalhe}` `{plataforma}`), any
+  Google Fonts font, colors, size, layout, entrance and exit animations, time
+  on screen and position on screen. The viewer's message can be read aloud
+  (Google TTS).
+- **Images and sounds:** a default kit of animated drawings and synthesized
+  sounds that works offline, your own files (GIF, PNG, JPG, WebP, WebM video,
+  MP3, WAV, OGG; kept in the plugin's config folder), a link, or a **GIPHY /
+  Tenor** search (paste your own free API key in the editor; it stays on your
+  computer).
+- Alerts wait in line and show one at a time. The dock can **Test** any type
+  and **Skip** the one on screen. Alert sounds play through the Browser Source,
+  so they show up in the OBS mixer.
+- The editor's API only answers the link the dock opens (a token after `#`),
+  so other websites open in your browser cannot change your alerts.
+- **Share configuration** takes the alert setup along (without API keys; your
+  own files have to be copied by hand).
 
 ### Outputs (multistream)
 

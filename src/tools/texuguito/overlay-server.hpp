@@ -36,11 +36,30 @@ class OverlayServer : public QObject {
 	Q_OBJECT
 
 public:
+	struct Request {
+		QByteArray method;
+		QString path;                          /* percent-encoded, without the query */
+		QString query;                         /* decoded later with QUrlQuery */
+		QHash<QByteArray, QByteArray> headers; /* names in lower case */
+		QByteArray body;
+	};
+	struct Reply {
+		int status = 200;
+		QByteArray type = "application/json";
+		QByteArray body;
+		QString file; /* sent instead of body when set */
+	};
+
 	struct Routes {
 		QString webDir;
 		std::function<QString()> audioDir;
 		std::function<QByteArray(const QString &id)> ttsClip;
 		std::function<QJsonObject()> snapshot;
+		/* Asked first for every request; true = it filled the reply. The
+		 * built-in routes only answer GET. */
+		std::function<bool(const Request &, Reply &)> handler;
+		/* Largest request body accepted (POST); 0 = none. */
+		qsizetype maxBody = 0;
 	};
 
 	explicit OverlayServer(Routes routes, QObject *parent = nullptr);
@@ -64,11 +83,15 @@ private:
 	struct Client {
 		QByteArray buffer;
 		bool websocket = false;
+		/* Headers read, waiting for the rest of the body. */
+		bool waitingBody = false;
+		qsizetype bodyLength = 0;
+		Request request;
 	};
 
 	void onNewConnection();
 	void onReadyRead(QTcpSocket *socket);
-	void handleHttp(QTcpSocket *socket, const QByteArray &request);
+	void handleHttp(QTcpSocket *socket, const Request &request);
 	void readFrames(QTcpSocket *socket, Client &client);
 	void sendFrame(QTcpSocket *socket, quint8 opcode, const QByteArray &payload);
 	void sendFile(QTcpSocket *socket, const QString &path);

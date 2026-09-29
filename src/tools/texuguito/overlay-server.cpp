@@ -50,6 +50,18 @@ QByteArray mimeFor(const QString &path)
 		return "audio/wav";
 	if (ext == QLatin1String("ogg"))
 		return "audio/ogg";
+	if (ext == QLatin1String("gif"))
+		return "image/gif";
+	if (ext == QLatin1String("jpg") || ext == QLatin1String("jpeg"))
+		return "image/jpeg";
+	if (ext == QLatin1String("webp"))
+		return "image/webp";
+	if (ext == QLatin1String("svg"))
+		return "image/svg+xml";
+	if (ext == QLatin1String("webm"))
+		return "video/webm";
+	if (ext == QLatin1String("mp4"))
+		return "video/mp4";
 	return "application/octet-stream";
 }
 
@@ -60,10 +72,14 @@ QByteArray statusText(int status)
 		return "OK";
 	case 400:
 		return "Bad Request";
+	case 403:
+		return "Forbidden";
 	case 404:
 		return "Not Found";
 	case 405:
 		return "Method Not Allowed";
+	case 413:
+		return "Payload Too Large";
 	default:
 		return "Error";
 	}
@@ -164,19 +180,57 @@ void OverlayServer::onReadyRead(QTcpSocket *socket)
 	auto it = m_clients.find(socket);
 	if (it == m_clients.end())
 		return;
-	it->buffer += socket->readAll();
-	if (it->websocket) {
-		readFrames(socket, it.value());
+	Client &client = it.value();
+	client.buffer += socket->readAll();
+	if (client.websocket) {
+		readFrames(socket, client);
 		return;
 	}
-	const qsizetype end = it->buffer.indexOf("\r\n\r\n");
-	if (end < 0) {
-		if (it->buffer.size() > kMaxRequest)
-			dropClient(socket);
-		return;
+	if (!client.waitingBody) {
+		const qsizetype end = client.buffer.indexOf("\r\n\r\n");
+		if (end < 0) {
+			if (client.buffer.size() > kMaxRequest)
+				dropClient(socket);
+			return;
+		}
+		const QList<QByteArray> lines = client.buffer.left(end).split('\n');
+		client.buffer.remove(0, end + 4);
+		const QList<QByteArray> first = lines.value(0).trimmed().split(' ');
+		if (first.size() < 2) {
+			sendResponse(socket, 400, "text/plain", "bad request");
+			return;
+		}
+		Request &request = client.request;
+		request.method = first[0];
+		const QUrl url(QString::fromLatin1(first[1]));
+		request.path = url.path(QUrl::FullyEncoded);
+		request.query = url.query(QUrl::FullyEncoded);
+		for (qsizetype i = 1; i < lines.size(); i++) {
+			const qsizetype colon = lines[i].indexOf(':');
+			if (colon > 0)
+				request.headers.insert(lines[i].left(colon).trimmed().toLower(),
+						       lines[i].mid(colon + 1).trimmed());
+		}
+		bool ok = true;
+		const QByteArray length = request.headers.value("content-length");
+		client.bodyLength = length.isEmpty() ? 0 : length.toLongLong(&ok);
+		if (!ok || client.bodyLength < 0) {
+			sendResponse(socket, 400, "text/plain", "bad request");
+			return;
+		}
+		if (client.bodyLength > m_routes.maxBody) {
+			sendResponse(socket, 413, "text/plain", "too large");
+			return;
+		}
+		client.waitingBody = true;
 	}
-	const QByteArray request = it->buffer.left(end);
-	it->buffer.remove(0, end + 4);
+	if (client.buffer.size() < client.bodyLength)
+		return;
+	client.waitingBody = false;
+	Request request = std::move(client.request);
+	client.request = Request();
+	request.body = client.buffer.left(client.bodyLength);
+	client.buffer.remove(0, client.bodyLength);
 	handleHttp(socket, request);
 }
 
@@ -200,25 +254,24 @@ void OverlayServer::sendFile(QTcpSocket *socket, const QString &path)
 	sendResponse(socket, 200, mimeFor(path), file.readAll());
 }
 
-void OverlayServer::handleHttp(QTcpSocket *socket, const QByteArray &request)
+void OverlayServer::handleHttp(QTcpSocket *socket, const Request &request)
 {
-	const QList<QByteArray> lines = request.split('\n');
-	const QList<QByteArray> first = lines.value(0).trimmed().split(' ');
-	if (first.size() < 2) {
-		sendResponse(socket, 400, "text/plain", "bad request");
-		return;
+	const QString &path = request.path;
+	const QHash<QByteArray, QByteArray> &headers = request.headers;
+
+	if (m_routes.handler && path != QLatin1String("/ws")) {
+		Reply reply;
+		if (m_routes.handler(request, reply)) {
+			if (!reply.file.isEmpty())
+				sendFile(socket, reply.file);
+			else
+				sendResponse(socket, reply.status, reply.type, reply.body);
+			return;
+		}
 	}
-	if (first[0] != "GET") {
+	if (request.method != "GET") {
 		sendResponse(socket, 405, "text/plain", "method not allowed");
 		return;
-	}
-	const QString path = QUrl(QString::fromLatin1(first[1])).path(QUrl::FullyEncoded);
-
-	QHash<QByteArray, QByteArray> headers;
-	for (qsizetype i = 1; i < lines.size(); i++) {
-		const qsizetype colon = lines[i].indexOf(':');
-		if (colon > 0)
-			headers.insert(lines[i].left(colon).trimmed().toLower(), lines[i].mid(colon + 1).trimmed());
 	}
 
 	if (path == QLatin1String("/ws")) {
@@ -232,6 +285,7 @@ void OverlayServer::handleHttp(QTcpSocket *socket, const QByteArray &request)
 			      acceptKey(key) + "\r\n\r\n");
 		Client &client = m_clients[socket];
 		client.websocket = true;
+		client.waitingBody = false;
 		if (m_routes.snapshot)
 			sendFrame(socket, 0x1, QJsonDocument(m_routes.snapshot()).toJson(QJsonDocument::Compact));
 		emit clientsChanged(clientCount());

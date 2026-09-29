@@ -1,0 +1,137 @@
+/* Shared by the overlay and the editor's preview (see alert-render.js). */
+.ar-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: var(--ar-margin, 80px);
+  box-sizing: border-box;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ar-stage[data-position^="top"] { align-items: flex-start; }
+.ar-stage[data-position^="middle"] { align-items: center; }
+.ar-stage[data-position^="bottom"] { align-items: flex-end; }
+.ar-stage[data-position$="left"] { justify-content: flex-start; }
+.ar-stage[data-position$="center"] { justify-content: center; }
+.ar-stage[data-position$="right"] { justify-content: flex-end; }
+
+.ar-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 1400px;
+  color: var(--ar-text);
+  font-size: var(--ar-size);
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.15;
+  animation-duration: 0.6s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ar-layout-side { flex-direction: row; text-align: left; gap: 24px; }
+.ar-layout-side .ar-texts { align-items: flex-start; }
+
+.ar-media {
+  position: relative;
+  width: var(--ar-image);
+  height: var(--ar-image);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ar-media img, .ar-media video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.ar-drawing, .ar-drawing svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+}
+
+.ar-texts { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ar-title, .ar-message {
+  text-shadow: 0 0 2px #000, 0 0 2px #000, 0 3px 0 rgba(0, 0, 0, 0.6), 0 0 18px rgba(0, 0, 0, 0.55);
+  overflow-wrap: anywhere;
+}
+.ar-hl { color: var(--ar-accent); }
+.ar-message { font-size: 0.6em; font-weight: 600; opacity: 0.95; max-width: 1100px; }
+
+/* Confetti behind the default drawings. */
+.ar-burst { position: absolute; inset: 0; pointer-events: none; }
+.ar-burst i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  border-radius: 3px;
+  background: var(--ar-accent);
+  opacity: 0;
+  animation: ar-burst 1.1s 0.25s ease-out both;
+}
+.ar-burst i:nth-child(3n) { background: #fff; width: 8px; height: 8px; }
+.ar-burst i:nth-child(4n) { border-radius: 50%; }
+@keyframes ar-burst {
+  0% { transform: rotate(var(--a)) translateY(0) scale(0.4); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(calc(var(--ar-image) * -0.75)) scale(1) rotate(180deg); opacity: 0; }
+}
+
+/* Entrances */
+.ar-in-fade { animation-name: ar-fade-in; }
+.ar-in-zoom { animation-name: ar-zoom-in; }
+.ar-in-bounce { animation-name: ar-bounce-in; animation-duration: 0.8s; animation-timing-function: linear; }
+.ar-in-slide-down { animation-name: ar-from-top; }
+.ar-in-slide-up { animation-name: ar-from-bottom; }
+.ar-in-slide-left { animation-name: ar-from-right; }
+.ar-in-slide-right { animation-name: ar-from-left; }
+/* Exits */
+.ar-out-fade { animation-name: ar-fade-out; }
+.ar-out-zoom { animation-name: ar-zoom-out; }
+.ar-out-slide-up { animation-name: ar-to-top; }
+.ar-out-slide-down { animation-name: ar-to-bottom; }
+.ar-out-none { visibility: hidden; }
+
+@keyframes ar-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ar-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ar-zoom-in { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: none; } }
+@keyframes ar-zoom-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.3); } }
+@keyframes ar-bounce-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  40% { opacity: 1; transform: scale(1.12); }
+  60% { transform: scale(0.94); }
+  80% { transform: scale(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes ar-from-top { from { opacity: 0; transform: translateY(-120%); } to { opacity: 1; transform: none; } }
+@keyframes ar-from-bottom { from { opacity: 0; transform: translateY(120%); } to { opacity: 1; transform: none; } }
+@keyframes ar-from-right { from { opacity: 0; transform: translateX(60%); } to { opacity: 1; transform: none; } }
+@keyframes ar-from-left { from { opacity: 0; transform: translateX(-60%); } to { opacity: 1; transform: none; } }
+@keyframes ar-to-top { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-120%); } }
+@keyframes ar-to-bottom { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(120%); } }
+
+/* Motion inside the default drawings */
+.k-bob { animation: k-bob 1.6s ease-in-out infinite; transform-origin: 50% 50%; }
+.k-beat { animation: k-beat 0.9s ease-in-out infinite; transform-origin: 50% 55%; }
+.k-spin-slow { animation: k-wobble 2.4s ease-in-out infinite; transform-origin: 50% 55%; }
+.k-twinkle { animation: k-twinkle 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.k-d2 { animation-delay: 0.4s; }
+.k-d3 { animation-delay: 0.8s; }
+.k-lid { animation: k-lid 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.k-flip { animation: k-flip 1.4s linear infinite; transform-box: fill-box; transform-origin: center; }
+.k-shake { animation: k-shake 0.25s linear infinite; }
+.k-flame { animation: k-flame 0.18s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0; }
+@keyframes k-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes k-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.14); } 30% { transform: scale(0.98); } 45% { transform: scale(1.08); } }
+@keyframes k-wobble { 0%, 100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(8deg) scale(1.06); } }
+@keyframes k-twinkle { 0%, 100% { opacity: 0.2; transform: scale(0.5); } 50% { opacity: 1; transform: scale(1.3); } }
+@keyframes k-lid { 0%, 60%, 100% { transform: translateY(0) rotate(0); } 75% { transform: translateY(-10px) rotate(-6deg); } }
+@keyframes k-flip { from { transform: rotateY(0); } to { transform: rotateY(360deg); } }
+@keyframes k-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, -1px); } }
+@keyframes k-flame { from { transform: scaleY(0.75); } to { transform: scaleY(1.15); } }

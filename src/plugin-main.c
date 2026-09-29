@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/outputs/outputs.h"
 #include "tools/vertical/vertical.h"
 #include "tools/texuguito/texuguito.h"
+#include "tools/alerts/alerts.h"
 #include "tools/updater/updater.h"
 
 OBS_DECLARE_MODULE()
@@ -56,6 +57,7 @@ bool obs_module_load(void)
 	unified_chat_register();
 	outputs_register();
 	texuguito_register();
+	alerts_register();
 
 	canvas_tools = obs_supports_canvas_tools();
 	if (canvas_tools)

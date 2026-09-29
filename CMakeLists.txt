@@ -59,6 +59,11 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/plugin-main.c
+    src/tools/alerts/alert-logic.cpp
+    src/tools/alerts/alert-logic.hpp
+    src/tools/alerts/alerts-dock.cpp
+    src/tools/alerts/alerts-dock.hpp
+    src/tools/alerts/alerts.h
     src/tools/bass-shake.c
     src/tools/vertical/audio-wrapper-source.c
     src/tools/vertical/audio-wrapper-source.h

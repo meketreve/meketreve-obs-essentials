@@ -121,3 +121,17 @@ target_include_directories(test-updater PRIVATE ${_updater})
 target_link_libraries(test-updater PRIVATE Qt6::Core Qt6::Test)
 set_target_properties(test-updater PROPERTIES AUTOMOC ON)
 add_test(NAME updater COMMAND test-updater)
+
+set(_alerts "${CMAKE_SOURCE_DIR}/src/tools/alerts")
+add_executable(
+  test-alerts
+  test-alerts.cpp
+  ${_alerts}/alert-logic.cpp
+  ${_alerts}/alert-logic.hpp
+  ${_texuguito}/overlay-server.cpp
+  ${_texuguito}/overlay-server.hpp
+)
+target_include_directories(test-alerts PRIVATE ${_alerts} ${_texuguito})
+target_link_libraries(test-alerts PRIVATE chat-core Qt6::Test)
+set_target_properties(test-alerts PROPERTIES AUTOMOC ON)
+add_test(NAME alerts COMMAND test-alerts)
