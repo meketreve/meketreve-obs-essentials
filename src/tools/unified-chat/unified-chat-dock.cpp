@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "unified-chat-dock.hpp"
+#include "chat-html.hpp"
 
 #include "kick-chat.hpp"
 #include "tiktok-chat.hpp"
@@ -520,13 +521,13 @@ void UnifiedChatDock::appendMessage(const ChatMessage &msg)
 		html += QStringLiteral("<span style=\"color:#FFB300;font-weight:bold\">[%1]</span> ")
 				.arg(msg.highlight.toHtmlEscaped());
 	const QString color = readableColor(msg.authorColor, msg.author, background);
-	const QString name = QStringLiteral("<b style=\"color:%1\">%2</b>").arg(color, msg.author.toHtmlEscaped());
+	const QString name = QStringLiteral("<b style=\"color:%1\">%2</b>").arg(color, chatHtml(msg.author));
 	html += QStringLiteral("%1: %2").arg(canModerate(msg)
 						     ? QStringLiteral("<a href=\"msg:%1\" style=\"color:%2\">%3</a>")
 							       .arg(remember(msg))
 							       .arg(color, name)
 						     : name,
-					     msg.text.toHtmlEscaped());
+					     chatHtml(msg.text));
 
 	m_view->append(html);
 	if (atBottom)
@@ -548,9 +549,9 @@ void UnifiedChatDock::appendEventLine(const ChatMessage &msg, const QString &des
 			       "<span style=\"background-color:%2;color:%3;font-weight:bold\">&nbsp;%4&nbsp;</span> "
 			       "<span style=\"color:#FFB300;font-weight:bold\">&#9733; %5</span>")
 			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
-			     QLatin1String(info.tagForeground), QLatin1String(info.tag), description.toHtmlEscaped());
+			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(description));
 	if (!msg.text.isEmpty())
-		html += QStringLiteral(": %1").arg(msg.text.toHtmlEscaped());
+		html += QStringLiteral(": %1").arg(chatHtml(msg.text));
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());
@@ -848,10 +849,9 @@ void ActivityDock::addEvent(const ChatMessage &msg, const QString &description)
 			       "<span style=\"background-color:%2;color:%3;font-weight:bold\">&nbsp;%4&nbsp;</span> "
 			       "<b>%5</b>")
 			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
-			     QLatin1String(info.tagForeground), QLatin1String(info.tag), line.toHtmlEscaped());
+			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(line));
 	if (!msg.text.isEmpty())
-		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>")
-				.arg(msg.text.toHtmlEscaped());
+		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>").arg(chatHtml(msg.text));
 	m_view->append(html);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());

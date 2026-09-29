@@ -124,6 +124,8 @@ target_sources(
     src/tools/unified-chat/chat-accounts.hpp
     src/tools/unified-chat/chat-connector.cpp
     src/tools/unified-chat/chat-connector.hpp
+    src/tools/unified-chat/chat-html.cpp
+    src/tools/unified-chat/chat-html.hpp
     src/tools/unified-chat/irc-message.cpp
     src/tools/unified-chat/irc-message.hpp
     src/tools/unified-chat/kick-chat.cpp

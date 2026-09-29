@@ -183,6 +183,11 @@ int main(int argc, char **argv)
 		};
 		chat->appendMessage({ChatPlatform::Twitch, QStringLiteral("viewer1"), QStringLiteral("#1E90FF"),
 				     QStringLiteral("boa noite!"), QString()});
+		chat->appendMessage(
+			{ChatPlatform::Twitch, QStringLiteral("emojis"), QStringLiteral("#FF4500"),
+			 QString::fromUtf8("oi \xF0\x9F\x98\x80\xF0\x9F\x94\xA5\xE2\x9D\xA4\xEF\xB8\x8F "
+					   "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD \xF0\x9F\x87\xA7\xF0\x9F\x87\xB7 ok"),
+			 QString()});
 		ev(ChatPlatform::Twitch, ChatEvent::Sub, "Resubber", 5, "Tier 1", "five months!");
 		ev(ChatPlatform::Twitch, ChatEvent::GiftSub, "Santa", 20, "Tier 1", "");
 		ev(ChatPlatform::Twitch, ChatEvent::Bits, "Cheerer", 100, "", "Cheer100 gg");

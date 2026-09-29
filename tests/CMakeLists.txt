@@ -13,6 +13,8 @@ target_sources(
     ${_chat}/chat-accounts.hpp
     ${_chat}/chat-connector.cpp
     ${_chat}/chat-connector.hpp
+    ${_chat}/chat-html.cpp
+    ${_chat}/chat-html.hpp
     ${_chat}/irc-message.cpp
     ${_chat}/irc-message.hpp
     ${_chat}/kick-chat.cpp

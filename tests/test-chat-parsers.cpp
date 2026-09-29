@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
+#include "chat-html.hpp"
 #include "irc-message.hpp"
 #include "kick-chat.hpp"
 #include "oauth-util.hpp"
@@ -55,6 +56,34 @@ class TestChatParsers : public QObject {
 	Q_OBJECT
 
 private slots:
+	void emojiGetsTheColorFont()
+	{
+		const QString open =
+			QStringLiteral("<span style=\"font-family:'Noto Color Emoji','Segoe UI Emoji','Apple "
+				       "Color Emoji'\">");
+		const QString close = QStringLiteral("</span>");
+		QCOMPARE(chatHtml(QStringLiteral("a <b> & c")), QStringLiteral("a &lt;b&gt; &amp; c"));
+		/* 😀 */
+		QCOMPARE(chatHtml(QString::fromUtf8("oi \xF0\x9F\x98\x80!")),
+			 QStringLiteral("oi ") + open + QString::fromUtf8("\xF0\x9F\x98\x80") + close +
+				 QStringLiteral("!"));
+		/* 👍🏽 (skin tone), 🇧🇷 (flag) and 👨‍👩‍👧 (ZWJ family) stay one piece each. */
+		for (const char *emoji : {"\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD", "\xF0\x9F\x87\xA7\xF0\x9F\x87\xB7",
+					  "\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7"})
+			QCOMPARE(chatHtml(QString::fromUtf8(emoji)), open + QString::fromUtf8(emoji) + close);
+		/* Two flags in a row are two pieces. */
+		const QString br = QString::fromUtf8("\xF0\x9F\x87\xA7\xF0\x9F\x87\xB7");
+		QCOMPARE(chatHtml(br + br), open + br + close + open + br + close);
+		/* ❤️ and keycap 1️⃣; a plain © stays text. */
+		QCOMPARE(chatHtml(QString::fromUtf8("\xE2\x9D\xA4\xEF\xB8\x8F")),
+			 open + QString::fromUtf8("\xE2\x9D\xA4\xEF\xB8\x8F") + close);
+		QCOMPARE(chatHtml(QString::fromUtf8("1\xEF\xB8\x8F\xE2\x83\xA3")),
+			 open + QString::fromUtf8("1\xEF\xB8\x8F\xE2\x83\xA3") + close);
+		QCOMPARE(chatHtml(QString::fromUtf8("\xC2\xA9 2026")), QString::fromUtf8("\xC2\xA9 2026"));
+		QVERIFY(isEmojiCodePoint(0x1F525));
+		QVERIFY(!isEmojiCodePoint(U'a'));
+	}
+
 	void ircPrivmsgWithTags()
 	{
 		IrcMessage m;
