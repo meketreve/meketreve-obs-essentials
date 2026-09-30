@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "youtube-chat.hpp"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QNetworkReply>
@@ -29,6 +30,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace {
 
 constexpr int kOfflineRecheckSeconds = 60;
+/* The account lookup costs API quota: at most every 3 minutes (~480 a day
+ * of the 10,000 units, and only while the public page shows nothing). */
+constexpr qint64 kLookupIntervalMs = 3 * 60 * 1000;
 
 QJsonValue path(QJsonValue v, std::initializer_list<const char *> keys)
 {
@@ -164,6 +168,13 @@ void YouTubeChat::disconnectNow()
 		m_pending = nullptr;
 	}
 	m_continuation.clear();
+	m_lookupSerial++;
+}
+
+QString YouTubeChat::channelIdFromPage(const QByteArray &html)
+{
+	return regexCapture(html, QStringLiteral("<link rel=\"canonical\" "
+						 "href=\"https://www\\.youtube\\.com/channel/(UC[A-Za-z0-9_-]{22})\""));
 }
 
 void YouTubeChat::onLivePage(QNetworkReply *reply)
@@ -180,16 +191,37 @@ void YouTubeChat::onLivePage(QNetworkReply *reply)
 	}
 
 	/* /live redirects to the channel page when nothing is on air. */
+	const QByteArray html = reply->readAll();
 	const QString videoId = regexCapture(
-		reply->readAll(),
+		html,
 		QStringLiteral(
 			"<link rel=\"canonical\" href=\"https://www\\.youtube\\.com/watch\\?v=([A-Za-z0-9_-]{11})\""));
-	if (videoId.isEmpty()) {
+	if (!videoId.isEmpty()) {
+		loadChatPage(videoId);
+		return;
+	}
+
+	/* Unlisted and private lives never show on /live: ask the account. */
+	const QString channelId = channelIdFromPage(html);
+	const qint64 now = QDateTime::currentMSecsSinceEpoch();
+	if (!m_liveLookup || channelId.isEmpty() || now - m_lastLookup < kLookupIntervalMs) {
 		setState(ConnectorState::Offline);
 		scheduleRetry(kOfflineRecheckSeconds);
 		return;
 	}
-	loadChatPage(videoId);
+	m_lastLookup = now;
+	const quint64 serial = ++m_lookupSerial;
+	QPointer<YouTubeChat> self = this;
+	m_liveLookup(channelId, [self, serial](const QString &found) {
+		if (!self || self->m_lookupSerial != serial)
+			return;
+		if (found.isEmpty()) {
+			self->setState(ConnectorState::Offline);
+			self->scheduleRetry(kOfflineRecheckSeconds);
+			return;
+		}
+		self->loadChatPage(found);
+	});
 }
 
 void YouTubeChat::loadChatPage(const QString &videoId)

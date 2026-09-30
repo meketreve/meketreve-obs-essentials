@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 /* Runs one chat connector outside OBS and prints what it sees:
  *   chat-probe twitch xqc 25
+ * CHAT_PROBE_ACCOUNTS=<copy of chat-accounts.json> lets YouTube find the
+ * account's unlisted live like the plugin does.
  * Exit code 0 when at least one message arrived, 1 otherwise. */
 
 #include "chat-accounts.hpp"
@@ -136,9 +138,24 @@ int main(int argc, char **argv)
 	ChatConnector *c = nullptr;
 	if (platform == QLatin1String("twitch"))
 		c = new TwitchChat(&net, &app);
-	else if (platform == QLatin1String("youtube"))
-		c = new YouTubeChat(&net, &app);
-	else if (platform == QLatin1String("kick"))
+	else if (platform == QLatin1String("youtube")) {
+		auto *youtube = new YouTubeChat(&net, &app);
+		const QString accountsPath = qEnvironmentVariable("CHAT_PROBE_ACCOUNTS");
+		if (!accountsPath.isEmpty()) {
+			auto *accounts = new ChatAccounts(accountsPath, &app);
+			youtube->setLiveLookup([accounts](const QString &channelId,
+							  std::function<void(const QString &)> done) {
+				std::fprintf(stderr, "[lookup] asking the account for %s\n", qPrintable(channelId));
+				accounts->youtubeLiveVideo(channelId, [done](const QString &videoId,
+									     const QString &privacy) {
+					std::fprintf(stderr, "[lookup] live '%s' (%s)\n", qPrintable(videoId),
+						     qPrintable(privacy));
+					done(privacy == QLatin1String("private") ? QString() : videoId);
+				});
+			});
+		}
+		c = youtube;
+	} else if (platform == QLatin1String("kick"))
 		c = new KickChat(&net, &app);
 	if (!c) {
 		std::fprintf(stderr, "unknown platform '%s'\n", qPrintable(platform));

@@ -716,6 +716,26 @@ void ChatAccounts::youtubeBroadcast(bool orUpcoming,
 	});
 }
 
+void ChatAccounts::youtubeLiveVideo(const QString &channelId,
+				    std::function<void(const QString &, const QString &)> done)
+{
+	const ChatAccount &a = account(ChatPlatform::YouTube);
+	if (!a.loggedIn() || a.userId != channelId) {
+		done(QString(), QString());
+		return;
+	}
+	api(ChatPlatform::YouTube, "GET",
+	    youtubeUrl(QStringLiteral("liveBroadcasts"), {{QStringLiteral("part"), QStringLiteral("id,status")},
+							  {QStringLiteral("broadcastStatus"), QStringLiteral("active")},
+							  {QStringLiteral("broadcastType"), QStringLiteral("all")},
+							  {QStringLiteral("maxResults"), QStringLiteral("1")}}),
+	    QJsonObject(), [done](int, const QJsonObject &body, const QString &) {
+		    const QJsonObject b = body.value(QStringLiteral("items")).toArray().at(0).toObject();
+		    done(b.value(QStringLiteral("id")).toString(),
+			 b.value(QStringLiteral("status")).toObject().value(QStringLiteral("privacyStatus")).toString());
+	    });
+}
+
 void ChatAccounts::youtubeCategories(std::function<void(const QList<StreamCategory> &, const QString &)> done)
 {
 	if (!m_youtubeCategories.isEmpty()) {

@@ -229,7 +229,23 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	connect(m_accounts, &ChatAccounts::openBrowser, this, [](const QUrl &url) { QDesktopServices::openUrl(url); });
 
 	m_connectors[indexOf(ChatPlatform::Twitch)] = new TwitchChat(&m_net, this);
-	m_connectors[indexOf(ChatPlatform::YouTube)] = new YouTubeChat(&m_net, this);
+	auto *youtube = new YouTubeChat(&m_net, this);
+	youtube->setLiveLookup([this](const QString &channelId, std::function<void(const QString &)> done) {
+		m_accounts->youtubeLiveVideo(channelId, [this, done](const QString &videoId, const QString &privacy) {
+			/* A private live's chat needs a login to read, and nobody
+			 * else can watch it anyway: say so once instead. */
+			if (privacy == QLatin1String("private")) {
+				if (videoId != m_warnedPrivateLive) {
+					m_warnedPrivateLive = videoId;
+					appendSystemLine(ChatPlatform::YouTube, T("UnifiedChat.YouTube.PrivateLive"));
+				}
+				done(QString());
+				return;
+			}
+			done(videoId);
+		});
+	});
+	m_connectors[indexOf(ChatPlatform::YouTube)] = youtube;
 	m_connectors[indexOf(ChatPlatform::Kick)] = new KickChat(&m_net, this);
 
 	for (ChatConnector *c : m_connectors) {

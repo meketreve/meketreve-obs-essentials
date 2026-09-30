@@ -120,6 +120,11 @@ public:
 
 	/* channel = what the user typed as the chat target (name or link). */
 	void sendMessage(ChatPlatform p, const QString &channel, const QString &text);
+	/* The logged-in YouTube account's live broadcast when that account is
+	 * channelId (unlisted and private ones too): video id and privacy
+	 * ("public", "unlisted", "private"), or empty. */
+	void youtubeLiveVideo(const QString &channelId,
+			      std::function<void(const QString &videoId, const QString &privacy)> done);
 	/* done (optional) gets the error, empty on success; failures also go
 	 * to actionFailed. */
 	using ActionDone = std::function<void(const QString &error)>;

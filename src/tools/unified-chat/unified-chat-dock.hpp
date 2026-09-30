@@ -126,6 +126,7 @@ private:
 	QHash<quint64, ChatMessage> m_recent;
 	QList<quint64> m_recentOrder;
 	quint64 m_lastRecentId = 0;
+	QString m_warnedPrivateLive; /* YouTube video id already warned about */
 	bool m_eventsInChat = true;
 	QPointer<ViewersDialog> m_viewers;
 };

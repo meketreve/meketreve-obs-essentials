@@ -23,6 +23,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QJsonObject>
 #include <QPointer>
 
+#include <functional>
+
 class QNetworkReply;
 
 /* YouTube live chat through the same InnerTube endpoint the popout chat
@@ -40,6 +42,14 @@ public:
 
 	/* One entry of get_live_chat's "actions"; public so tests can feed it. */
 	void handleAction(const QJsonObject &action);
+
+	/* Asked when the channel page shows no public live: the logged-in
+	 * account's live video on that channel (unlisted ones too), or empty. */
+	using LiveLookup =
+		std::function<void(const QString &channelId, std::function<void(const QString &videoId)> done)>;
+	void setLiveLookup(LiveLookup lookup) { m_liveLookup = std::move(lookup); }
+	/* "https://www.youtube.com/channel/UC…" in the page -> "UC…". */
+	static QString channelIdFromPage(const QByteArray &html);
 
 protected:
 	void connectNow() override;
@@ -59,4 +69,7 @@ private:
 	QString m_clientVersion;
 	QString m_continuation;
 	bool m_skipBacklog = false;
+	LiveLookup m_liveLookup;
+	qint64 m_lastLookup = 0; /* ms since epoch; the API has a daily quota */
+	quint64 m_lookupSerial = 0;
 };

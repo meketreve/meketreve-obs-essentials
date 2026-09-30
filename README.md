@@ -170,7 +170,7 @@ channels you stream to. Each field takes a plain name or a link:
 | Platform | Example | How it connects |
 |----------|---------|-----------------|
 | Twitch | `xqc` or `twitch.tv/xqc` | Anonymous read-only IRC over WebSocket. |
-| YouTube | `@handle`, channel link or live/video link | The same InnerTube endpoint the popout chat uses, so no API key and no daily quota. |
+| YouTube | `@handle`, channel link or live/video link | The same InnerTube endpoint the popout chat uses, so no API key and no daily quota. An unlisted live does not show on the channel page: when you are logged in to that channel, the plugin asks YouTube for it (at most every 3 minutes, 1 API unit each). A private live cannot be read; the chat says so. |
 | Kick | `westcol` or `kick.com/westcol` | Kick's public Pusher channel. If Kick's API is blocked, type the numeric chatroom id instead. |
 
 Leave a field empty to turn that platform off. A channel that is not live is

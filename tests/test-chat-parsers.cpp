@@ -357,6 +357,17 @@ private slots:
 		QCOMPARE(msgs[3].amount, 5);
 	}
 
+	void youtubeChannelIdFromPage()
+	{
+		QCOMPARE(
+			YouTubeChat::channelIdFromPage(
+				"<link rel=\"canonical\" href=\"https://www.youtube.com/channel/UCMBSKO1nn-uXBwn9Sy_reDw\">"),
+			QStringLiteral("UCMBSKO1nn-uXBwn9Sy_reDw"));
+		QVERIFY(YouTubeChat::channelIdFromPage(
+				"<link rel=\"canonical\" href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">")
+				.isEmpty());
+	}
+
 	void pkceMatchesRfc7636()
 	{
 		/* RFC 7636 appendix B. */
