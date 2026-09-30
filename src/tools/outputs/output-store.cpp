@@ -22,13 +22,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 const QList<PlatformDefaults> &outputPlatforms()
 {
-	/* Ingest servers every account of that platform can use. Kick and
-	 * TikTok hand out per-account URLs too; the user can paste those. */
+	/* Ingest servers every account of that platform can use. Kick hands
+	 * out per-account URLs too; the user can paste those. */
 	static const QList<PlatformDefaults> platforms{
 		{"twitch", "Twitch", "rtmp://live.twitch.tv/app", 6000},
 		{"youtube", "YouTube", "rtmps://a.rtmps.youtube.com:443/live2", 51000},
 		{"kick", "Kick", "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app", 8000},
-		{"tiktok", "TikTok", "", 6000},
 		{"custom", "RTMP(S)", "", 0},
 		{"srt", "SRT", "srt://", 0},
 	};

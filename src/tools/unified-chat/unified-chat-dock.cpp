@@ -22,7 +22,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "emote-sets.hpp"
 
 #include "kick-chat.hpp"
-#include "tiktok-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 #include "chat-accounts.hpp"
@@ -38,7 +37,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <util/platform.h>
 
 #include <QCheckBox>
-#include <QDateTime>
 #include <QComboBox>
 #include <QCursor>
 #include <QDesktopServices>
@@ -51,7 +49,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QPushButton>
 #include <QDialog>
 #include <QTextBlock>
-#include <QTextCursor>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -87,11 +84,10 @@ struct PlatformInfo {
 	const char *tagForeground;
 };
 
-const std::array<PlatformInfo, 4> kPlatformInfo{{
+const std::array<PlatformInfo, 3> kPlatformInfo{{
 	{"twitch", "UnifiedChat.Twitch", "UnifiedChat.Twitch.Placeholder", "TW", "#9146FF", "#FFFFFF"},
 	{"youtube", "UnifiedChat.YouTube", "UnifiedChat.YouTube.Placeholder", "YT", "#FF0033", "#FFFFFF"},
 	{"kick", "UnifiedChat.Kick", "UnifiedChat.Kick.Placeholder", "KK", "#53FC18", "#000000"},
-	{"tiktok", "UnifiedChat.TikTok", "UnifiedChat.TikTok.Placeholder", "TT", "#FE2C55", "#FFFFFF"},
 }};
 
 QString T(const char *key)
@@ -235,7 +231,6 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	m_connectors[indexOf(ChatPlatform::Twitch)] = new TwitchChat(&m_net, this);
 	m_connectors[indexOf(ChatPlatform::YouTube)] = new YouTubeChat(&m_net, this);
 	m_connectors[indexOf(ChatPlatform::Kick)] = new KickChat(&m_net, this);
-	m_connectors[indexOf(ChatPlatform::TikTok)] = new TikTokChat(&m_net, this);
 
 	for (ChatConnector *c : m_connectors) {
 		connect(c, &ChatConnector::messageReceived, this, &UnifiedChatDock::appendMessage);
@@ -307,7 +302,6 @@ void UnifiedChatDock::loadSettings()
 		m_targets[i] = QString::fromUtf8(obs_data_get_string(data, kPlatformInfo[i].configKey));
 	obs_data_set_default_bool(data, "eventsInChat", true);
 	m_eventsInChat = obs_data_get_bool(data, "eventsInChat");
-	m_activityLikes = obs_data_get_bool(data, "activityLikes");
 	obs_data_release(data);
 }
 
@@ -317,7 +311,6 @@ void UnifiedChatDock::saveSettings()
 	for (size_t i = 0; i < kPlatforms; i++)
 		obs_data_set_string(data, kPlatformInfo[i].configKey, m_targets[i].toUtf8().constData());
 	obs_data_set_bool(data, "eventsInChat", m_eventsInChat);
-	obs_data_set_bool(data, "activityLikes", m_activityLikes);
 	if (!obs_data_save_json_safe(data, configPath().toUtf8().constData(), "tmp", "bak"))
 		obs_log(LOG_WARNING, "[unified-chat] could not save %s", kConfigFile);
 	obs_data_release(data);
@@ -356,20 +349,10 @@ void UnifiedChatDock::openSettings()
 	auto *eventsInChat = new QCheckBox(T("UnifiedChat.EventsInChat"), &dialog);
 	eventsInChat->setChecked(m_eventsInChat);
 	layout->addWidget(eventsInChat);
-	auto *likes = new QCheckBox(T("UnifiedChat.ActivityLikes"), &dialog);
-	likes->setChecked(m_activityLikes);
-	layout->addWidget(likes);
 
 	auto *hint = new QLabel(T("UnifiedChat.Hint"), &dialog);
 	hint->setWordWrap(true);
 	layout->addWidget(hint);
-
-	auto *tiktokNote = new QLabel(T("UnifiedChat.TikTok.Note"), &dialog);
-	tiktokNote->setWordWrap(true);
-	QFont small = tiktokNote->font();
-	small.setPointSizeF(small.pointSizeF() * 0.9);
-	tiktokNote->setFont(small);
-	layout->addWidget(tiktokNote);
 
 	auto *accountsBox = new QGroupBox(T("UnifiedChat.Accounts"), &dialog);
 	auto *accountsLayout = new QVBoxLayout(accountsBox);
@@ -390,9 +373,8 @@ void UnifiedChatDock::openSettings()
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
-	bool changed = eventsInChat->isChecked() != m_eventsInChat || likes->isChecked() != m_activityLikes;
+	bool changed = eventsInChat->isChecked() != m_eventsInChat;
 	m_eventsInChat = eventsInChat->isChecked();
-	m_activityLikes = likes->isChecked();
 	for (size_t i = 0; i < kPlatforms; i++) {
 		const QString value = edits[i]->text().trimmed();
 		if (value != m_targets[i]) {
@@ -447,10 +429,6 @@ QString UnifiedChatDock::describeEvent(const ChatMessage &msg)
 		break;
 	case ChatEvent::Gift:
 		return T("Activity.Gift").arg(who).arg(std::max(1, msg.amount)).arg(msg.detail);
-	case ChatEvent::Like:
-		return T("Activity.Like").arg(who).arg(std::max(1, msg.amount));
-	case ChatEvent::Share:
-		return T("Activity.Share").arg(who);
 	}
 	if (!msg.detail.isEmpty())
 		line += QStringLiteral(" · ") + msg.detail;
@@ -494,14 +472,10 @@ void UnifiedChatDock::appendMessage(const ChatMessage &incoming)
 	addEmotes(msg);
 
 	if (msg.event != ChatEvent::None) {
-		if (msg.event == ChatEvent::Like && !m_activityLikes)
-			return;
 		const QString description = describeEvent(msg);
 		emit activity(msg, description);
-		/* Likes, follows and shares are too frequent for the chat. */
-		const bool quiet = msg.event == ChatEvent::Like || msg.event == ChatEvent::Follow ||
-				   msg.event == ChatEvent::Share;
-		if (!m_eventsInChat || quiet) {
+		/* Follows are too frequent for the chat. */
+		if (!m_eventsInChat || msg.event == ChatEvent::Follow) {
 			if (msg.event != ChatEvent::Bits)
 				return;
 			/* Bits come with a chat message: show it as a plain line. */
@@ -809,7 +783,6 @@ ActivityDock::ActivityDock(QWidget *parent) : QWidget(parent)
 	connect(clear, &QToolButton::clicked, this, [this]() {
 		m_view->clear();
 		m_hasEvents = false;
-		m_lastLikeKey.clear();
 		showPlaceholder();
 	});
 	bar->addWidget(clear);
@@ -837,33 +810,12 @@ void ActivityDock::addEvent(const ChatMessage &msg, const QString &description)
 	const bool atBottom = scroll->value() >= scroll->maximum() - 4;
 	const PlatformInfo &info = kPlatformInfo[indexOf(msg.platform)];
 
-	QString line = description;
-	if (msg.event == ChatEvent::Like) {
-		const QString key = QString::number(static_cast<int>(msg.platform)) + QLatin1Char('/') + msg.author;
-		const qint64 now = QDateTime::currentMSecsSinceEpoch();
-		if (key == m_lastLikeKey && now - m_lastLikeAt < 15000) {
-			m_lastLikeCount += std::max(1, msg.amount);
-			QTextCursor cursor(m_view->document()->lastBlock());
-			cursor.select(QTextCursor::BlockUnderCursor);
-			cursor.removeSelectedText();
-			ChatMessage merged = msg;
-			merged.amount = m_lastLikeCount;
-			line = UnifiedChatDock::describeEvent(merged);
-		} else {
-			m_lastLikeKey = key;
-			m_lastLikeCount = std::max(1, msg.amount);
-		}
-		m_lastLikeAt = now;
-	} else {
-		m_lastLikeKey.clear();
-	}
-
 	QString html =
 		QStringLiteral("<span style=\"color:gray\">%1</span> "
 			       "<span style=\"background-color:%2;color:%3;font-weight:bold\">&nbsp;%4&nbsp;</span> "
 			       "<b>%5</b>")
 			.arg(QTime::currentTime().toString(QStringLiteral("HH:mm")), QLatin1String(info.tagBackground),
-			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(line));
+			     QLatin1String(info.tagForeground), QLatin1String(info.tag), chatHtml(description));
 	if (!msg.text.isEmpty())
 		html += QStringLiteral("<br><span style=\"color:gray\">&nbsp;&nbsp;%1</span>")
 				.arg(chatHtml(msg.text, msg.emotes, m_view->emoteHeight()));

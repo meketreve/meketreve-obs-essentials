@@ -40,7 +40,7 @@ struct Event {
 	QString amount;   /* {quantidade} as shown: "5", "R$ 10,00" */
 	QString detail;   /* gift name, tier */
 	QString message;  /* what they typed */
-	QString platform; /* twitch, youtube, kick, tiktok */
+	QString platform; /* twitch, youtube, kick */
 	bool test = false;
 };
 
@@ -52,8 +52,6 @@ bool isType(const QString &type);
 Event fromChat(const ChatMessage &msg);
 /* "R$ 10,00", "$5.00", "€1.234,56", "¥500" -> 10, 5, 1234.56, 500. */
 double parseMoney(const QString &text);
-/* "Rose (50 ♦)" -> 50, or 0. */
-int diamondsIn(const QString &detail);
 QString platformKey(ChatPlatform platform);
 
 /* A made-up event of that type for the "Test" buttons. */

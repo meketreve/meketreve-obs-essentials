@@ -48,8 +48,6 @@ constexpr TypeDefault kDefaults[] = {
 	{"raid", "Alerts.Default.Raid", "builtin:rocket", "builtin:whoosh", "#FF7043", true, 8},
 	{"membership", "Alerts.Default.Membership", "builtin:medal", "builtin:fanfare", "#26A69A", true, 7},
 	{"gift", "Alerts.Default.Gift", "builtin:gift", "builtin:sparkle", "#FF4081", true, 5},
-	{"share", "Alerts.Default.Share", "builtin:share", "builtin:chime", "#29B6F6", false, 4},
-	{"like", "Alerts.Default.Like", "builtin:heart", "builtin:pop", "#EF5350", false, 4},
 };
 
 const QStringList kPositions = {
@@ -185,8 +183,6 @@ QString platformKey(ChatPlatform platform)
 		return QStringLiteral("youtube");
 	case ChatPlatform::Kick:
 		return QStringLiteral("kick");
-	case ChatPlatform::TikTok:
-		return QStringLiteral("tiktok");
 	}
 	return QString();
 }
@@ -220,13 +216,6 @@ double parseMoney(const QString &text)
 			plain.append(QLatin1Char('.'));
 	}
 	return plain.toDouble();
-}
-
-int diamondsIn(const QString &detail)
-{
-	static const QRegularExpression re(QStringLiteral("\\((\\d+)\\s*♦\\)"));
-	const QRegularExpressionMatch m = re.match(detail);
-	return m.hasMatch() ? m.captured(1).toInt() : 0;
 }
 
 Event fromChat(const ChatMessage &msg)
@@ -269,22 +258,9 @@ Event fromChat(const ChatMessage &msg)
 		e.type = QStringLiteral("membership");
 		e.detail = msg.detail;
 		break;
-	case ChatEvent::Gift: {
+	case ChatEvent::Gift:
 		e.type = QStringLiteral("gift");
-		/* TikTok says what the gifts are worth; the minimum uses that. */
-		const int diamonds = diamondsIn(msg.detail);
-		if (diamonds > 0)
-			e.value = diamonds;
-		QString name = msg.detail;
-		name.remove(QRegularExpression(QStringLiteral("\\s*\\(\\d+\\s*♦\\)")));
-		e.detail = name.trimmed();
-		break;
-	}
-	case ChatEvent::Like:
-		e.type = QStringLiteral("like");
-		break;
-	case ChatEvent::Share:
-		e.type = QStringLiteral("share");
+		e.detail = msg.detail.trimmed();
 		break;
 	}
 	return e;
@@ -323,16 +299,10 @@ Event sample(const QString &type, const TextLookup &text)
 	} else if (type == QLatin1String("membership")) {
 		e.platform = QStringLiteral("youtube");
 	} else if (type == QLatin1String("gift")) {
-		e.platform = QStringLiteral("tiktok");
+		e.platform = QStringLiteral("kick");
 		e.value = 10;
 		e.amount = QStringLiteral("10");
 		e.detail = text("Alerts.TestGift");
-	} else if (type == QLatin1String("like")) {
-		e.platform = QStringLiteral("tiktok");
-		e.value = 50;
-		e.amount = QStringLiteral("50");
-	} else if (type == QLatin1String("share")) {
-		e.platform = QStringLiteral("tiktok");
 	}
 	return e;
 }

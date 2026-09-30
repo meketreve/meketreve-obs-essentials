@@ -96,7 +96,7 @@ public:
 	void reloadData();
 
 	void handleMessage(const BotMessage &msg);
-	/* Bits, Super Chats and TikTok gifts make the viewer cheer on screen. */
+	/* Bits, Super Chats and Kick gifts make the viewer cheer on screen. */
 	void handleCheer(ChatPlatform platform, const QString &user);
 	/* Twitch viewer list (Helix chatters): who is watching even if quiet. */
 	void setTwitchChatters(const QSet<QString> &logins);

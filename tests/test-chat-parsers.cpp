@@ -21,7 +21,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "irc-message.hpp"
 #include "kick-chat.hpp"
 #include "oauth-util.hpp"
-#include "tiktok-proto.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 
@@ -358,52 +357,6 @@ private slots:
 		QCOMPARE(msgs[3].amount, 5);
 	}
 
-	void tiktokEvents()
-	{
-		QByteArray user;
-		putBytesField(user, 3, "Fan");
-		QByteArray giftInfo;
-		putVarintField(giftInfo, 11, 1);
-		putVarintField(giftInfo, 12, 5);
-		putBytesField(giftInfo, 16, "Rose");
-		QByteArray gift;
-		putVarintField(gift, 5, 7);
-		putBytesField(gift, 7, user);
-		putBytesField(gift, 15, giftInfo);
-
-		TikTokGift g;
-		QVERIFY(parseTikTokGift(gift, g));
-		QCOMPARE(g.name, QStringLiteral("Rose"));
-		QCOMPARE(g.repeatCount, 7);
-		QCOMPARE(g.diamonds, 5);
-		QVERIFY(g.streakable);
-		QVERIFY(!g.isFinal());
-		putVarintField(gift, 9, 1);
-		QVERIFY(parseTikTokGift(gift, g));
-		QVERIFY(g.isFinal());
-
-		QByteArray text;
-		putBytesField(text, 1, "pm_main_follow_message_viewer_2");
-		QByteArray common;
-		putBytesField(common, 8, text);
-		QByteArray social;
-		putBytesField(social, 1, common);
-		putBytesField(social, 2, user);
-		TikTokSocial so;
-		QVERIFY(parseTikTokSocial(social, so));
-		QVERIFY(so.displayKey.contains(QStringLiteral("follow")));
-		QCOMPARE(so.user.displayName(), QStringLiteral("Fan"));
-
-		QByteArray like;
-		putVarintField(like, 2, 15);
-		putVarintField(like, 3, 99999);
-		putBytesField(like, 5, user);
-		TikTokLike l;
-		QVERIFY(parseTikTokLike(like, l));
-		QCOMPARE(l.count, 15);
-		QCOMPARE(l.total, 99999);
-	}
-
 	void pkceMatchesRfc7636()
 	{
 		/* RFC 7636 appendix B. */
@@ -425,63 +378,6 @@ private slots:
 		QVERIFY(OAuthUtil::parseRequestLine("POST /callback HTTP/1.1", q).isEmpty());
 		QCOMPARE(OAuthUtil::formBody({{QStringLiteral("a b"), QStringLiteral("c&d")}}),
 			 QByteArray("a%20b=c%26d"));
-	}
-
-	void protobufRoundTrip()
-	{
-		QByteArray user;
-		putBytesField(user, 3, "Nick Name");
-		putBytesField(user, 38, "nick_id");
-		QByteArray chat;
-		putVarintField(chat, 1, 300);
-		putBytesField(chat, 2, user);
-		putBytesField(chat, 3, "olá mundo");
-
-		TikTokChatMessage msg;
-		QVERIFY(parseTikTokChat(chat, msg));
-		QCOMPARE(msg.user.nickname, QStringLiteral("Nick Name"));
-		QCOMPARE(msg.user.uniqueId, QStringLiteral("nick_id"));
-		QCOMPARE(msg.text, QStringLiteral("olá mundo"));
-	}
-
-	void protobufFetchResult()
-	{
-		QByteArray message;
-		putBytesField(message, 1, "WebcastChatMessage");
-		putBytesField(message, 2, "payload");
-		QByteArray route;
-		putBytesField(route, 1, "k");
-		putBytesField(route, 2, "v");
-
-		QByteArray fetch;
-		putBytesField(fetch, 1, message);
-		putBytesField(fetch, 2, "cursor-1");
-		putBytesField(fetch, 5, "ext");
-		putBytesField(fetch, 7, route);
-		putVarintField(fetch, 9, 1);
-		putBytesField(fetch, 10, "wss://push");
-
-		const FetchResult r = parseFetchResult(fetch);
-		QCOMPARE(r.messages.size(), 1);
-		QCOMPARE(r.messages[0].first, QByteArray("WebcastChatMessage"));
-		QCOMPARE(r.messages[0].second, QByteArray("payload"));
-		QCOMPARE(r.cursor, QByteArray("cursor-1"));
-		QCOMPARE(r.internalExt, QByteArray("ext"));
-		QCOMPARE(r.routeParams.size(), 1);
-		QVERIFY(r.needAck);
-		QCOMPARE(r.pushServer, QByteArray("wss://push"));
-	}
-
-	void protobufTruncatedIsSafe()
-	{
-		QByteArray chat;
-		putBytesField(chat, 3, "hello");
-		chat.chop(2);
-		TikTokChatMessage msg;
-		parseTikTokChat(chat, msg);
-		QVERIFY(msg.text.isEmpty());
-		const FetchResult r = parseFetchResult(QByteArray("\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff", 11));
-		QVERIFY(r.messages.isEmpty());
 	}
 };
 

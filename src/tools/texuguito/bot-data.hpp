@@ -20,7 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 /* Texuguito's data, ported from texuguito-seu-bot-amigo (same JSON files, so
  * an existing data/ folder can be copied over): viewers.json, points.json and
  * custom_commands.json. Keys are lowercase usernames; viewers from platforms
- * other than Twitch get a "kick:", "yt:" or "tt:" prefix so names from
+ * other than Twitch get a "kick:" or "yt:" prefix so names from
  * different platforms never merge. */
 
 #include <QHash>

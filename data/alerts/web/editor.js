@@ -9,8 +9,8 @@ let samples = {};
 let media = [];
 let current = "general";
 
-const TYPES = ["follow", "sub", "resub", "giftsub", "bits", "donation", "raid", "membership", "gift", "share", "like"];
-const MIN_TYPES = ["resub", "giftsub", "bits", "donation", "raid", "gift", "like"];
+const TYPES = ["follow", "sub", "resub", "giftsub", "bits", "donation", "raid", "membership", "gift"];
+const MIN_TYPES = ["resub", "giftsub", "bits", "donation", "raid", "gift"];
 const MESSAGE_TYPES = ["sub", "resub", "bits", "donation", "membership"];
 const FONTS = ["Poppins", "Montserrat", "Nunito", "Fredoka", "Rubik", "Bangers", "Luckiest Guy", "Lilita One",
   "Bebas Neue", "Oswald", "Permanent Marker", "Press Start 2P", "Arial Black", "Impact", "Verdana"];

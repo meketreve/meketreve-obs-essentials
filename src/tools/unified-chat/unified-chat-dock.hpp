@@ -53,10 +53,6 @@ private:
 
 	ChatView *m_view = nullptr;
 	bool m_hasEvents = false;
-	/* TikTok sends a like event per tap burst; merge a user's bursts. */
-	QString m_lastLikeKey;
-	int m_lastLikeCount = 0;
-	qint64 m_lastLikeAt = 0;
 };
 
 class UnifiedChatDock : public QWidget {
@@ -95,7 +91,7 @@ signals:
 	void targetsChanged();
 
 private:
-	static constexpr size_t kPlatforms = 4;
+	static constexpr size_t kPlatforms = 3;
 
 	void loadSettings();
 	void saveSettings();
@@ -131,7 +127,6 @@ private:
 	QList<quint64> m_recentOrder;
 	quint64 m_lastRecentId = 0;
 	bool m_eventsInChat = true;
-	bool m_activityLikes = false;
 	QPointer<ViewersDialog> m_viewers;
 };
 

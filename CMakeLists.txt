@@ -136,10 +136,6 @@ target_sources(
     src/tools/unified-chat/kick-chat.hpp
     src/tools/unified-chat/oauth-util.cpp
     src/tools/unified-chat/oauth-util.hpp
-    src/tools/unified-chat/tiktok-chat.cpp
-    src/tools/unified-chat/tiktok-chat.hpp
-    src/tools/unified-chat/tiktok-proto.cpp
-    src/tools/unified-chat/tiktok-proto.hpp
     src/tools/unified-chat/twitch-chat.cpp
     src/tools/unified-chat/twitch-chat.hpp
     src/tools/unified-chat/unified-chat-dock.cpp

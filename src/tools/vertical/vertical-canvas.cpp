@@ -7869,17 +7869,10 @@ void CanvasDock::OnStreamStop(int code, QString last_error, QString stream_serve
 
 	case OBS_OUTPUT_CONNECT_FAILED:
 		use_last_error = true;
-		if (stream_server.contains("tiktok")) {
-			last_error = QString::fromUtf8(obs_module_text("tiktokError"));
-		}
 		errorDescription = obs_frontend_get_locale_string("Output.ConnectFail.ConnectFailed");
 		break;
 
 	case OBS_OUTPUT_INVALID_STREAM:
-		if (stream_server.contains("tiktok")) {
-			use_last_error = true;
-			last_error = QString::fromUtf8(obs_module_text("tiktokError"));
-		}
 		errorDescription = obs_frontend_get_locale_string("Output.ConnectFail.InvalidStream");
 		break;
 

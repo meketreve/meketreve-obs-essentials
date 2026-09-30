@@ -293,7 +293,7 @@ void TexuguitoDock::refreshStatus()
 	}
 
 	bool anyChannel = false;
-	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::TikTok})
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick})
 		anyChannel |= !m_chat->target(p).trimmed().isEmpty();
 	if (m_enabled && !anyChannel)
 		m_status->setText(m_status->text() + QStringLiteral("<br><span style=\"color:#E0A000\">%1</span>")

@@ -83,22 +83,17 @@ private slots:
 		QCOMPARE(superChat.amount, key("R$ 10,00"));
 		QCOMPARE(superChat.value, 10.0);
 
-		const Event gift =
-			fromChat(chat(ChatPlatform::TikTok, ChatEvent::Gift, 5, QStringLiteral("Rose (5 \u2666)")));
+		const Event gift = fromChat(chat(ChatPlatform::Kick, ChatEvent::Gift, 100, QStringLiteral("Hype")));
 		QCOMPARE(gift.type, key("gift"));
-		QCOMPARE(gift.amount, key("5"));
-		QCOMPARE(gift.detail, key("Rose"));
-		QCOMPARE(gift.value, 5.0);
-		const Event bigGift =
-			fromChat(chat(ChatPlatform::TikTok, ChatEvent::Gift, 2, QStringLiteral("Lion (58000 \u2666)")));
-		QCOMPARE(bigGift.value, 58000.0);
+		QCOMPARE(gift.platform, key("kick"));
+		QCOMPARE(gift.amount, key("100"));
+		QCOMPARE(gift.detail, key("Hype"));
+		QCOMPARE(gift.value, 100.0);
 
 		QCOMPARE(fromChat(chat(ChatPlatform::Twitch, ChatEvent::Raid, 42)).value, 42.0);
 		QCOMPARE(fromChat(chat(ChatPlatform::Kick, ChatEvent::Raid, 0)).amount, key("0"));
 		QCOMPARE(fromChat(chat(ChatPlatform::Twitch, ChatEvent::Bits, 500)).type, key("bits"));
 		QCOMPARE(fromChat(chat(ChatPlatform::YouTube, ChatEvent::Membership)).type, key("membership"));
-		QCOMPARE(fromChat(chat(ChatPlatform::TikTok, ChatEvent::Like, 30)).type, key("like"));
-		QCOMPARE(fromChat(chat(ChatPlatform::TikTok, ChatEvent::Share)).type, key("share"));
 		QCOMPARE(fromChat(chat(ChatPlatform::Twitch, ChatEvent::GiftSub, 5)).type, key("giftsub"));
 		for (const QString &type : types())
 			QCOMPARE(sample(type, key).type, type);
@@ -115,7 +110,6 @@ private slots:
 		QCOMPARE(parseMoney(QStringLiteral("₹2,000")), 2000.0);
 		QCOMPARE(parseMoney(QStringLiteral("CA$2.5")), 2.5);
 		QCOMPARE(parseMoney(QString()), 0.0);
-		QCOMPARE(diamondsIn(QStringLiteral("Rose")), 0);
 	}
 
 	void configDefaultsAndCleaning()
@@ -123,7 +117,6 @@ private slots:
 		const QJsonObject def = defaults(key);
 		QCOMPARE(def.value(QStringLiteral("types")).toObject().size(), types().size());
 		QCOMPARE(typeOf(def, "follow").value(QStringLiteral("text")).toString(), key("Alerts.Default.Follow"));
-		QVERIFY(!typeOf(def, "like").value(QStringLiteral("enabled")).toBool());
 
 		/* Empty or broken input comes back as the defaults. */
 		QCOMPARE(normalize(QJsonObject(), key), def);
@@ -138,6 +131,9 @@ private slots:
 					      {QStringLiteral("extra"), 1}});
 		messy.insert(QStringLiteral("position"), QStringLiteral("nowhere"));
 		messy.insert(QStringLiteral("junk"), true);
+		QJsonObject messyTypes = messy.value(QStringLiteral("types")).toObject();
+		messyTypes.insert(QStringLiteral("like"), QJsonObject{{QStringLiteral("enabled"), true}});
+		messy.insert(QStringLiteral("types"), messyTypes);
 		const QJsonObject clean = normalize(messy, key);
 		const QJsonObject bits = typeOf(clean, "bits");
 		QCOMPARE(bits.value(QStringLiteral("duration")).toDouble(), 60.0);
@@ -149,6 +145,7 @@ private slots:
 		QVERIFY(!bits.contains(QStringLiteral("extra")));
 		QCOMPARE(clean.value(QStringLiteral("position")).toString(), key("top-center"));
 		QVERIFY(!clean.contains(QStringLiteral("junk")));
+		QVERIFY(!clean.value(QStringLiteral("types")).toObject().contains(QStringLiteral("like")));
 
 		/* API keys never reach the overlay. */
 		QJsonObject keyed = def;
@@ -197,8 +194,6 @@ private slots:
 		config = withType(config, "donation", {{QStringLiteral("min"), 5}});
 		QVERIFY(!passes(config, fromChat(chat(ChatPlatform::YouTube, ChatEvent::Donation, 0, "R$ 2,00"))));
 		QVERIFY(passes(config, fromChat(chat(ChatPlatform::YouTube, ChatEvent::Donation, 0, "R$ 5,00"))));
-		/* Likes are off out of the box. */
-		QVERIFY(!passes(config, fromChat(chat(ChatPlatform::TikTok, ChatEvent::Like, 100))));
 		QVERIFY(!passes(config, Event()));
 	}
 

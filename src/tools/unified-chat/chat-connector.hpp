@@ -24,11 +24,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QString>
 #include <QTimer>
 
-enum class ChatPlatform { Twitch, YouTube, Kick, TikTok };
+enum class ChatPlatform { Twitch, YouTube, Kick };
 
 /* Things that happen in a live besides chat. Connectors only fill in the
  * data; the dock turns it into translated text. */
-enum class ChatEvent { None, Sub, GiftSub, Raid, Bits, Follow, Donation, Membership, Gift, Like, Share };
+enum class ChatEvent { None, Sub, GiftSub, Raid, Bits, Follow, Donation, Membership, Gift };
 
 /* An emote picture inside a message: text.mid(start, length) is its name. */
 struct ChatEmote {
@@ -44,7 +44,7 @@ struct ChatMessage {
 	QString text; /* what the user typed, if anything */
 	QString highlight;
 	ChatEvent event = ChatEvent::None;
-	int amount = 0; /* months, gifts, viewers, bits, likes */
+	int amount = 0; /* months, gifts, viewers, bits */
 	QString detail; /* tier, recipient, gift name, paid amount */
 	QString id;     /* platform message id */
 	QString userId; /* platform user id */

@@ -23,7 +23,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-accounts.hpp"
 #include "tts-client.hpp"
 #include "kick-chat.hpp"
-#include "tiktok-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 
@@ -63,7 +62,7 @@ int main(int argc, char **argv)
 	QCoreApplication app(argc, argv);
 	const QStringList args = app.arguments();
 	if (args.size() < 3) {
-		std::fprintf(stderr, "usage: chat-probe <twitch|youtube|kick|tiktok> <channel> [seconds]\n");
+		std::fprintf(stderr, "usage: chat-probe <twitch|youtube|kick> <channel> [seconds]\n");
 		return 2;
 	}
 
@@ -141,8 +140,6 @@ int main(int argc, char **argv)
 		c = new YouTubeChat(&net, &app);
 	else if (platform == QLatin1String("kick"))
 		c = new KickChat(&net, &app);
-	else if (platform == QLatin1String("tiktok"))
-		c = new TikTokChat(&net, &app);
 	if (!c) {
 		std::fprintf(stderr, "unknown platform '%s'\n", qPrintable(platform));
 		return 2;

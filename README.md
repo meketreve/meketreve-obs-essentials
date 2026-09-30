@@ -14,11 +14,11 @@ required, though building locally on Linux is a one-liner (see
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
-| **Unified Chat** | Dock | Twitch, YouTube, Kick and TikTok chat merged into one panel inside OBS. |
+| **Unified Chat** | Dock | Twitch, YouTube and Kick chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
 | **Texuguito** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
-| **Alerts** | Dock + overlay + web editor | Follows, subs, gift subs, bits, Super Chats, raids and TikTok/Kick gifts from every chat as on-screen alerts, set up in an editor that opens in your browser. |
-| **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, TikTok, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
+| **Alerts** | Dock + overlay + web editor | Follows, subs, gift subs, bits, Super Chats, raids and Kick gifts from every chat as on-screen alerts, set up in an editor that opens in your browser. |
+| **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
 | **Vertical canvas** | Docks | A second 9:16 canvas with its own scenes, sources, preview, recording, backtrack and streaming. Port of Aitum Vertical Canvas. Needs OBS 32+. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
 
@@ -50,7 +50,7 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
 
 - **Parade:** everyone chatting walks along the bottom of the stream with an
   LPC pixel-art avatar they customize with `!cor`, `!chapeu`, `!acessorio`,
-  `!apelido` and `!dança`. Bits, Super Chats and TikTok gifts make them cheer.
+  `!apelido` and `!dança`. Bits, Super Chats and Kick gifts make them cheer.
 - **Points:** a point per minute in chat, spent on `!tocar <clip>` (clips in
   the audio folder, in subfolders named after their price, e.g.
   `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points). Each
@@ -68,8 +68,7 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
 
 It reads every platform set up in Unified Chat. Replies go back to the
 platform the command came from when you are logged in there (Twitch, YouTube
-and Kick, see [Chat login](#chat-login)); TikTok viewers can use the
-commands, but the bot cannot answer them. With a Twitch login as the
+and Kick, see [Chat login](#chat-login)). With a Twitch login as the
 broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
 message. Coming from the Python bot? **Import old bot** copies its `data/`
@@ -84,10 +83,9 @@ your web browser. It runs on your own computer, and changes are saved and reach
 OBS as you make them.
 
 - **Events:** follow, sub, resub, gift sub (a gift of many shows once), bits,
-  Super Chat / Super Sticker, raid / host, YouTube member, TikTok and Kick
-  gifts, TikTok shares and likes (the last two are off by default). Each one
-  has its own on/off switch and a minimum (bits, months, viewers, amount paid,
-  TikTok diamonds…).
+  Super Chat / Super Sticker, raid / host, YouTube member and Kick gifts.
+  Each one has its own on/off switch and a minimum (bits, months, viewers,
+  amount paid, Kicks…).
 - **Look:** text with `{name}` `{amount}` `{message}` `{detail}` `{platform}`
   (or `{nome}` `{quantidade}` `{mensagem}` `{detalhe}` `{plataforma}`), any
   Google Fonts font, colors, size, layout, entrance and exit animations, time
@@ -173,7 +171,6 @@ channels you stream to. Each field takes a plain name or a link:
 | Twitch | `xqc` or `twitch.tv/xqc` | Anonymous read-only IRC over WebSocket. |
 | YouTube | `@handle`, channel link or live/video link | The same InnerTube endpoint the popout chat uses, so no API key and no daily quota. |
 | Kick | `westcol` or `kick.com/westcol` | Kick's public Pusher channel. If Kick's API is blocked, type the numeric chatroom id instead. |
-| TikTok | `@user` or `tiktok.com/@user` | TikTok signs its chat WebSocket URL, so the signed URL comes from [Euler Stream](https://www.eulerstream.com) (the sign server TikTok-Live-Connector uses); after that the connection goes straight to TikTok. |
 
 Leave a field empty to turn that platform off. A channel that is not live is
 checked again every minute, so the chat connects on its own when the stream
@@ -181,9 +178,9 @@ starts, and dropped connections retry with backoff. Hover the colored dots at
 the top to see each platform's status.
 
 **Activity** (Docks → Activity) lists subs, gifted subs, raids, bits,
-follows, Super Chats/stickers, memberships and TikTok gifts, follows and
-shares from every platform; they are also highlighted in the chat (turn that
-off in Settings). TikTok likes are off by default. Twitch follows need a login
+follows, Super Chats/stickers, memberships and Kick gifts from every
+platform; they are also highlighted in the chat (turn that off in Settings).
+Twitch follows need a login
 (see below); Kick follows arrive on their own.
 
 Emotes show as pictures: Twitch and Kick emotes, plus the global and channel
@@ -197,8 +194,7 @@ Without logging in the chat is read-only and nothing is sent to any platform.
 #### Stream info
 
 **Docks → Stream info** sets the stream **title** and **category/game** on
-every logged-in platform at once (Twitch, YouTube and Kick; TikTok does not
-allow it through its API). On YouTube it applies to the live broadcast (or
+every logged-in platform at once (Twitch, YouTube and Kick). On YouTube it applies to the live broadcast (or
 the next scheduled one) and the category is the video category: YouTube's
 game title cannot be set through the API. It opens with what is live now; search a
 category, pick it, and the same name is looked up on each platform (a
@@ -213,12 +209,11 @@ one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
 ban, unban / lift timeout, delete message. On Twitch it also brings follows
 into Activity (you must be the broadcaster or a moderator), and the **Viewers**
 button lists who is in chat (broadcaster or moderator) and who is banned
-(broadcaster only), with timeout, ban and unban right there; Kick, YouTube and
-TikTok do not offer these lists. On YouTube, sending and moderation go to your
+(broadcaster only), with timeout, ban and unban right there; Kick and YouTube do
+not offer these lists. On YouTube, sending and moderation go to your
 own live broadcast's chat and each costs 50 of the 10,000 daily API units
 (about 200 actions a day); reading the chat costs nothing. YouTube lifts a
 ban by its id, so unban works for bans made from OBS since it started.
-TikTok has no sending.
 
 - **Twitch:** nothing to set up. Click **Log in** in Unified Chat → Settings →
   Twitch; OBS shows a code and opens twitch.tv/activate, approve it there. The
@@ -245,15 +240,15 @@ TikTok has no sending.
   - **Want your own Kick app instead?** At
     [kick.com/settings/developer](https://kick.com/settings/developer) create
     an app with Redirect URL `http://localhost:53682/callback` and the scopes
-    *user:read, channel:read, chat:write, moderation:ban,
+    *user:read, channel:read, channel:write, chat:write, moderation:ban,
     moderation:chat_message:manage*; paste its *Client ID* and *Client
     Secret* and the plugin talks to Kick directly.
 
 Tokens are kept as plain text in the plugin's config folder
 (`chat-accounts.json`, readable only by your user). Use **Log out** to revoke
 them.
-YouTube and TikTok use unofficial endpoints, so a change on their side can
-break those two until the plugin is updated.
+YouTube chat is read through an unofficial endpoint, so a change on
+YouTube's side can break it until the plugin is updated.
 
 ### Voice FX Mixer
 

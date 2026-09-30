@@ -210,9 +210,7 @@ int main(int argc, char **argv)
 		ev(ChatPlatform::Kick, ChatEvent::Raid, "Raider", 1234, "", "");
 		ev(ChatPlatform::YouTube, ChatEvent::Donation, "Rich", 0, "R$ 10,00", "valeu pela live");
 		ev(ChatPlatform::YouTube, ChatEvent::Membership, "Member", 0, "Welcome to Members!", "");
-		ev(ChatPlatform::TikTok, ChatEvent::Gift, "Fan", 7, "Rose (7 \u2666)", "");
-		ev(ChatPlatform::TikTok, ChatEvent::Follow, "newfan", 0, "", "");
-		ev(ChatPlatform::TikTok, ChatEvent::Share, "sharer", 0, "", "");
+		ev(ChatPlatform::Kick, ChatEvent::Gift, "Fan", 100, "Hype", "");
 		ev(ChatPlatform::Kick, ChatEvent::Follow, "kickfan", 0, "", "");
 		chat->appendMessage(
 			{ChatPlatform::Kick, QStringLiteral("kicker"), QString(), QStringLiteral("salve"), QString()});
