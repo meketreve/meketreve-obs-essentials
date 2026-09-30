@@ -184,7 +184,7 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 			   {QStringLiteral("acessorio"), optional(v.acessorio)},
 			   {QStringLiteral("is_mod"), status.isMod},
 			   {QStringLiteral("is_sub"), status.isSub},
-			   {QStringLiteral("is_broadcaster"), status.isBroadcaster},
+			   {QStringLiteral("is_broadcaster"), status.isBroadcaster || status.streamer},
 			   {QStringLiteral("platform"), QLatin1String(platforms[static_cast<int>(status.platform)])},
 			   /* Seconds left, not booleans: the overlay turns them into
 			    * its own deadlines and checks them every frame. */
@@ -260,7 +260,8 @@ void BotEngine::refreshPresence()
 	const qint64 now = m_clock.elapsed();
 	for (auto it = m_status.begin(); it != m_status.end(); ++it) {
 		Status &s = it.value();
-		const bool present = s.inChatters || (s.lastSeen > 0 && now - s.lastSeen < kPresenceMinutes * 60000LL);
+		const bool present = s.streamer || s.isBroadcaster || s.inChatters ||
+				     (s.lastSeen > 0 && now - s.lastSeen < kPresenceMinutes * 60000LL);
 		if (present == s.present)
 			continue;
 		s.present = present;
@@ -285,6 +286,24 @@ void BotEngine::setTwitchChatters(const QSet<QString> &logins)
 		if (it->platform == ChatPlatform::Twitch)
 			it->inChatters = keys.contains(it.key());
 	}
+	refreshPresence();
+}
+
+void BotEngine::setStreamerChannels(const QList<QPair<ChatPlatform, QString>> &channels)
+{
+	QSet<QString> keys;
+	for (const auto &[platform, name] : channels) {
+		if (name.trimmed().isEmpty())
+			continue;
+		const QString key = keyFor(platform, name);
+		keys.insert(key);
+		if (!m_status.contains(key)) {
+			m_viewers.getOrCreate(key, name.trimmed());
+			m_status[key].platform = platform;
+		}
+	}
+	for (auto it = m_status.begin(); it != m_status.end(); ++it)
+		it->streamer = keys.contains(it.key());
 	refreshPresence();
 }
 

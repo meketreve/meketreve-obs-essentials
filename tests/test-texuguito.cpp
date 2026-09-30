@@ -380,6 +380,42 @@ private slots:
 		QCOMPARE(bot.snapshot().value(QStringLiteral("viewers")).toArray().size(), 1);
 	}
 
+	void streamerAlwaysInParade()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		const auto keys = [&bot]() {
+			QStringList out;
+			for (const QJsonValue v : bot.snapshot().value(QStringLiteral("viewers")).toArray())
+				out.append(v.toObject().value(QStringLiteral("username")).toString());
+			return out;
+		};
+
+		/* Twitch and Kick channels with the same name: one crowned avatar. */
+		bot.setStreamerChannels({{ChatPlatform::Twitch, QStringLiteral("meketreve")},
+					 {ChatPlatform::Kick, QStringLiteral("meketreve")}});
+		QCOMPARE(keys().size(), 1);
+		const QJsonObject streamer = bot.snapshot().value(QStringLiteral("viewers")).toArray().at(0).toObject();
+		QVERIFY(streamer.value(QStringLiteral("is_broadcaster")).toBool());
+
+		/* Not in the Twitch viewer list and quiet: still there. */
+		bot.setTwitchChatters({QStringLiteral("ana")});
+		bot.setTwitchChatters({});
+		QCOMPARE(keys().size(), 1);
+		QVERIFY(keys().first().endsWith(QLatin1String("meketreve")));
+
+		/* A new channel name takes the old one's place. */
+		bot.setStreamerChannels({{ChatPlatform::Twitch, QStringLiteral("outro")}});
+		QCOMPARE(keys(), QStringList{QStringLiteral("outro")});
+
+		/* The broadcaster badge (YouTube) keeps them too. */
+		BotMessage owner = msg(QStringLiteral("Dono"), QStringLiteral("oi"), ChatPlatform::YouTube);
+		owner.isBroadcaster = true;
+		bot.handleMessage(owner);
+		bot.setStreamerChannels({});
+		QCOMPARE(keys(), QStringList{QStringLiteral("yt:dono")});
+	}
+
 	void englishReplies()
 	{
 		QTemporaryDir dir;

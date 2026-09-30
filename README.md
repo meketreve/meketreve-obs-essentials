@@ -71,7 +71,8 @@ platform the command came from when you are logged in there (Twitch, YouTube
 and Kick, see [Chat login](#chat-login)). With a Twitch login as the
 broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
-message. Coming from the Python bot? **Import old bot** copies its `data/`
+message. The streamer's own avatar (the Twitch and Kick channels set in
+Unified Chat, or whoever chats with the broadcaster badge) never leaves. Coming from the Python bot? **Import old bot** copies its `data/`
 and `audios/` folders. Clips and TTS play through the Browser Source, so they
 show up in the OBS mixer.
 

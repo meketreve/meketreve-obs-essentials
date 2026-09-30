@@ -20,6 +20,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tts-client.hpp"
 
 #include "../unified-chat/chat-accounts.hpp"
+#include "../unified-chat/kick-chat.hpp"
+#include "../unified-chat/twitch-chat.hpp"
 #include "../unified-chat/unified-chat-dock.hpp"
 
 #include <obs-frontend-api.h>
@@ -142,9 +144,11 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	});
 	connect(m_chat, &UnifiedChatDock::incoming, this, &TexuguitoDock::onChat);
 	connect(m_chat, &UnifiedChatDock::targetsChanged, this, [this]() {
+		updateStreamerChannels();
 		refreshStatus();
 		pollChatters();
 	});
+	updateStreamerChannels();
 	connect(m_chat->accounts(), &ChatAccounts::accountChanged, this, [this]() {
 		m_chattersDenied = false;
 		refreshStatus();
@@ -350,6 +354,20 @@ void TexuguitoDock::onReply(ChatPlatform platform, const QString &text)
 	if (!m_chat->sendAs(platform, text))
 		obs_log(LOG_INFO, "[texuguito] reply not sent (no login on that platform): %s",
 			text.toUtf8().constData());
+}
+
+void TexuguitoDock::updateStreamerChannels()
+{
+	/* YouTube channels are handles or links, not names: the streamer's
+	 * avatar shows there after their first message (broadcaster badge). */
+	QList<QPair<ChatPlatform, QString>> channels;
+	channels.append({ChatPlatform::Twitch, TwitchChat::normalizeChannel(m_chat->target(ChatPlatform::Twitch))});
+	const QString kick = KickChat::normalizeChannel(m_chat->target(ChatPlatform::Kick));
+	bool numeric = false;
+	kick.toLongLong(&numeric);
+	if (!numeric) /* a chatroom id, not a name */
+		channels.append({ChatPlatform::Kick, kick});
+	m_engine->setStreamerChannels(channels);
 }
 
 void TexuguitoDock::pollChatters()

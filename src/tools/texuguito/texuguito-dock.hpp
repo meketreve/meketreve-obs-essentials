@@ -48,6 +48,7 @@ private:
 	void onChat(const ChatMessage &msg);
 	void onReply(ChatPlatform platform, const QString &text);
 	void pollChatters();
+	void updateStreamerChannels();
 	void refreshStatus();
 	void addBrowserSource();
 	void importOldBot();

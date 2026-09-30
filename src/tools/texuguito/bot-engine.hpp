@@ -22,7 +22,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QElapsedTimer>
 #include <QJsonObject>
+#include <QList>
 #include <QObject>
+#include <QPair>
 #include <QPointer>
 #include <QTimer>
 
@@ -100,6 +102,8 @@ public:
 	void handleCheer(ChatPlatform platform, const QString &user);
 	/* Twitch viewer list (Helix chatters): who is watching even if quiet. */
 	void setTwitchChatters(const QSet<QString> &logins);
+	/* The streamer's own channels: their avatar never leaves the parade. */
+	void setStreamerChannels(const QList<QPair<ChatPlatform, QString>> &channels);
 	/* Runs the per-minute points tick now (the timer calls it too). */
 	void pointsTick();
 	void refreshPresence();
@@ -125,6 +129,7 @@ private:
 		bool isBroadcaster = false;
 		bool present = false;
 		bool inChatters = false;
+		bool streamer = false; /* one of the streamer's channels */
 		qint64 lastSeen = 0;
 		qint64 presentSince = 0; /* who got the avatar first among same-name viewers */
 		qint64 dancingUntil = 0;
