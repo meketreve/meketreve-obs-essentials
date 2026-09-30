@@ -69,6 +69,7 @@ public:
 	/* Without a viewer list (every platform but a logged-in Twitch), a
 	 * viewer counts as present for this long after their last message. */
 	static constexpr int kPresenceMinutes = 10;
+	static constexpr qint64 kSameCommandMs = 15000;
 	/* The site's command list, one page per language. */
 	static constexpr const char *kCommandsUrlPt =
 		"https://meketreve.github.io/meketreve-obs-essentials/comandos.html";
@@ -172,6 +173,14 @@ private:
 	std::map<QString, AudioClip> m_clips;
 	QString m_audioDir;
 	QHash<int, QElapsedTimer> m_lastClip; /* by price */
+	/* A command the streamer sent to every chat at once comes back from
+	 * each platform: only the first one runs. */
+	struct StreamerCommand {
+		QString text;
+		ChatPlatform platform = ChatPlatform::Twitch;
+		qint64 at = -1;
+	};
+	StreamerCommand m_lastStreamerCommand;
 	QHash<int, int> m_cooldowns;
 	QElapsedTimer m_clock;
 	double m_volume = 1.0;

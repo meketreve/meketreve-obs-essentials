@@ -68,7 +68,9 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
 
 It reads every platform set up in Unified Chat. Replies go back to the
 platform the command came from when you are logged in there (Twitch, YouTube
-and Kick, see [Chat login](#chat-login)). With a Twitch login as the
+and Kick, see [Chat login](#chat-login)); a command you send to every chat
+at once runs and answers only once, on the first chat it comes back from.
+With a Twitch login as the
 broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
 message. The streamer's own avatar (the Twitch and Kick channels set in

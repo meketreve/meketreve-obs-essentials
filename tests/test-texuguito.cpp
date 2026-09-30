@@ -416,6 +416,35 @@ private slots:
 		QCOMPARE(keys(), QStringList{QStringLiteral("yt:dono")});
 	}
 
+	void streamerCommandToEveryChatAnswersOnce()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
+		bot.setStreamerChannels({{ChatPlatform::Twitch, QStringLiteral("meketreve")},
+					 {ChatPlatform::Kick, QStringLiteral("meketreve")}});
+		QSignalSpy said(&bot, &BotEngine::reply);
+
+		/* Sent to every chat: it comes back from Twitch, Kick and YouTube. */
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!pontos")));
+		bot.handleMessage(msg(QStringLiteral("meketreve"), QStringLiteral("!pontos"), ChatPlatform::Kick));
+		BotMessage owner = msg(QStringLiteral("Meketreve"), QStringLiteral("!pontos"), ChatPlatform::YouTube);
+		owner.isBroadcaster = true;
+		bot.handleMessage(owner);
+		QCOMPARE(said.size(), 1);
+		QCOMPARE(said.at(0).at(0).value<ChatPlatform>(), ChatPlatform::Twitch);
+
+		/* Typed again in one chat, or a different command: answered. */
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!pontos")));
+		bot.handleMessage(msg(QStringLiteral("meketreve"), QStringLiteral("!audios"), ChatPlatform::Kick));
+		QCOMPARE(said.size(), 3);
+
+		/* Viewers with the same name on two platforms are two people. */
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!pontos")));
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!pontos"), ChatPlatform::Kick));
+		QCOMPARE(said.size(), 5);
+	}
+
 	void englishReplies()
 	{
 		QTemporaryDir dir;

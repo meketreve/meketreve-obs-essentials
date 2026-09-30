@@ -350,6 +350,16 @@ void BotEngine::handleMessage(const BotMessage &msg)
 	if (name.isEmpty())
 		return;
 
+	if (s.isBroadcaster || s.streamer) {
+		const QString text = msg.text.simplified().toLower();
+		const qint64 now = m_clock.elapsed();
+		StreamerCommand &last = m_lastStreamerCommand;
+		if (last.at >= 0 && now - last.at < kSameCommandMs && last.text == text &&
+		    last.platform != msg.platform)
+			return;
+		last = {text, msg.platform, now};
+	}
+
 	/* Chat-made commands first, but they can never shadow a built-in one. */
 	if (!reservedNames().contains(name) && m_custom.contains(name)) {
 		say(msg.platform, handleCustomCommand(msg, name, args));
