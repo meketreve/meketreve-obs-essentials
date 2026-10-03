@@ -198,7 +198,7 @@ private:
 
 	QString m_storePath;
 	QNetworkAccessManager m_net;
-	std::array<ChatAccount, 3> m_accounts; /* Twitch, Kick, YouTube */
+	std::array<ChatAccount, 4> m_accounts; /* Twitch, Kick, YouTube, Trovo */
 	/* YouTube lifts a ban by the ban's id: user channel id -> ban id, for
 	 * bans made since OBS started. */
 	QHash<QString, QString> m_youtubeBans;

@@ -91,7 +91,7 @@ signals:
 	void targetsChanged();
 
 private:
-	static constexpr size_t kPlatforms = 3;
+	static constexpr size_t kPlatforms = 4;
 
 	void loadSettings();
 	void saveSettings();

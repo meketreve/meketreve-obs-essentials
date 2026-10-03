@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "emote-sets.hpp"
 
 #include "kick-chat.hpp"
+#include "trovo-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 #include "chat-accounts.hpp"
@@ -84,10 +85,11 @@ struct PlatformInfo {
 	const char *tagForeground;
 };
 
-const std::array<PlatformInfo, 3> kPlatformInfo{{
+const std::array<PlatformInfo, 4> kPlatformInfo{{
 	{"twitch", "UnifiedChat.Twitch", "UnifiedChat.Twitch.Placeholder", "TW", "#9146FF", "#FFFFFF"},
 	{"youtube", "UnifiedChat.YouTube", "UnifiedChat.YouTube.Placeholder", "YT", "#FF0033", "#FFFFFF"},
 	{"kick", "UnifiedChat.Kick", "UnifiedChat.Kick.Placeholder", "KK", "#53FC18", "#000000"},
+	{"trovo", "UnifiedChat.Trovo", "UnifiedChat.Trovo.Placeholder", "TR", "#19D66B", "#000000"},
 }};
 
 QString T(const char *key)
@@ -247,6 +249,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	});
 	m_connectors[indexOf(ChatPlatform::YouTube)] = youtube;
 	m_connectors[indexOf(ChatPlatform::Kick)] = new KickChat(&m_net, this);
+	m_connectors[indexOf(ChatPlatform::Trovo)] = new TrovoChat(&m_net, this);
 
 	for (ChatConnector *c : m_connectors) {
 		connect(c, &ChatConnector::messageReceived, this, &UnifiedChatDock::appendMessage);

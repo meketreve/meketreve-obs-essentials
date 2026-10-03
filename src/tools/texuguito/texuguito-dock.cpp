@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "../unified-chat/chat-accounts.hpp"
 #include "../unified-chat/kick-chat.hpp"
+#include "../unified-chat/trovo-chat.hpp"
 #include "../unified-chat/twitch-chat.hpp"
 #include "../unified-chat/unified-chat-dock.hpp"
 
@@ -306,7 +307,7 @@ void TexuguitoDock::refreshStatus()
 	}
 
 	bool anyChannel = false;
-	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick})
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::Trovo})
 		anyChannel |= !m_chat->target(p).trimmed().isEmpty();
 	if (m_enabled && !anyChannel)
 		m_status->setText(m_status->text() + QStringLiteral("<br><span style=\"color:#E0A000\">%1</span>")
@@ -376,6 +377,10 @@ void TexuguitoDock::updateStreamerChannels()
 	kick.toLongLong(&numeric);
 	if (!numeric) /* a chatroom id, not a name */
 		channels.append({ChatPlatform::Kick, kick});
+	const QString trovo = TrovoChat::normalizeChannel(m_chat->target(ChatPlatform::Trovo));
+	trovo.toLongLong(&numeric);
+	if (!numeric)
+		channels.append({ChatPlatform::Trovo, trovo});
 	m_engine->setStreamerChannels(channels);
 }
 

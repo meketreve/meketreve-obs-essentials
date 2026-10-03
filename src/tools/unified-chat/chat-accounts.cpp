@@ -56,12 +56,32 @@ const char *const kKickScopes =
 
 size_t slot(ChatPlatform p)
 {
-	return p == ChatPlatform::Kick ? 1 : p == ChatPlatform::YouTube ? 2 : 0;
+	switch (p) {
+	case ChatPlatform::Twitch:
+		return 0;
+	case ChatPlatform::Kick:
+		return 1;
+	case ChatPlatform::YouTube:
+		return 2;
+	case ChatPlatform::Trovo:
+		return 3;
+	}
+	return 0;
 }
 
 const char *platformKey(ChatPlatform p)
 {
-	return p == ChatPlatform::Kick ? "kick" : p == ChatPlatform::YouTube ? "youtube" : "twitch";
+	switch (p) {
+	case ChatPlatform::Twitch:
+		return "twitch";
+	case ChatPlatform::Kick:
+		return "kick";
+	case ChatPlatform::YouTube:
+		return "youtube";
+	case ChatPlatform::Trovo:
+		return "trovo";
+	}
+	return "twitch";
 }
 
 QUrl youtubeUrl(const QString &path, const QUrlQuery &query = {})

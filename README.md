@@ -14,7 +14,7 @@ required, though building locally on Linux is a one-liner (see
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
-| **Unified Chat** | Dock | Twitch, YouTube and Kick chat merged into one panel inside OBS. |
+| **Unified Chat** | Dock | Twitch, YouTube, Kick and Trovo chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
 | **Texuguito** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
 | **Alerts** | Dock + overlay + web editor | Follows, subs, gift subs, bits, Super Chats, raids and Kick gifts from every chat as on-screen alerts, set up in an editor that opens in your browser. |
@@ -178,6 +178,7 @@ channels you stream to. Each field takes a plain name or a link:
 | Twitch | `xqc` or `twitch.tv/xqc` | Anonymous read-only IRC over WebSocket. |
 | YouTube | `@handle`, channel link or live/video link | The same InnerTube endpoint the popout chat uses, so no API key and no daily quota. An unlisted live does not show on the channel page: when you are logged in to that channel, the plugin asks YouTube for it (at most every 3 minutes, 1 API unit each). A private live cannot be read; the chat says so. |
 | Kick | `westcol` or `kick.com/westcol` | Kick's public Pusher channel. If Kick's API is blocked, type the numeric chatroom id instead. |
+| Trovo | `meketreve` or `trovo.live/s/meketreve` | Trovo's open chat service, with the plugin's app id: no login needed to read. Spells, subs, gift subs, follows and raids show in Activity. |
 
 Leave a field empty to turn that platform off. A channel that is not live is
 checked again every minute, so the chat connects on its own when the stream

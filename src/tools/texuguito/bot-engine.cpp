@@ -100,6 +100,8 @@ QString BotEngine::keyFor(ChatPlatform platform, const QString &user)
 		return QStringLiteral("kick:") + name;
 	case ChatPlatform::YouTube:
 		return QStringLiteral("yt:") + name;
+	case ChatPlatform::Trovo:
+		return QStringLiteral("tr:") + name;
 	}
 	return name;
 }
@@ -218,7 +220,7 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 	const auto optional = [](const QString &s) {
 		return s.isEmpty() ? QJsonValue() : QJsonValue(s);
 	};
-	static const char *const platforms[] = {"twitch", "youtube", "kick"};
+	static const char *const platforms[] = {"twitch", "youtube", "kick", "trovo"};
 	return QJsonObject{{QStringLiteral("username"), key},
 			   {QStringLiteral("nick"), v.nick.isEmpty() ? displayName(key) : v.nick},
 			   {QStringLiteral("cor"), v.cor},

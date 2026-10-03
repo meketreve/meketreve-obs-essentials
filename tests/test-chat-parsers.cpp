@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "emote-sets.hpp"
 #include "irc-message.hpp"
 #include "kick-chat.hpp"
+#include "trovo-chat.hpp"
 #include "oauth-util.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
@@ -379,6 +380,63 @@ private slots:
 		QCOMPARE(msgs[3].amount, 5);
 		QCOMPARE(msgs[4].text,
 			 QStringLiteral("!addaudio https://www.myinstants.com/pt/instant/vine-boom-sound-70972/ 50"));
+	}
+
+	void trovoEvents()
+	{
+		qRegisterMetaType<ChatMessage>();
+		QCOMPARE(TrovoChat::normalizeChannel(QStringLiteral("https://trovo.live/s/Meketreve?x=1")),
+			 QStringLiteral("meketreve"));
+		QCOMPARE(TrovoChat::normalizeChannel(QStringLiteral("@Meketreve")), QStringLiteral("meketreve"));
+
+		TrovoChat chat(nullptr, nullptr);
+		chat.setConnectedAt(1000);
+		QSignalSpy spy(&chat, &ChatConnector::messageReceived);
+		const auto item = [](int type, const char *nick, const QString &content, qint64 sent = 2000) {
+			return QJsonObject{{QStringLiteral("type"), type},
+					   {QStringLiteral("nick_name"), QString::fromUtf8(nick)},
+					   {QStringLiteral("content"), content},
+					   {QStringLiteral("send_time"), sent},
+					   {QStringLiteral("sender_id"), 100000037},
+					   {QStringLiteral("message_id"), QStringLiteral("m1")},
+					   {QStringLiteral("sub_tier"), QStringLiteral("1")},
+					   {QStringLiteral("roles"),
+					    QJsonArray{QStringLiteral("mod"), QStringLiteral("subscriber")}}};
+		};
+		const QJsonArray chats{
+			item(0, "Velho", QStringLiteral("history"), 900), /* replayed on connect: skipped */
+			item(0, "Ana", QStringLiteral("oi trovo")),
+			item(5, "Fan", QStringLiteral("{\"gift\":\"Winner\", \"num\":3}")),
+			item(5001, "Sub", QStringLiteral("has subscribed to the channel!")),
+			item(5003, "Seguidor", QStringLiteral("just followed channel!")),
+			item(5005, "Papai", QStringLiteral("2")),
+			item(5006, "Tia", QStringLiteral("100000252,CatKing")),
+			item(5008, "Raider42",
+			     QStringLiteral("Raider42 is carrying 15 raiders to this channel. Welcome!")),
+			item(5004, "Entrou", QStringLiteral("joined")), /* ignored */
+		};
+		chat.handleFrame(QJsonDocument(QJsonObject{{QStringLiteral("type"), QStringLiteral("CHAT")},
+							   {QStringLiteral("data"),
+							    QJsonObject{{QStringLiteral("chats"), chats}}}})
+					 .toJson());
+
+		const QList<ChatMessage> msgs = collect(spy);
+		QCOMPARE(msgs.size(), 7);
+		QCOMPARE(msgs[0].platform, ChatPlatform::Trovo);
+		QCOMPARE(msgs[0].text, QStringLiteral("oi trovo"));
+		QCOMPARE(msgs[0].userId, QStringLiteral("100000037"));
+		QVERIFY(msgs[0].isMod && msgs[0].isSub && !msgs[0].isBroadcaster);
+		QCOMPARE(msgs[1].event, ChatEvent::Gift);
+		QCOMPARE(msgs[1].amount, 3);
+		QCOMPARE(msgs[1].detail, QStringLiteral("Winner"));
+		QCOMPARE(msgs[2].event, ChatEvent::Sub);
+		QCOMPARE(msgs[2].detail, QStringLiteral("Tier 1"));
+		QCOMPARE(msgs[3].event, ChatEvent::Follow);
+		QCOMPARE(msgs[4].event, ChatEvent::GiftSub);
+		QCOMPARE(msgs[4].amount, 2);
+		QCOMPARE(msgs[5].detail, QStringLiteral("CatKing"));
+		QCOMPARE(msgs[6].event, ChatEvent::Raid);
+		QCOMPARE(msgs[6].amount, 15);
 	}
 
 	void youtubeChannelIdFromPage()

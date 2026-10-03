@@ -10,7 +10,7 @@ const AlertRender = (() => {
     "serif", "monospace", "system-ui",
   ]);
 
-  const PLATFORM_NAMES = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+  const PLATFORM_NAMES = { twitch: "Twitch", youtube: "YouTube", kick: "Kick", trovo: "Trovo" };
 
   // ---- Default drawings (viewBox 0 0 100 100, "A" = accent colour) ----
   const DRAWINGS = {

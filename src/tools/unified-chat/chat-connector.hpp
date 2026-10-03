@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QString>
 #include <QTimer>
 
-enum class ChatPlatform { Twitch, YouTube, Kick };
+enum class ChatPlatform { Twitch, YouTube, Kick, Trovo };
 
 /* Things that happen in a live besides chat. Connectors only fill in the
  * data; the dock turns it into translated text. */
