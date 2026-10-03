@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-connector.hpp"
 #include "ws-client.hpp"
 
+#include <QJsonObject>
 #include <QPointer>
 
 class QNetworkReply;
@@ -38,10 +39,14 @@ public:
 
 	/* One Pusher frame; public so tests can feed it. */
 	void handleEvent(const QByteArray &data);
+	/* kick.com/api/v2/channels/<slug> -> livestream.viewer_count, -1 when
+	 * the channel is not live. */
+	static int viewersFromChannel(const QJsonObject &channel);
 
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
+	void fetchViewers() override;
 
 private:
 	void onChannelInfo(QNetworkReply *reply);
@@ -49,6 +54,8 @@ private:
 
 	WsClient m_ws;
 	QPointer<QNetworkReply> m_pending;
+	QPointer<QNetworkReply> m_viewersReply;
+	QString m_slug; /* empty when the chatroom id was typed instead */
 	QString m_chatroomId;
 	QString m_channelId;
 };

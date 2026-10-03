@@ -53,6 +53,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPointer>
@@ -228,7 +229,11 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 	connect(m_accounts, &ChatAccounts::eventReceived, this, &UnifiedChatDock::incoming);
 	connect(m_accounts, &ChatAccounts::openBrowser, this, [](const QUrl &url) { QDesktopServices::openUrl(url); });
 
-	m_connectors[indexOf(ChatPlatform::Twitch)] = new TwitchChat(&m_net, this);
+	auto *twitch = new TwitchChat(&m_net, this);
+	twitch->setViewerLookup([this](const QString &channel, std::function<void(int)> done) {
+		m_accounts->twitchViewers(channel, std::move(done));
+	});
+	m_connectors[indexOf(ChatPlatform::Twitch)] = twitch;
 	auto *youtube = new YouTubeChat(&m_net, this);
 	youtube->setLiveLookup([this](const QString &channelId, std::function<void(const QString &)> done) {
 		m_accounts->youtubeLiveVideo(channelId, [this, done](const QString &videoId, const QString &privacy) {
@@ -256,6 +261,10 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 			[this, platform](ConnectorState state, const QString &detail) {
 				updateStatus(platform, state, detail);
 			});
+		connect(c, &ChatConnector::viewersChanged, this, [this, platform](int) {
+			const size_t i = indexOf(platform);
+			updateStatus(platform, m_states[i], m_stateDetails[i]);
+		});
 		updateStatus(platform, ConnectorState::Idle, QString());
 	}
 
@@ -754,6 +763,8 @@ void UnifiedChatDock::appendSystemLine(ChatPlatform platform, const QString &tex
 void UnifiedChatDock::updateStatus(ChatPlatform platform, ConnectorState state, const QString &detail)
 {
 	const size_t i = indexOf(platform);
+	m_states[i] = state;
+	m_stateDetails[i] = detail;
 	const char *color = "gray";
 	const char *stateKey = "UnifiedChat.State.Idle";
 	switch (state) {
@@ -778,9 +789,19 @@ void UnifiedChatDock::updateStatus(ChatPlatform platform, ConnectorState state, 
 	}
 
 	QLabel *label = m_status[i];
-	label->setText(QStringLiteral("<span style=\"color:%1\">&#9679;</span> %2")
-			       .arg(QLatin1String(color), QLatin1String(kPlatformInfo[i].tag)));
+	QString text = QStringLiteral("<span style=\"color:%1\">&#9679;</span> %2")
+			       .arg(QLatin1String(color), QLatin1String(kPlatformInfo[i].tag));
 	QString tip = T(kPlatformInfo[i].labelKey) + QStringLiteral(": ") + T(stateKey);
+	const int viewers = m_connectors[i] ? m_connectors[i]->viewers() : -1;
+	if (viewers >= 0) {
+		const QString count = QLocale().toString(viewers);
+		text += QStringLiteral(" <span style=\"color:gray\">%1</span>").arg(count);
+		tip += QStringLiteral("\n") + T("UnifiedChat.WatchingNow").arg(count);
+	} else if (platform == ChatPlatform::Twitch && state == ConnectorState::Connected &&
+		   !m_accounts->account(ChatPlatform::Twitch).loggedIn()) {
+		tip += QStringLiteral("\n") + T("UnifiedChat.Twitch.ViewersNeedLogin");
+	}
+	label->setText(text);
 	if (!detail.isEmpty())
 		tip += QStringLiteral("\n") + detail;
 	label->setToolTip(tip);

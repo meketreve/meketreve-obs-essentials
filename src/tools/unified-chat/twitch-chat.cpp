@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "irc-message.hpp"
 
+#include <QPointer>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 
@@ -70,6 +71,18 @@ void TwitchChat::connectNow()
 void TwitchChat::disconnectNow()
 {
 	m_ws.close();
+}
+
+void TwitchChat::fetchViewers()
+{
+	if (!m_viewerLookup || m_channel.isEmpty())
+		return;
+	QPointer<TwitchChat> self(this);
+	const QString channel = m_channel;
+	m_viewerLookup(channel, [self, channel](int viewers) {
+		if (self && self->running() && self->m_channel == channel)
+			self->setViewers(viewers);
+	});
 }
 
 QList<ChatEmote> TwitchChat::parseEmotes(const QString &tag, const QString &text)

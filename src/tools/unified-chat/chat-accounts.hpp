@@ -155,6 +155,10 @@ public:
 			      std::function<void(const QList<StreamCategory> &found, const QString &error)> done);
 	void updateStreamInfo(ChatPlatform p, const QString &title, const QString &categoryId, ActionDone done);
 
+	/* People watching the Twitch channel now (Helix streams, any login);
+	 * -1 when it is offline or nobody is logged in. */
+	void twitchViewers(const QString &channel, std::function<void(int viewers)> done);
+
 	/* Twitch follows need a moderator token: subscribe over EventSub. */
 	void watchTwitchFollows(const QString &channel);
 

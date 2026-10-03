@@ -81,6 +81,7 @@ void KickChat::connectNow()
 
 	bool numeric = false;
 	channel.toLongLong(&numeric);
+	m_slug = numeric ? QString() : channel;
 	if (numeric) {
 		m_chatroomId = channel;
 		m_channelId.clear();
@@ -103,7 +104,41 @@ void KickChat::disconnectNow()
 		m_pending->abort();
 		m_pending = nullptr;
 	}
+	if (m_viewersReply) {
+		m_viewersReply->abort();
+		m_viewersReply = nullptr;
+	}
 	m_ws.close();
+}
+
+int KickChat::viewersFromChannel(const QJsonObject &channel)
+{
+	const QJsonValue live = channel.value(QStringLiteral("livestream"));
+	if (!live.isObject())
+		return -1;
+	return live.toObject().value(QStringLiteral("viewer_count")).toInt(-1);
+}
+
+void KickChat::fetchViewers()
+{
+	if (m_slug.isEmpty() || m_viewersReply)
+		return;
+	QNetworkRequest req(QUrl(QStringLiteral("https://kick.com/api/v2/channels/%1").arg(m_slug)));
+	req.setHeader(QNetworkRequest::UserAgentHeader, QString::fromLatin1(kBrowserUserAgent));
+	req.setRawHeader("Accept", "application/json");
+	req.setTransferTimeout(15000);
+	m_viewersReply = net()->get(req);
+	QNetworkReply *reply = m_viewersReply;
+	connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+		reply->deleteLater();
+		if (m_viewersReply != reply)
+			return;
+		m_viewersReply = nullptr;
+		/* A blocked or failed check keeps the last number. */
+		if (reply->error() != QNetworkReply::NoError)
+			return;
+		setViewers(viewersFromChannel(QJsonDocument::fromJson(reply->readAll()).object()));
+	});
 }
 
 void KickChat::onChannelInfo(QNetworkReply *reply)

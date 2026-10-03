@@ -71,14 +71,22 @@ public:
 	void start(const QString &target);
 	void stop();
 
+	/* People watching the stream now; -1 when unknown (offline, no source). */
+	int viewers() const { return m_viewers; }
+
 signals:
 	void messageReceived(const ChatMessage &msg);
 	void stateChanged(ConnectorState state, const QString &detail);
+	void viewersChanged(int viewers);
 
 protected:
 	virtual void connectNow() = 0;
 	virtual void disconnectNow() = 0;
+	/* Asked right after connecting and then every minute; answer through
+	 * setViewers. */
+	virtual void fetchViewers() {}
 
+	void setViewers(int viewers);
 	void setState(ConnectorState state, const QString &detail = QString());
 	void emitMessage(const QString &author, const QString &color, const QString &text,
 			 const QString &highlight = QString());
@@ -98,6 +106,8 @@ private:
 	QNetworkAccessManager *m_net;
 	QString m_target;
 	QTimer m_retryTimer;
+	QTimer m_viewersTimer;
+	int m_viewers = -1;
 	int m_backoff = 0;
 	bool m_running = false;
 };

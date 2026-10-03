@@ -33,6 +33,11 @@ ChatConnector::ChatConnector(ChatPlatform platform, QNetworkAccessManager *net, 
 		if (m_running)
 			connectNow();
 	});
+	m_viewersTimer.setInterval(60000);
+	connect(&m_viewersTimer, &QTimer::timeout, this, [this]() {
+		if (m_running)
+			fetchViewers();
+	});
 }
 
 void ChatConnector::start(const QString &target)
@@ -59,7 +64,27 @@ void ChatConnector::stop()
 
 void ChatConnector::setState(ConnectorState state, const QString &detail)
 {
+	if (state == ConnectorState::Connected) {
+		if (!m_viewersTimer.isActive()) {
+			m_viewersTimer.start();
+			QTimer::singleShot(0, this, [this]() {
+				if (m_running)
+					fetchViewers();
+			});
+		}
+	} else {
+		m_viewersTimer.stop();
+		setViewers(-1);
+	}
 	emit stateChanged(state, detail);
+}
+
+void ChatConnector::setViewers(int viewers)
+{
+	if (viewers == m_viewers)
+		return;
+	m_viewers = viewers;
+	emit viewersChanged(viewers);
 }
 
 void ChatConnector::emitMessage(const QString &author, const QString &color, const QString &text,

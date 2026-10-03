@@ -185,7 +185,12 @@ void YouTubeChat::disconnectNow()
 		m_pending->abort();
 		m_pending = nullptr;
 	}
+	if (m_viewersReply) {
+		m_viewersReply->abort();
+		m_viewersReply = nullptr;
+	}
 	m_continuation.clear();
+	m_videoId.clear();
 	m_lookupSerial++;
 }
 
@@ -244,6 +249,7 @@ void YouTubeChat::onLivePage(QNetworkReply *reply)
 
 void YouTubeChat::loadChatPage(const QString &videoId)
 {
+	m_videoId = videoId;
 	QNetworkReply *reply =
 		get(QUrl(QStringLiteral("https://www.youtube.com/live_chat?is_popout=1&v=%1").arg(videoId)));
 	connect(reply, &QNetworkReply::finished, this, [this, reply]() { onChatPage(reply); });
@@ -296,6 +302,51 @@ void YouTubeChat::onChatPage(QNetworkReply *reply)
 	m_skipBacklog = true;
 	markHealthy();
 	poll();
+}
+
+int YouTubeChat::viewersFromMetadata(const QJsonObject &root)
+{
+	for (const QJsonValue action : root.value(QStringLiteral("actions")).toArray()) {
+		const QJsonValue count = path(action, {"updateViewershipAction", "viewCount", "videoViewCountRenderer",
+						       "originalViewCount"});
+		bool ok = false;
+		const int n = count.toString().toInt(&ok);
+		if (ok)
+			return n;
+	}
+	return -1;
+}
+
+void YouTubeChat::fetchViewers()
+{
+	if (m_videoId.isEmpty() || m_clientVersion.isEmpty() || m_viewersReply)
+		return;
+	/* The watch page's own "watching now" request: no API quota. */
+	QString url = QStringLiteral("https://www.youtube.com/youtubei/v1/updated_metadata?prettyPrint=false");
+	if (!m_apiKey.isEmpty())
+		url += QStringLiteral("&key=") + m_apiKey;
+	QNetworkRequest req{QUrl(url)};
+	req.setHeader(QNetworkRequest::UserAgentHeader, QString::fromLatin1(kBrowserUserAgent));
+	req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+	req.setTransferTimeout(20000);
+	const QJsonObject body{{QStringLiteral("context"),
+				QJsonObject{{QStringLiteral("client"),
+					     QJsonObject{{QStringLiteral("clientName"), QStringLiteral("WEB")},
+							 {QStringLiteral("clientVersion"), m_clientVersion}}}}},
+			       {QStringLiteral("videoId"), m_videoId}};
+	m_viewersReply = net()->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+	QNetworkReply *reply = m_viewersReply;
+	connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+		reply->deleteLater();
+		if (m_viewersReply != reply)
+			return;
+		m_viewersReply = nullptr;
+		if (reply->error() != QNetworkReply::NoError)
+			return;
+		const int n = viewersFromMetadata(QJsonDocument::fromJson(reply->readAll()).object());
+		if (n >= 0)
+			setViewers(n);
+	});
 }
 
 void YouTubeChat::poll()

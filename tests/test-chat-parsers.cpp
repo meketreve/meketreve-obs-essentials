@@ -392,6 +392,27 @@ private slots:
 				.isEmpty());
 	}
 
+	void viewerCounts()
+	{
+		/* Kick: livestream is null while offline. */
+		const QJsonObject live{
+			{QStringLiteral("livestream"),
+			 QJsonObject{{QStringLiteral("is_live"), true}, {QStringLiteral("viewer_count"), 80568}}}};
+		QCOMPARE(KickChat::viewersFromChannel(live), 80568);
+		QCOMPARE(KickChat::viewersFromChannel(QJsonObject{{QStringLiteral("livestream"), QJsonValue()}}), -1);
+		QCOMPARE(KickChat::viewersFromChannel(QJsonObject()), -1);
+
+		/* YouTube updated_metadata: the count rides in one of the actions. */
+		const QJsonObject renderer{{QStringLiteral("originalViewCount"), QStringLiteral("3990")},
+					   {QStringLiteral("isLive"), true}};
+		const QJsonObject viewership{{QStringLiteral("viewCount"),
+					      QJsonObject{{QStringLiteral("videoViewCountRenderer"), renderer}}}};
+		const QJsonArray actions{QJsonObject{{QStringLiteral("updateTitleAction"), QJsonObject()}},
+					 QJsonObject{{QStringLiteral("updateViewershipAction"), viewership}}};
+		QCOMPARE(YouTubeChat::viewersFromMetadata(QJsonObject{{QStringLiteral("actions"), actions}}), 3990);
+		QCOMPARE(YouTubeChat::viewersFromMetadata(QJsonObject()), -1);
+	}
+
 	void pkceMatchesRfc7636()
 	{
 		/* RFC 7636 appendix B. */

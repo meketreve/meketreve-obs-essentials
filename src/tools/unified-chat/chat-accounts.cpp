@@ -1230,6 +1230,21 @@ void ChatAccounts::twitchChatters(const QString &channel,
 	});
 }
 
+void ChatAccounts::twitchViewers(const QString &channel, std::function<void(int)> done)
+{
+	if (!account(ChatPlatform::Twitch).loggedIn()) {
+		done(-1);
+		return;
+	}
+	QUrl url(QStringLiteral("https://api.twitch.tv/helix/streams"));
+	url.setQuery(QUrlQuery{{QStringLiteral("user_login"), TwitchChat::normalizeChannel(channel)}});
+	api(ChatPlatform::Twitch, "GET", url, QJsonObject(), [done](int, const QJsonObject &body, const QString &) {
+		/* No entry: the channel is offline. */
+		const QJsonArray data = body.value(QStringLiteral("data")).toArray();
+		done(data.isEmpty() ? -1 : data.at(0).toObject().value(QStringLiteral("viewer_count")).toInt(-1));
+	});
+}
+
 void ChatAccounts::watchTwitchFollows(const QString &channel)
 {
 	m_eventSub.close();

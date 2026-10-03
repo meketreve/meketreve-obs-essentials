@@ -50,10 +50,13 @@ public:
 	void setLiveLookup(LiveLookup lookup) { m_liveLookup = std::move(lookup); }
 	/* "https://www.youtube.com/channel/UC…" in the page -> "UC…". */
 	static QString channelIdFromPage(const QByteArray &html);
+	/* updated_metadata's "watching now" count, -1 when it has none. */
+	static int viewersFromMetadata(const QJsonObject &root);
 
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
+	void fetchViewers() override;
 
 private:
 	QNetworkReply *get(const QUrl &url);
@@ -64,7 +67,9 @@ private:
 	void onPoll(QNetworkReply *reply);
 
 	QPointer<QNetworkReply> m_pending;
+	QPointer<QNetworkReply> m_viewersReply;
 	QTimer m_pollTimer;
+	QString m_videoId;
 	QString m_apiKey;
 	QString m_clientVersion;
 	QString m_continuation;

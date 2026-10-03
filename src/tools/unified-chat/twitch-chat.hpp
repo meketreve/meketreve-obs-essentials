@@ -21,6 +21,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-connector.hpp"
 #include "ws-client.hpp"
 
+#include <functional>
+
 struct IrcMessage;
 
 /* Anonymous (read-only) Twitch IRC over WebSocket. */
@@ -38,13 +40,19 @@ public:
 	/* One IRC line from the server; public so tests can feed it. */
 	void handleLine(const QByteArray &line);
 
+	/* Anonymous IRC has no viewer count: the logged-in account asks Helix. */
+	using ViewerLookup = std::function<void(const QString &channel, std::function<void(int viewers)> done)>;
+	void setViewerLookup(ViewerLookup lookup) { m_viewerLookup = std::move(lookup); }
+
 protected:
 	void connectNow() override;
 	void disconnectNow() override;
+	void fetchViewers() override;
 
 private:
 	void handleUserNotice(const IrcMessage &irc);
 
 	WsClient m_ws;
 	QString m_channel;
+	ViewerLookup m_viewerLookup;
 };

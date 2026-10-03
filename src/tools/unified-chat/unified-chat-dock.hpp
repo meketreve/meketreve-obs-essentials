@@ -115,6 +115,9 @@ private:
 	EmoteSets *m_emotes = nullptr;
 	std::array<ChatConnector *, kPlatforms> m_connectors{};
 	std::array<QLabel *, kPlatforms> m_status{};
+	/* Last state per platform, to redraw the label when the viewers change. */
+	std::array<ConnectorState, kPlatforms> m_states{};
+	std::array<QString, kPlatforms> m_stateDetails;
 	std::array<QString, kPlatforms> m_targets;
 	ChatView *m_view = nullptr;
 	bool m_hasMessages = false;
