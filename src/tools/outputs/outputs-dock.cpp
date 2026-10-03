@@ -25,6 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/config-file.h>
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateTime>
@@ -35,6 +36,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
@@ -256,8 +258,14 @@ void OutputsDock::saveProfile()
 
 void OutputsDock::rebuildRows()
 {
-	for (auto it = m_rows.begin(); it != m_rows.end(); ++it)
-		delete it.value().dot->parentWidget();
+	/* deleteLater: this can run while a row's own menu or button is still
+	 * handling the click that led here. */
+	for (auto it = m_rows.begin(); it != m_rows.end(); ++it) {
+		QWidget *row = it.value().dot->parentWidget();
+		m_list->removeWidget(row);
+		row->hide();
+		row->deleteLater();
+	}
 	m_rows.clear();
 
 	QWidget *listWidget = m_empty->parentWidget();
@@ -286,8 +294,14 @@ void OutputsDock::rebuildRows()
 		more->setText(QStringLiteral("⋯"));
 		more->setPopupMode(QToolButton::InstantPopup);
 		auto *menu = new QMenu(more);
-		menu->addAction(T("Outputs.Edit"), this, [this, id]() { editOutput(id); });
-		menu->addAction(T("Outputs.Remove"), this, [this, id]() { removeOutput(id); });
+		/* Queued: editing and removing rebuild the rows, and this row owns
+		 * the menu that is still handling the click (it crashed OBS). */
+		menu->addAction(T("Outputs.Edit"), this, [this, id]() {
+			QMetaObject::invokeMethod(this, [this, id]() { editOutput(id); }, Qt::QueuedConnection);
+		});
+		menu->addAction(T("Outputs.Remove"), this, [this, id]() {
+			QMetaObject::invokeMethod(this, [this, id]() { removeOutput(id); }, Qt::QueuedConnection);
+		});
 		more->setMenu(menu);
 
 		h->addWidget(r.dot);
@@ -651,9 +665,49 @@ void OutputsDock::outputReconnected(void *data, calldata_t *cd)
 
 /* Developer smoke test, inert unless MEKETREVE_SELFTEST_OUTPUTS is set:
  * starts the main stream (outputs that follow it start too), then logs
- * every output's state and stops. */
+ * every output's state and stops. "edit" instead goes through a row's
+ * "⋯" → Edit → OK a few times, the way a user changes a stream key. */
 void OutputsDock::runSelfTest()
 {
+	if (qEnvironmentVariable("MEKETREVE_SELFTEST_OUTPUTS") == QLatin1String("edit")) {
+		auto *rounds = new int(0);
+		auto *step = new QTimer(this);
+		step->setInterval(300);
+		connect(step, &QTimer::timeout, this, [this, rounds, step]() {
+			if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+				dialog->accept();
+				return;
+			}
+			if (auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget())) {
+				/* Posted: a timer does not fire again while its own slot
+				 * is still running the dialog's event loop. */
+				QPointer<QMenu> target = menu;
+				QTimer::singleShot(0, this, [target]() {
+					if (!target)
+						return;
+					target->setActiveAction(target->actions().value(0));
+					QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+					QApplication::sendEvent(target, &press);
+				});
+				return;
+			}
+			if (++*rounds > 5) {
+				step->stop();
+				delete rounds;
+				obs_log(LOG_INFO, "[selftest] outputs edit done");
+				return;
+			}
+			obs_log(LOG_INFO, "[selftest] outputs edit round %d", *rounds);
+			for (QToolButton *b : findChildren<QToolButton *>()) {
+				if (b->menu()) {
+					QTimer::singleShot(0, b, [b]() { b->showMenu(); });
+					break;
+				}
+			}
+		});
+		QTimer::singleShot(2000, step, qOverload<>(&QTimer::start));
+		return;
+	}
 	const auto report = [this](const char *when) {
 		for (const OutputConfig &c : m_outputs)
 			obs_log(LOG_INFO, "[selftest] outputs %s: %s = %s", when, c.name.toUtf8().constData(),
