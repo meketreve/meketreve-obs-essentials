@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QUrlQuery>
 
 #include <algorithm>
 
@@ -46,6 +47,23 @@ QString runsToText(const QJsonArray &runs)
 	QString out;
 	for (const QJsonValue run : runs) {
 		const QJsonObject r = run.toObject();
+		/* Links show shortened ("site.com/pa..."): use the real address,
+		 * unwrapped from YouTube's redirect. */
+		const QString link = r.value(QStringLiteral("navigationEndpoint"))
+					     .toObject()
+					     .value(QStringLiteral("urlEndpoint"))
+					     .toObject()
+					     .value(QStringLiteral("url"))
+					     .toString();
+		if (!link.isEmpty()) {
+			const QUrl url(link);
+			const QString target =
+				url.path() == QLatin1String("/redirect")
+					? QUrlQuery(url).queryItemValue(QStringLiteral("q"), QUrl::FullyDecoded)
+					: QString();
+			out += target.isEmpty() ? link : target;
+			continue;
+		}
 		if (r.contains(QStringLiteral("text"))) {
 			out += r.value(QStringLiteral("text")).toString();
 			continue;

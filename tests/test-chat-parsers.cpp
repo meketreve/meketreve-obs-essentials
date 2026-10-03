@@ -342,9 +342,31 @@ private slots:
 			"liveChatSponsorshipsGiftPurchaseAnnouncementRenderer",
 			R"({"id":"g1","header":{"liveChatSponsorshipsHeaderRenderer":{"authorName":{"simpleText":"Giver"},
 			"primaryText":{"runs":[{"text":"Gifted "},{"text":"5"},{"text":" Channel memberships"}]}}}})"));
+		/* A long link shows shortened; the real one is in the redirect. */
+		const QJsonObject linkRun{
+			{QStringLiteral("text"), QStringLiteral("myinstants.com/pt/instant/vin...")},
+			{QStringLiteral("navigationEndpoint"),
+			 QJsonObject{{QStringLiteral("urlEndpoint"),
+				      QJsonObject{{QStringLiteral("url"),
+						   QStringLiteral("https://www.youtube.com/redirect?event=live_chat&q="
+								  "https%3A%2F%2Fwww.myinstants.com%2Fpt%2Finstant%2F"
+								  "vine-boom-sound-70972%2F")}}}}}};
+		const QJsonObject textMessage{
+			{QStringLiteral("id"), QStringLiteral("t1")},
+			{QStringLiteral("authorName"),
+			 QJsonObject{{QStringLiteral("simpleText"), QStringLiteral("Mod")}}},
+			{QStringLiteral("message"),
+			 QJsonObject{
+				 {QStringLiteral("runs"),
+				  QJsonArray{QJsonObject{{QStringLiteral("text"), QStringLiteral("!addaudio ")}},
+					     linkRun, QJsonObject{{QStringLiteral("text"), QStringLiteral(" 50")}}}}}}};
+		chat.handleAction(QJsonObject{
+			{QStringLiteral("addChatItemAction"),
+			 QJsonObject{{QStringLiteral("item"),
+				      QJsonObject{{QStringLiteral("liveChatTextMessageRenderer"), textMessage}}}}}});
 
 		const QList<ChatMessage> msgs = collect(spy);
-		QCOMPARE(msgs.size(), 4);
+		QCOMPARE(msgs.size(), 5);
 		QCOMPARE(msgs[0].event, ChatEvent::Donation);
 		QCOMPARE(msgs[0].detail, QStringLiteral("R$ 10,00"));
 		QCOMPARE(msgs[0].text, QStringLiteral("oi"));
@@ -355,6 +377,8 @@ private slots:
 		QCOMPARE(msgs[3].event, ChatEvent::GiftSub);
 		QCOMPARE(msgs[3].author, QStringLiteral("Giver"));
 		QCOMPARE(msgs[3].amount, 5);
+		QCOMPARE(msgs[4].text,
+			 QStringLiteral("!addaudio https://www.myinstants.com/pt/instant/vine-boom-sound-70972/ 50"));
 	}
 
 	void youtubeChannelIdFromPage()
