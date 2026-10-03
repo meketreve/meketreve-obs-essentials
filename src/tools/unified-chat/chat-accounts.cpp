@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-accounts.hpp"
 
 #include "kick-chat.hpp"
+#include "trovo-chat.hpp"
 #include "oauth-util.hpp"
 #include "twitch-chat.hpp"
 
@@ -53,6 +54,16 @@ const char *const kGoogleScopes = "https://www.googleapis.com/auth/youtube";
 const char *const kYouTubeApi = "https://www.googleapis.com/youtube/v3/";
 const char *const kKickScopes =
 	"user:read channel:read channel:write chat:write moderation:ban moderation:chat_message:manage";
+const char *const kTrovoApi = "https://open-api.trovo.live/openplatform/";
+const char *const kTrovoTokenProxy = "https://204-216-150-248.sslip.io/trovo/token";
+const char *const kTrovoRedirect = "https://204-216-150-248.sslip.io/trovo/callback";
+/* "+" is Trovo's scope separator. */
+const char *const kTrovoScopes = "user_details_self+channel_update_self+chat_send_self+manage_messages";
+
+QUrl trovoUrl(const QString &path)
+{
+	return QUrl(QString::fromLatin1(kTrovoApi) + path);
+}
 
 size_t slot(ChatPlatform p)
 {
@@ -119,6 +130,7 @@ QString ChatAccounts::defaultClientId(ChatPlatform p)
 {
 	return QString::fromLatin1(p == ChatPlatform::Twitch    ? kTwitchClientId
 				   : p == ChatPlatform::YouTube ? kGoogleClientId
+				   : p == ChatPlatform::Trovo   ? kTrovoClientId
 								: kKickClientId);
 }
 
@@ -131,6 +143,7 @@ QString ChatAccounts::redirectUri(ChatPlatform p)
 {
 	return p == ChatPlatform::Twitch    ? twitchRedirectUri()
 	       : p == ChatPlatform::YouTube ? youtubeRedirectUri()
+	       : p == ChatPlatform::Trovo   ? QString::fromLatin1(kTrovoRedirect)
 					    : kickRedirectUri();
 }
 
@@ -164,6 +177,8 @@ const ChatAccount &ChatAccounts::account(ChatPlatform p) const
 bool ChatAccounts::canLogIn(ChatPlatform p) const
 {
 	const ChatAccount &a = account(p);
+	if (p == ChatPlatform::Trovo)
+		return a.clientId == defaultClientId(p);
 	if (p == ChatPlatform::Kick || p == ChatPlatform::YouTube)
 		return !a.clientId.isEmpty() && (!a.clientSecret.isEmpty() || a.clientId == defaultClientId(p));
 	return p == ChatPlatform::Twitch && !a.clientId.isEmpty();
@@ -173,6 +188,8 @@ QUrl ChatAccounts::tokenUrl(ChatPlatform p) const
 {
 	if (p == ChatPlatform::Twitch)
 		return QUrl(QStringLiteral("https://id.twitch.tv/oauth2/token"));
+	if (p == ChatPlatform::Trovo)
+		return QUrl(QString::fromLatin1(kTrovoTokenProxy));
 	/* The plugin's own Kick and Google apps go through the server that holds
 	 * their secrets. */
 	const ChatAccount &a = account(p);
@@ -187,7 +204,7 @@ QUrl ChatAccounts::tokenUrl(ChatPlatform p) const
 
 bool ChatAccounts::usesRedirect(ChatPlatform p) const
 {
-	return p == ChatPlatform::Kick || p == ChatPlatform::YouTube ||
+	return p == ChatPlatform::Kick || p == ChatPlatform::YouTube || p == ChatPlatform::Trovo ||
 	       (p == ChatPlatform::Twitch && !account(p).clientSecret.isEmpty());
 }
 
@@ -262,6 +279,14 @@ void ChatAccounts::logOut(ChatPlatform p)
 			     {{QStringLiteral("client_id"), a.clientId}, {QStringLiteral("token"), a.accessToken}}),
 		     [](int, const QJsonObject &, const QString &) {});
 		m_eventSub.close();
+	}
+	if (p == ChatPlatform::Trovo && !a.accessToken.isEmpty()) {
+		QNetworkRequest req(trovoUrl(QStringLiteral("revoke")));
+		req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+		req.setRawHeader("Client-ID", kTrovoClientId);
+		QNetworkReply *reply = m_net.post(
+			req, QJsonDocument(QJsonObject{{QStringLiteral("access_token"), a.accessToken}}).toJson());
+		connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
 	}
 	if (p == ChatPlatform::YouTube && !a.accessToken.isEmpty())
 		post(QUrl(QStringLiteral("https://oauth2.googleapis.com/revoke")),
@@ -345,7 +370,11 @@ void ChatAccounts::logIn(ChatPlatform p)
 	 * with PKCE, Twitch (confidential app) with the client secret. */
 	const bool kick = p == ChatPlatform::Kick;
 	const bool google = p == ChatPlatform::YouTube;
-	const quint16 port = kick ? kKickRedirectPort : google ? kYouTubeRedirectPort : kTwitchRedirectPort;
+	const bool trovo = p == ChatPlatform::Trovo;
+	const quint16 port = kick     ? kKickRedirectPort
+			     : google ? kYouTubeRedirectPort
+			     : trovo  ? kTrovoRedirectPort
+				      : kTwitchRedirectPort;
 	if (!listenForCallback(port)) {
 		emit loginFailed(p, QStringLiteral("port %1 is in use").arg(port));
 		return;
@@ -354,6 +383,7 @@ void ChatAccounts::logIn(ChatPlatform p)
 	m_authState = OAuthUtil::newState();
 	QUrl url(kick     ? QStringLiteral("https://id.kick.com/oauth/authorize")
 		 : google ? QStringLiteral("https://accounts.google.com/o/oauth2/v2/auth")
+		 : trovo  ? QStringLiteral("https://open.trovo.live/page/login.html")
 			  : QStringLiteral("https://id.twitch.tv/oauth2/authorize"));
 	QUrlQuery q;
 	q.addQueryItem(QStringLiteral("client_id"), a.clientId);
@@ -361,6 +391,7 @@ void ChatAccounts::logIn(ChatPlatform p)
 	q.addQueryItem(QStringLiteral("redirect_uri"), redirectUri(p));
 	q.addQueryItem(QStringLiteral("scope"), QString::fromLatin1(kick     ? kKickScopes
 								    : google ? kGoogleScopes
+								    : trovo  ? kTrovoScopes
 									     : kTwitchScopes));
 	q.addQueryItem(QStringLiteral("state"), QString::fromLatin1(m_authState));
 	if (google) {
@@ -373,7 +404,7 @@ void ChatAccounts::logIn(ChatPlatform p)
 		q.addQueryItem(QStringLiteral("code_challenge"),
 			       QString::fromLatin1(OAuthUtil::codeChallengeS256(m_authVerifier)));
 		q.addQueryItem(QStringLiteral("code_challenge_method"), QStringLiteral("S256"));
-	} else {
+	} else if (!trovo) { /* Trovo has no PKCE */
 		/* The old bot may still hold a session on this app. */
 		q.addQueryItem(QStringLiteral("force_verify"), QStringLiteral("true"));
 	}
@@ -492,7 +523,7 @@ void ChatAccounts::onAuthCallback()
 								     QStringLiteral("authorization_code")}};
 				if (!a.clientSecret.isEmpty())
 					form.append({QStringLiteral("client_secret"), a.clientSecret});
-				if (p != ChatPlatform::Twitch)
+				if (p != ChatPlatform::Twitch && p != ChatPlatform::Trovo)
 					form.append({QStringLiteral("code_verifier"), QString::fromLatin1(verifier)});
 				post(tokenUrl(p), OAuthUtil::formBody(form),
 				     [this, p](int, const QJsonObject &body, const QString &error) {
@@ -544,6 +575,27 @@ void ChatAccounts::fetchIdentity(ChatPlatform p)
 					    p, error.isEmpty()
 						       ? QStringLiteral("this Google account has no YouTube channel")
 						       : error);
+				    emit accountChanged(p);
+				    return;
+			    }
+			    save();
+			    emit accountChanged(p);
+		    });
+		return;
+	}
+	if (p == ChatPlatform::Trovo) {
+		api(p, "GET", trovoUrl(QStringLiteral("getuserinfo")), QJsonObject(),
+		    [this, p](int, const QJsonObject &body, const QString &error) {
+			    ChatAccount &a = acc(p);
+			    a.userId = body.value(QStringLiteral("channelId")).toString();
+			    if (a.userId.isEmpty())
+				    a.userId = body.value(QStringLiteral("userId")).toString();
+			    a.login = body.value(QStringLiteral("userName")).toString();
+			    if (!error.isEmpty() || a.userId.isEmpty()) {
+				    a = ChatAccount{a.clientId, a.clientSecret, {}, {}, {}, {}, 0};
+				    save();
+				    emit loginFailed(p, error.isEmpty() ? QStringLiteral("could not read the account")
+									: error);
 				    emit accountChanged(p);
 				    return;
 			    }
@@ -635,8 +687,9 @@ void ChatAccounts::api(ChatPlatform p, const QByteArray &verb, const QUrl &url, 
 	}
 
 	QNetworkRequest req(url);
-	req.setRawHeader("Authorization", "Bearer " + a.accessToken.toUtf8());
-	if (p == ChatPlatform::Twitch)
+	/* Trovo says "OAuth" where everyone else says "Bearer". */
+	req.setRawHeader("Authorization", (p == ChatPlatform::Trovo ? "OAuth " : "Bearer ") + a.accessToken.toUtf8());
+	if (p == ChatPlatform::Twitch || p == ChatPlatform::Trovo)
 		req.setRawHeader("Client-Id", a.clientId.toUtf8());
 	req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 	req.setRawHeader("Accept", "application/json");
@@ -665,11 +718,43 @@ void ChatAccounts::api(ChatPlatform p, const QByteArray &verb, const QUrl &url, 
 
 void ChatAccounts::withBroadcaster(ChatPlatform p, const QString &channel, std::function<void(const QString &)> then)
 {
-	const QString name = p == ChatPlatform::Twitch ? TwitchChat::normalizeChannel(channel)
-						       : KickChat::normalizeChannel(channel);
-	const QString key = QLatin1String(p == ChatPlatform::Twitch ? "t:" : "k:") + name;
+	const QString name = p == ChatPlatform::Twitch  ? TwitchChat::normalizeChannel(channel)
+			     : p == ChatPlatform::Trovo ? TrovoChat::normalizeChannel(channel)
+							: KickChat::normalizeChannel(channel);
+	const QString key = QLatin1String(p == ChatPlatform::Twitch  ? "t:"
+					  : p == ChatPlatform::Trovo ? "r:"
+								     : "k:") +
+			    name;
 	if (m_broadcasterIds.contains(key)) {
 		then(m_broadcasterIds.value(key));
+		return;
+	}
+	if (p == ChatPlatform::Trovo) {
+		/* Trovo's channel id; the account's own channel needs no lookup. */
+		bool numeric = false;
+		name.toLongLong(&numeric);
+		if (numeric || name.isEmpty() || name == account(p).login.toLower()) {
+			then(numeric ? name : account(p).userId);
+			return;
+		}
+		api(p, "POST", trovoUrl(QStringLiteral("getusers")),
+		    QJsonObject{{QStringLiteral("user"), QJsonArray{name}}},
+		    [this, p, key, name, then](int, const QJsonObject &body, const QString &error) {
+			    const QString id = body.value(QStringLiteral("users"))
+						       .toArray()
+						       .at(0)
+						       .toObject()
+						       .value(QStringLiteral("channel_id"))
+						       .toString();
+			    if (id.isEmpty()) {
+				    emit actionFailed(p, error.isEmpty()
+								 ? QStringLiteral("channel '%1' not found").arg(name)
+								 : error);
+				    return;
+			    }
+			    m_broadcasterIds.insert(key, id);
+			    then(id);
+		    });
 		return;
 	}
 	QUrl url(p == ChatPlatform::Twitch ? QStringLiteral("https://api.twitch.tv/helix/users")
@@ -784,8 +869,43 @@ void ChatAccounts::youtubeCategories(std::function<void(const QList<StreamCatego
 	    });
 }
 
+void ChatAccounts::trovoCommand(const QString &channel, const QString &command, ActionDone done)
+{
+	const ChatPlatform p = ChatPlatform::Trovo;
+	withBroadcaster(p, channel, [this, p, command, done](const QString &channelId) {
+		api(p, "POST", trovoUrl(QStringLiteral("channels/command")),
+		    QJsonObject{{QStringLiteral("command"), command}, {QStringLiteral("channel_id"), channelId}},
+		    [this, p, done](int, const QJsonObject &body, const QString &error) {
+			    QString e = error;
+			    /* A refused command is still HTTP 200. */
+			    if (e.isEmpty() && body.contains(QStringLiteral("is_success")) &&
+				!body.value(QStringLiteral("is_success")).toBool())
+				    e = body.value(QStringLiteral("display_msg"))
+						.toString(QStringLiteral("command failed"));
+			    if (!e.isEmpty())
+				    emit actionFailed(p, e);
+			    if (done)
+				    done(e);
+		    });
+	});
+}
+
 void ChatAccounts::sendMessage(ChatPlatform p, const QString &channel, const QString &text)
 {
+	if (p == ChatPlatform::Trovo) {
+		withBroadcaster(p, channel, [this, p, text](const QString &channelId) {
+			QJsonObject body{{QStringLiteral("content"), text}};
+			/* Without channel_id it goes to the account's own channel. */
+			if (channelId != account(p).userId)
+				body.insert(QStringLiteral("channel_id"), channelId);
+			api(p, "POST", trovoUrl(QStringLiteral("chat/send")), body,
+			    [this, p](int, const QJsonObject &, const QString &error) {
+				    if (!error.isEmpty())
+					    emit actionFailed(p, error);
+			    });
+		});
+		return;
+	}
 	if (p == ChatPlatform::YouTube) {
 		/* Into this account's own live chat, whatever channel the dock reads. */
 		youtubeBroadcast(false, [this, text](const QString &, const QString &chatId, const QString &error) {
@@ -844,6 +964,16 @@ void ChatAccounts::sendMessage(ChatPlatform p, const QString &channel, const QSt
 void ChatAccounts::timeoutUser(ChatPlatform p, const QString &channel, const QString &userId, int seconds,
 			       ActionDone done)
 {
+	if (p == ChatPlatform::Trovo) {
+		/* userId is the Trovo user name: commands take names. Timeouts
+		 * go from 10 seconds to 2 days. */
+		trovoCommand(channel,
+			     seconds > 0
+				     ? QStringLiteral("timeout %1 %2").arg(userId).arg(std::clamp(seconds, 10, 172800))
+				     : QStringLiteral("ban %1").arg(userId),
+			     std::move(done));
+		return;
+	}
 	if (p == ChatPlatform::YouTube) {
 		youtubeBroadcast(false, [this, userId, seconds, done](const QString &, const QString &chatId,
 								      const QString &error) {
@@ -911,6 +1041,10 @@ void ChatAccounts::banUser(ChatPlatform p, const QString &channel, const QString
 
 void ChatAccounts::unbanUser(ChatPlatform p, const QString &channel, const QString &userId, ActionDone done)
 {
+	if (p == ChatPlatform::Trovo) {
+		trovoCommand(channel, QStringLiteral("unban %1").arg(userId), std::move(done));
+		return;
+	}
 	if (p == ChatPlatform::YouTube) {
 		const QString banId = m_youtubeBans.value(userId);
 		if (banId.isEmpty()) {
@@ -968,6 +1102,17 @@ void ChatAccounts::deleteMessage(ChatPlatform p, const QString &channel, const Q
 	if (p == ChatPlatform::Kick) {
 		api(p, "DELETE", QUrl(QStringLiteral("https://api.kick.com/public/v1/chat/%1").arg(messageId)),
 		    QJsonObject(), report);
+		return;
+	}
+	if (p == ChatPlatform::Trovo) {
+		/* TrovoChat keeps "<message id>|<sender id>": deleting needs both. */
+		const QString id = messageId.section(QLatin1Char('|'), 0, 0);
+		const QString sender = messageId.section(QLatin1Char('|'), 1);
+		withBroadcaster(p, channel, [this, p, id, sender, report](const QString &channelId) {
+			api(p, "DELETE",
+			    trovoUrl(QStringLiteral("channels/%1/messages/%2/users/%3").arg(channelId, id, sender)),
+			    QJsonObject(), report);
+		});
 		return;
 	}
 	withBroadcaster(p, channel, [this, p, messageId, report](const QString &broadcaster) {
@@ -1098,6 +1243,17 @@ void ChatAccounts::streamInfo(ChatPlatform p, std::function<void(const StreamInf
 		});
 		return;
 	}
+	if (p == ChatPlatform::Trovo) {
+		api(p, "POST", trovoUrl(QStringLiteral("channels/id")),
+		    QJsonObject{{QStringLiteral("channel_id"), account(p).userId}},
+		    [done](int, const QJsonObject &body, const QString &error) {
+			    done({body.value(QStringLiteral("live_title")).toString(),
+				  body.value(QStringLiteral("category_id")).toString(),
+				  body.value(QStringLiteral("category_name")).toString()},
+				 error);
+		    });
+		return;
+	}
 	/* Without a slug or id Kick answers with the token owner's channel. */
 	api(p, "GET", QUrl(QStringLiteral("https://api.kick.com/public/v1/channels")), QJsonObject(),
 	    [done](int, const QJsonObject &body, const QString &error) {
@@ -1121,6 +1277,20 @@ void ChatAccounts::searchCategories(ChatPlatform p, const QString &query,
 					found.append(c);
 			done(found, error);
 		});
+		return;
+	}
+	if (p == ChatPlatform::Trovo) {
+		api(p, "POST", trovoUrl(QStringLiteral("searchcategory")),
+		    QJsonObject{{QStringLiteral("query"), query}, {QStringLiteral("limit"), 25}},
+		    [done](int, const QJsonObject &body, const QString &error) {
+			    QList<StreamCategory> found;
+			    for (const QJsonValue v : body.value(QStringLiteral("category_info")).toArray()) {
+				    const QJsonObject o = v.toObject();
+				    found.append({o.value(QStringLiteral("id")).toString(),
+						  o.value(QStringLiteral("name")).toString()});
+			    }
+			    done(found, error);
+		    });
 		return;
 	}
 	QUrl url(p == ChatPlatform::Twitch ? QStringLiteral("https://api.twitch.tv/helix/search/categories")
@@ -1200,6 +1370,15 @@ void ChatAccounts::updateStreamInfo(ChatPlatform p, const QString &title, const 
 		if (!categoryId.isEmpty())
 			body.insert(QStringLiteral("game_id"), categoryId);
 		api(p, "PATCH", url, body, report);
+		return;
+	}
+	if (p == ChatPlatform::Trovo) {
+		QJsonObject body{{QStringLiteral("channel_id"), account(p).userId}};
+		if (!title.isEmpty())
+			body.insert(QStringLiteral("live_title"), title);
+		if (!categoryId.isEmpty())
+			body.insert(QStringLiteral("category_id"), categoryId);
+		api(p, "POST", trovoUrl(QStringLiteral("channels/update")), body, report);
 		return;
 	}
 	QJsonObject body;

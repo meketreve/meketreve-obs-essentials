@@ -202,7 +202,7 @@ Without logging in the chat is read-only and nothing is sent to any platform.
 #### Stream info
 
 **Docks → Stream info** sets the stream **title** and **category/game** on
-every logged-in platform at once (Twitch, YouTube and Kick). On YouTube it applies to the live broadcast (or
+every logged-in platform at once (Twitch, YouTube, Kick and Trovo). On YouTube it applies to the live broadcast (or
 the next scheduled one) and the category is the video category: YouTube's
 game title cannot be set through the API. It opens with what is live now; search a
 category, pick it, and the same name is looked up on each platform (a
@@ -212,7 +212,7 @@ permissions: log out and in again once after updating.
 
 #### Chat login
 
-Logging in to Twitch, YouTube and/or Kick adds a message box under the chat (send to
+Logging in to Twitch, YouTube, Kick and/or Trovo adds a message box under the chat (send to
 one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
 ban, unban / lift timeout, delete message. On Twitch it also brings follows
 into Activity (you must be the broadcaster or a moderator), and the **Viewers**
@@ -251,6 +251,12 @@ ban by its id, so unban works for bans made from OBS since it started.
     *user:read, channel:read, channel:write, chat:write, moderation:ban,
     moderation:chat_message:manage*; paste its *Client ID* and *Client
     Secret* and the plugin talks to Kick directly.
+- **Trovo:** nothing to set up. Click **Log in** in Unified Chat → Settings →
+  Trovo. Like Kick, the secret stays on the project's server; Trovo only
+  accepts https return addresses, so its login comes back to the server's
+  `/trovo/callback`, which sends the browser on to OBS
+  (`http://localhost:53684/callback`). On Trovo, timeouts go from 10 seconds
+  to 2 days, and unban lifts bans (use Trovo for a running timeout).
 
 Tokens are kept as plain text in the plugin's config folder
 (`chat-accounts.json`, readable only by your user). Use **Log out** to revoke

@@ -395,6 +395,7 @@ private slots:
 		const auto item = [](int type, const char *nick, const QString &content, qint64 sent = 2000) {
 			return QJsonObject{{QStringLiteral("type"), type},
 					   {QStringLiteral("nick_name"), QString::fromUtf8(nick)},
+					   {QStringLiteral("user_name"), QString::fromUtf8(nick).toLower()},
 					   {QStringLiteral("content"), content},
 					   {QStringLiteral("send_time"), sent},
 					   {QStringLiteral("sender_id"), 100000037},
@@ -424,7 +425,8 @@ private slots:
 		QCOMPARE(msgs.size(), 7);
 		QCOMPARE(msgs[0].platform, ChatPlatform::Trovo);
 		QCOMPARE(msgs[0].text, QStringLiteral("oi trovo"));
-		QCOMPARE(msgs[0].userId, QStringLiteral("100000037"));
+		QCOMPARE(msgs[0].userId, QStringLiteral("ana"));
+		QCOMPARE(msgs[0].id, QStringLiteral("m1|100000037"));
 		QVERIFY(msgs[0].isMod && msgs[0].isSub && !msgs[0].isBroadcaster);
 		QCOMPARE(msgs[1].event, ChatEvent::Gift);
 		QCOMPARE(msgs[1].amount, 3);

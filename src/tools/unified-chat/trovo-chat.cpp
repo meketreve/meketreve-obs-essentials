@@ -243,8 +243,13 @@ void TrovoChat::handleChat(const QJsonObject &chat)
 		ChatMessage msg;
 		msg.author = nick;
 		msg.text = content;
-		msg.id = chat.value(QStringLiteral("message_id")).toString();
-		msg.userId = QString::number(chat.value(QStringLiteral("sender_id")).toInteger());
+		/* Moderation commands take the user name; deleting a message
+		 * takes its id and the sender's id together. */
+		msg.userId = chat.value(QStringLiteral("user_name")).toString();
+		const QString messageId = chat.value(QStringLiteral("message_id")).toString();
+		if (!messageId.isEmpty())
+			msg.id = messageId + QLatin1Char('|') +
+				 QString::number(chat.value(QStringLiteral("sender_id")).toInteger());
 		msg.channelId = m_channelId;
 		for (const QJsonValue role : chat.value(QStringLiteral("roles")).toArray()) {
 			const QString r = role.toString().toLower();

@@ -91,6 +91,9 @@ public:
 	/* Google "desktop app" clients accept any loopback port. */
 	static constexpr quint16 kYouTubeRedirectPort = 53683;
 	static QString youtubeRedirectUri();
+	/* Trovo only takes https redirects: the token server's /trovo/callback
+	 * sends the browser on to this port. */
+	static constexpr quint16 kTrovoRedirectPort = 53684;
 	static QString redirectUri(ChatPlatform p);
 	/* The plugin's own app (Twitch public, Kick through the token server),
 	 * used while the user sets none. */
@@ -102,13 +105,16 @@ public:
 	const ChatAccount &account(ChatPlatform p) const;
 	static bool supports(ChatPlatform p)
 	{
-		return p == ChatPlatform::Twitch || p == ChatPlatform::YouTube || p == ChatPlatform::Kick;
+		return p == ChatPlatform::Twitch || p == ChatPlatform::YouTube || p == ChatPlatform::Kick ||
+		       p == ChatPlatform::Trovo;
 	}
 	/* The platforms you can log in to, in the order the UI lists them. */
-	static std::array<ChatPlatform, 3> loginPlatforms()
+	static std::array<ChatPlatform, 4> loginPlatforms()
 	{
-		return {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick};
+		return {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::Trovo};
 	}
+	/* Only the plugin's own app (no Client ID or secret of your own). */
+	static bool pluginAppOnly(ChatPlatform p) { return p == ChatPlatform::Trovo; }
 	bool canLogIn(ChatPlatform p) const;
 	/* Twitch with a client secret logs in through the browser redirect
 	 * instead of the device code. */
@@ -190,6 +196,8 @@ private:
 		 bool retried = false);
 	void post(const QUrl &url, const QByteArray &form, Done done);
 	void withBroadcaster(ChatPlatform p, const QString &channel, std::function<void(const QString &)> then);
+	/* Trovo moderation is chat commands ("ban name") run on a channel. */
+	void trovoCommand(const QString &channel, const QString &command, ActionDone done);
 	/* GET every page of a Helix list (cursor pagination), up to maxPages. */
 	void helixPages(const QUrl &url, int maxPages,
 			std::function<void(const QJsonArray &data, const QString &error)> done,

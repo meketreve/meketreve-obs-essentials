@@ -618,6 +618,12 @@ void UnifiedChatDock::addAccountRows(QFormLayout *form, QWidget *dialog)
 		});
 
 		auto *row = new QHBoxLayout();
+		if (ChatAccounts::pluginAppOnly(p)) {
+			/* Only the plugin's app: no fields, just the button. */
+			clientId->hide();
+			secret->hide();
+			row->addStretch(1);
+		}
 		row->addWidget(clientId, 1);
 		row->addWidget(secret, 1);
 		row->addWidget(button);
