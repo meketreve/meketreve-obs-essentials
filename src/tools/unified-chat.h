@@ -22,7 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 extern "C" {
 #endif
 
-/* Adds the "Unified Chat" dock (Twitch + YouTube + Kick + Trovo). */
+/* Adds the "Unified Chat" dock (Twitch + YouTube + Kick). */
 void unified_chat_register(void);
 void unified_chat_unregister(void);
 

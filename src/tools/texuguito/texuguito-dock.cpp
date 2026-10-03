@@ -22,7 +22,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "../unified-chat/chat-accounts.hpp"
 #include "../unified-chat/kick-chat.hpp"
-#include "../unified-chat/trovo-chat.hpp"
 #include "../unified-chat/twitch-chat.hpp"
 #include "../unified-chat/unified-chat-dock.hpp"
 
@@ -87,6 +86,30 @@ QString webDir()
 	return path;
 }
 
+/* Both bot languages (Key="value" lines), so replies follow the command's
+ * language instead of the OBS language. */
+QHash<QString, QString> readBotLocale(const char *name)
+{
+	QHash<QString, QString> texts;
+	const QByteArray path = QByteArray("locale/") + name;
+	char *ini = obs_module_file(path.constData());
+	QFile file(QString::fromUtf8(ini ? ini : ""));
+	bfree(ini);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+		return texts;
+	while (!file.atEnd()) {
+		const QString line = QString::fromUtf8(file.readLine()).trimmed();
+		const qsizetype eq = line.indexOf(QLatin1Char('='));
+		if (eq <= 0 || line.startsWith(QLatin1Char('#')))
+			continue;
+		QString value = line.mid(eq + 1);
+		if (value.startsWith(QLatin1Char('"')) && value.endsWith(QLatin1Char('"')))
+			value = value.mid(1, value.size() - 2);
+		texts.insert(line.left(eq), value.replace(QStringLiteral("\\\""), QStringLiteral("\"")));
+	}
+	return texts;
+}
+
 /* Copies <from> into <to>, keeping a .bak of anything it replaces. */
 int copyTree(const QString &from, const QString &to)
 {
@@ -120,6 +143,7 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	m_engine->setVolume(m_volume);
 	m_engine->setClipCooldowns(m_cooldowns);
 	m_engine->setText([](const char *key) { return T(key); });
+	m_engine->setCommandTexts(readBotLocale("en-US.ini"), readBotLocale("pt-BR.ini"));
 	m_engine->setTts(
 		[this](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
 			GoogleTts::synthesize(&m_net, text, std::move(done), this, lang);
@@ -307,7 +331,7 @@ void TexuguitoDock::refreshStatus()
 	}
 
 	bool anyChannel = false;
-	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::Trovo})
+	for (ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick})
 		anyChannel |= !m_chat->target(p).trimmed().isEmpty();
 	if (m_enabled && !anyChannel)
 		m_status->setText(m_status->text() + QStringLiteral("<br><span style=\"color:#E0A000\">%1</span>")
@@ -377,10 +401,6 @@ void TexuguitoDock::updateStreamerChannels()
 	kick.toLongLong(&numeric);
 	if (!numeric) /* a chatroom id, not a name */
 		channels.append({ChatPlatform::Kick, kick});
-	const QString trovo = TrovoChat::normalizeChannel(m_chat->target(ChatPlatform::Trovo));
-	trovo.toLongLong(&numeric);
-	if (!numeric)
-		channels.append({ChatPlatform::Trovo, trovo});
 	m_engine->setStreamerChannels(channels);
 }
 

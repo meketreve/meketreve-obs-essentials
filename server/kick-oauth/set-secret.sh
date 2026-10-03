@@ -2,22 +2,22 @@
 # Stores an app's client id and secret in /etc/meketreve-kick-oauth.env on
 # the token server and restarts it. Run on your own computer:
 #
-#   server/kick-oauth/set-secret.sh TROVO ubuntu@host [-i ~/.ssh/key]
+#   server/kick-oauth/set-secret.sh KICK ubuntu@host [-i ~/.ssh/key]
 #
 # The secret is typed without echo and goes to the server over ssh's stdin:
 # it never lands in a file here, in the shell history or in a command line.
 set -eu
 
 if [ $# -lt 2 ]; then
-	echo "usage: $0 <KICK|GOOGLE|TROVO> <user@host> [ssh options...]" >&2
+	echo "usage: $0 <KICK|GOOGLE> <user@host> [ssh options...]" >&2
 	exit 2
 fi
 provider=$1
 shift
 case $provider in
-KICK | GOOGLE | TROVO) ;;
+KICK | GOOGLE) ;;
 *)
-	echo "unknown provider '$provider' (KICK, GOOGLE or TROVO)" >&2
+	echo "unknown provider '$provider' (KICK or GOOGLE)" >&2
 	exit 2
 	;;
 esac

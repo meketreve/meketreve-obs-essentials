@@ -40,7 +40,7 @@ struct Event {
 	QString amount;   /* {quantidade} as shown: "5", "R$ 10,00" */
 	QString detail;   /* gift name, tier */
 	QString message;  /* what they typed */
-	QString platform; /* twitch, youtube, kick, trovo */
+	QString platform; /* twitch, youtube, kick */
 	bool test = false;
 };
 

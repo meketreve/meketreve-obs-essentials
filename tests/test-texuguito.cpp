@@ -542,19 +542,70 @@ private slots:
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
 		bot.setText(locale("en-US.ini"));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
 		QSignalSpy said(&bot, &BotEngine::reply);
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!points")));
 		QCOMPARE(replies(said).last(), QStringLiteral("🪙 Viewer, you have 0 points."));
+		/* !chapeu answers in Portuguese even with OBS in English. */
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!chapeu sombrero")));
 		QVERIFY(replies(said).last().startsWith(
-			QStringLiteral("@Viewer invalid hat. Options: cap, crown, horns,")));
-		QVERIFY(replies(said).last().contains(QStringLiteral("tophat, tiara, coconut, santa, wizard, viking")));
-		/* The page's language follows the command, the wording follows OBS. */
+			QStringLiteral("@Viewer chapéu inválido. Opções: boné, coroa, chifres,")));
+		/* The wording and the page follow the command, not OBS. */
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!comandos")));
 		QCOMPARE(replies(said).last(),
-			 QStringLiteral("@Viewer all commands: ") + QLatin1String(BotEngine::kCommandsUrlPt));
+			 QStringLiteral("@Viewer todos os comandos: ") + QLatin1String(BotEngine::kCommandsUrlPt));
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!commands")));
 		QVERIFY(replies(said).last().endsWith(QStringLiteral("/commands.html")));
+	}
+
+	void commandLanguageFollowsCommand()
+	{
+		QVERIFY(BotEngine::commandEnglish(QStringLiteral("color")) == std::optional<bool>(true));
+		QVERIFY(BotEngine::commandEnglish(QStringLiteral("cor")) == std::optional<bool>(false));
+		QVERIFY(BotEngine::commandEnglish(QStringLiteral("help")) == std::optional<bool>(true));
+		QVERIFY(BotEngine::commandEnglish(QStringLiteral("ajuda")) == std::optional<bool>(false));
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("ping")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("status")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("pts")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("p")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("tts")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("cmd")).has_value());
+		QVERIFY(!BotEngine::commandEnglish(QStringLiteral("audio")).has_value());
+
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		/* OBS in Portuguese, but English commands answer in English. */
+		bot.setText(locale("pt-BR.ini"));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		QSignalSpy said(&bot, &BotEngine::reply);
+
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!points")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🪙 Viewer, you have 0 points."));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!pontos")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🪙 Viewer, você tem 0 pontos."));
+		/* Neutral aliases follow OBS. */
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!pts")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🪙 Viewer, você tem 0 pontos."));
+
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!color")));
+		QCOMPARE(replies(said).last(), QStringLiteral("@Viewer usage: !color <name or hex>"));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!cor")));
+		QCOMPARE(replies(said).last(), QStringLiteral("@Viewer uso: !cor <nome ou hex>"));
+
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!play")));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Usage: !play <name>"));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!tocar")));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Use: !tocar <nome>"));
+
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!speak")));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Usage: !speak <message>"));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!falar")));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Use: !falar <mensagem>"));
+
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!help")));
+		QVERIFY(replies(said).last().endsWith(QStringLiteral("/commands.html")));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!ajuda")));
+		QVERIFY(replies(said).last().endsWith(QStringLiteral("/comandos.html")));
 	}
 
 	void localeFilesHaveTheSameKeys()

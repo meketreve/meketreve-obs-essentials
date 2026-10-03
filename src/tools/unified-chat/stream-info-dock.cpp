@@ -91,8 +91,7 @@ StreamInfoDock::StreamInfoDock(ChatAccounts *accounts, QWidget *parent) : QWidge
 	layout->addWidget(applyTo);
 	m_targets = {{ChatPlatform::Twitch, "Twitch"},
 		     {ChatPlatform::YouTube, "YouTube"},
-		     {ChatPlatform::Kick, "Kick"},
-		     {ChatPlatform::Trovo, "Trovo"}};
+		     {ChatPlatform::Kick, "Kick"}};
 	for (Target &t : m_targets) {
 		auto *row = new QHBoxLayout();
 		t.enabled = new QCheckBox(QString::fromLatin1(t.name), this);

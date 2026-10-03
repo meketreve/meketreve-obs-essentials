@@ -183,8 +183,6 @@ QString platformKey(ChatPlatform platform)
 		return QStringLiteral("youtube");
 	case ChatPlatform::Kick:
 		return QStringLiteral("kick");
-	case ChatPlatform::Trovo:
-		return QStringLiteral("trovo");
 	}
 	return QString();
 }

@@ -23,8 +23,6 @@ target_sources(
     ${_chat}/kick-chat.hpp
     ${_chat}/oauth-util.cpp
     ${_chat}/oauth-util.hpp
-    ${_chat}/trovo-chat.cpp
-    ${_chat}/trovo-chat.hpp
     ${_chat}/twitch-chat.cpp
     ${_chat}/twitch-chat.hpp
     ${_chat}/ws-client.cpp

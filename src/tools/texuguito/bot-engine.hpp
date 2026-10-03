@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "../unified-chat/chat-connector.hpp"
 
 #include <QElapsedTimer>
+#include <QHash>
 #include <QJsonObject>
 #include <QList>
 #include <QObject>
@@ -31,6 +32,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <functional>
 #include <map>
+#include <optional>
 
 /* A chat line as the bot sees it, from any platform. */
 struct BotMessage {
@@ -64,6 +66,10 @@ public:
 	/* Chat replies by locale key ("Texuguito.Bot.*"); OBS answers them in
 	 * its UI language. */
 	using TextFunction = std::function<QString(const char *key)>;
+	/* Both languages for chat replies: the answer follows the language of
+	 * the command that was typed (!help answers in English, !ajuda in
+	 * Portuguese), not the language OBS is in. Neutral aliases (ping,
+	 * status, pts, p, tts, cmd, audio) fall back to TextFunction. */
 
 	static constexpr int kTtsCost = 200;
 	static constexpr int kMaxClipCost = 100000;
@@ -88,11 +94,21 @@ public:
 		std::function<void(const QString &link, std::function<void(const SoundFetch::Result &)> done)>;
 	void setSoundFetch(SoundFetchFunction fetch) { m_soundFetch = std::move(fetch); }
 	/* Saves a sound as <audio dir>/<cost>/<name>.<ext> for !tocar. Empty on
-	 * success, else the reason (translated). */
-	QString addClip(const QByteArray &data, const QString &ext, const QString &name, int cost);
+	 * success, else the reason (in the command's language; empty invoked
+	 * means the OBS language, for the dock button). */
+	QString addClip(const QByteArray &data, const QString &ext, const QString &name, int cost,
+			const QString &invoked = QString());
 	/* What a fetch error means, in the bot's language. */
-	QString soundFetchError(const SoundFetch::Result &result) const;
+	QString soundFetchError(const SoundFetch::Result &result, const QString &invoked = QString()) const;
 	void setText(TextFunction text) { m_text = std::move(text); }
+	void setCommandTexts(const QHash<QString, QString> &en, const QHash<QString, QString> &pt)
+	{
+		m_cmdEn = en;
+		m_cmdPt = pt;
+	}
+	/* True for an English command, false for Portuguese, empty for a
+	 * neutral one (ping, status, pts, p, tts, cmd, audio). */
+	static std::optional<bool> commandEnglish(const QString &invoked);
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
 	/* Seconds between two sounds of the same price (per price folder); a
@@ -159,6 +175,7 @@ private:
 	QSet<QString> reservedNames() const;
 	void say(ChatPlatform platform, const QString &text);
 	QString t(const char *key) const { return m_text ? m_text(key) : QString::fromLatin1(key); }
+	QString tCmd(const QString &invoked, const char *key) const;
 	bool english() const { return t("Texuguito.Bot.Language") == QLatin1String("en"); }
 	/* One avatar per name: the same name on two platforms (ana and
 	 * kick:ana) is drawn once, by whoever showed up first; the other takes
@@ -199,6 +216,8 @@ private:
 	TtsFunction m_tts;
 	SoundFetchFunction m_soundFetch;
 	TextFunction m_text;
+	QHash<QString, QString> m_cmdEn;
+	QHash<QString, QString> m_cmdPt;
 	QHash<QString, QByteArray> m_ttsClips;
 	QStringList m_ttsOrder;
 	QSet<QString> m_lastTickPresent;

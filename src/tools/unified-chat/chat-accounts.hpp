@@ -36,10 +36,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 class QTcpServer;
 
-/* A logged-in account on Twitch or Kick. Twitch defaults to the plugin's own
- * public app (device code, no secret); a user's app can replace it, with an
- * optional secret for a confidential one. Kick needs the user's app and its
- * secret. */
+/* A logged-in account on Twitch, YouTube or Kick. Twitch defaults to the
+ * plugin's own public app (device code, no secret); a user's app can
+ * replace it, with an optional secret for a confidential one. Kick needs
+ * the user's app and its secret. */
 struct ChatAccount {
 	QString clientId;
 	QString clientSecret;
@@ -91,9 +91,6 @@ public:
 	/* Google "desktop app" clients accept any loopback port. */
 	static constexpr quint16 kYouTubeRedirectPort = 53683;
 	static QString youtubeRedirectUri();
-	/* Trovo only takes https redirects: the token server's /trovo/callback
-	 * sends the browser on to this port. */
-	static constexpr quint16 kTrovoRedirectPort = 53684;
 	static QString redirectUri(ChatPlatform p);
 	/* The plugin's own app (Twitch public, Kick through the token server),
 	 * used while the user sets none. */
@@ -105,16 +102,13 @@ public:
 	const ChatAccount &account(ChatPlatform p) const;
 	static bool supports(ChatPlatform p)
 	{
-		return p == ChatPlatform::Twitch || p == ChatPlatform::YouTube || p == ChatPlatform::Kick ||
-		       p == ChatPlatform::Trovo;
+		return p == ChatPlatform::Twitch || p == ChatPlatform::YouTube || p == ChatPlatform::Kick;
 	}
 	/* The platforms you can log in to, in the order the UI lists them. */
-	static std::array<ChatPlatform, 4> loginPlatforms()
+	static std::array<ChatPlatform, 3> loginPlatforms()
 	{
-		return {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick, ChatPlatform::Trovo};
+		return {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick};
 	}
-	/* Only the plugin's own app (no Client ID or secret of your own). */
-	static bool pluginAppOnly(ChatPlatform p) { return p == ChatPlatform::Trovo; }
 	bool canLogIn(ChatPlatform p) const;
 	/* Twitch with a client secret logs in through the browser redirect
 	 * instead of the device code. */
@@ -196,8 +190,6 @@ private:
 		 bool retried = false);
 	void post(const QUrl &url, const QByteArray &form, Done done);
 	void withBroadcaster(ChatPlatform p, const QString &channel, std::function<void(const QString &)> then);
-	/* Trovo moderation is chat commands ("ban name") run on a channel. */
-	void trovoCommand(const QString &channel, const QString &command, ActionDone done);
 	/* GET every page of a Helix list (cursor pagination), up to maxPages. */
 	void helixPages(const QUrl &url, int maxPages,
 			std::function<void(const QJsonArray &data, const QString &error)> done,
@@ -206,7 +198,7 @@ private:
 
 	QString m_storePath;
 	QNetworkAccessManager m_net;
-	std::array<ChatAccount, 4> m_accounts; /* Twitch, Kick, YouTube, Trovo */
+	std::array<ChatAccount, 3> m_accounts; /* Twitch, Kick, YouTube */
 	/* YouTube lifts a ban by the ban's id: user channel id -> ban id, for
 	 * bans made since OBS started. */
 	QHash<QString, QString> m_youtubeBans;

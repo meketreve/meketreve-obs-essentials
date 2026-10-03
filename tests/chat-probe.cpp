@@ -26,7 +26,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "sound-fetch.hpp"
 #include "tts-client.hpp"
 #include "kick-chat.hpp"
-#include "trovo-chat.hpp"
 #include "twitch-chat.hpp"
 #include "youtube-chat.hpp"
 
@@ -66,7 +65,7 @@ int main(int argc, char **argv)
 	QCoreApplication app(argc, argv);
 	const QStringList args = app.arguments();
 	if (args.size() < 3) {
-		std::fprintf(stderr, "usage: chat-probe <twitch|youtube|kick|trovo> <channel> [seconds]\n");
+		std::fprintf(stderr, "usage: chat-probe <twitch|youtube|kick> <channel> [seconds]\n");
 		return 2;
 	}
 
@@ -118,7 +117,6 @@ int main(int argc, char **argv)
 	if (platform.startsWith(QLatin1String("login-"))) {
 		const ChatPlatform p = platform == QLatin1String("login-kick")      ? ChatPlatform::Kick
 				       : platform == QLatin1String("login-youtube") ? ChatPlatform::YouTube
-				       : platform == QLatin1String("login-trovo")   ? ChatPlatform::Trovo
 										    : ChatPlatform::Twitch;
 		ChatAccounts accounts(QDir::tempPath() + QStringLiteral("/chat-probe-accounts.json"));
 		accounts.setClient(p, args[2], args.size() > 3 ? args[3] : QString());
@@ -129,12 +127,9 @@ int main(int argc, char **argv)
 		QObject::connect(&accounts, &ChatAccounts::openBrowser, [&out, &net, p](const QUrl &url) {
 			out << "[browser] " << url.toString() << Qt::endl;
 			const QString state = QUrlQuery(url).queryItemValue(QStringLiteral("state"));
-			/* Trovo's https redirect bounces to the loopback port; go there. */
+			/* Kick and YouTube bounce through the plugin's loopback port. */
 			const QString callback = p == ChatPlatform::Twitch ? ChatAccounts::twitchRedirectUri() + '/'
-						 : p == ChatPlatform::Trovo
-							 ? QStringLiteral("http://localhost:%1/callback")
-								   .arg(ChatAccounts::kTrovoRedirectPort)
-							 : ChatAccounts::redirectUri(p);
+									   : ChatAccounts::redirectUri(p);
 			const QUrl back(callback + QStringLiteral("?code=fake-code&state=") + state);
 			net.get(QNetworkRequest(back));
 			/* Browsers may load the redirect twice: it must still answer. */
@@ -184,8 +179,6 @@ int main(int argc, char **argv)
 		c = youtube;
 	} else if (platform == QLatin1String("kick")) {
 		c = new KickChat(&net, &app);
-	} else if (platform == QLatin1String("trovo")) {
-		c = new TrovoChat(&net, &app);
 	}
 	if (!c) {
 		std::fprintf(stderr, "unknown platform '%s'\n", qPrintable(platform));
