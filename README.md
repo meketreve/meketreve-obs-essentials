@@ -57,6 +57,10 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
   price has its own wait between sounds, set in the dock's **Settings**
   (defaults: up to 20 pts 10 s, up to 100 pts 30 s, up to 200 pts 60 s,
   above that 120 s); a cheap sound can play right after an expensive one.
+- **Adding sounds:** mods and the streamer can type `!addaudio <link> <price>
+  [name]` with a [myinstants](https://www.myinstants.com) page or a link to an
+  `.mp3`/`.wav`/`.ogg` file (https, up to 3 MB); the dock's **Add sound** does
+  the same, or takes a file from your computer.
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
   `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
   the link to the [command list](https://meketreve.github.io/meketreve-obs-essentials/commands.html)

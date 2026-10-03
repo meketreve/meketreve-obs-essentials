@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 #include "bot-data.hpp"
+#include "sound-fetch.hpp"
 #include "../unified-chat/chat-connector.hpp"
 
 #include <QElapsedTimer>
@@ -65,6 +66,7 @@ public:
 	using TextFunction = std::function<QString(const char *key)>;
 
 	static constexpr int kTtsCost = 200;
+	static constexpr int kMaxClipCost = 100000;
 	static constexpr int kPointsTickSeconds = 60;
 	/* Without a viewer list (every platform but a logged-in Twitch), a
 	 * viewer counts as present for this long after their last message. */
@@ -81,6 +83,15 @@ public:
 	static QString keyFor(ChatPlatform platform, const QString &user);
 
 	void setTts(TtsFunction tts) { m_tts = std::move(tts); }
+	/* Downloads a sound from a link for !addaudio (SoundFetch::fetch). */
+	using SoundFetchFunction =
+		std::function<void(const QString &link, std::function<void(const SoundFetch::Result &)> done)>;
+	void setSoundFetch(SoundFetchFunction fetch) { m_soundFetch = std::move(fetch); }
+	/* Saves a sound as <audio dir>/<cost>/<name>.<ext> for !tocar. Empty on
+	 * success, else the reason (translated). */
+	QString addClip(const QByteArray &data, const QString &ext, const QString &name, int cost);
+	/* What a fetch error means, in the bot's language. */
+	QString soundFetchError(const SoundFetch::Result &result) const;
 	void setText(TextFunction text) { m_text = std::move(text); }
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
@@ -186,6 +197,7 @@ private:
 	double m_volume = 1.0;
 	int m_listeners = 0;
 	TtsFunction m_tts;
+	SoundFetchFunction m_soundFetch;
 	TextFunction m_text;
 	QHash<QString, QByteArray> m_ttsClips;
 	QStringList m_ttsOrder;

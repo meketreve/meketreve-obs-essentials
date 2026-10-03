@@ -42,6 +42,9 @@
          "desc": {"pt": "Para o som que está tocando.", "en": "Stops the sound that is playing."}},
         {"pt": "!darpontos <usuário> <quantidade>", "en": "!givepoints <user> <amount>", "also": ["!dar", "!give", "!addpontos", "!addpoints"], "who": "mod",
          "desc": {"pt": "Dá pontos para alguém (número negativo tira).", "en": "Gives someone points (a negative number takes them away)."}},
+        {"pt": "!addaudio <link> <preço> [nome]", "en": "!addsound <link> <price> [name]", "also": ["!adicionaraudio", "!addsom"], "who": "mod",
+         "desc": {"pt": "Adiciona um som ao <code>!tocar</code> a partir de um link do myinstants (ou de um arquivo .mp3/.wav/.ogg), com o preço dado. Sem nome, usa o nome do arquivo. Até 3 MB.",
+                  "en": "Adds a sound to <code>!play</code> from a myinstants link (or an .mp3/.wav/.ogg file) at the given price. Without a name, it takes the file's name. Up to 3 MB."}},
         {"pt": "!recarregar", "en": "!reload", "who": "mod",
          "desc": {"pt": "Lê de novo a pasta de sons.", "en": "Reads the sound folder again."}}
       ]

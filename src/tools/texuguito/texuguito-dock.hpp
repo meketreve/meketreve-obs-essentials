@@ -52,6 +52,7 @@ private:
 	void refreshStatus();
 	void addBrowserSource();
 	void importOldBot();
+	void addAudio();
 	void openSettings();
 
 	UnifiedChatDock *m_chat;

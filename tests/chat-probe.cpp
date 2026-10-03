@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * Exit code 0 when at least one message arrived, 1 otherwise. */
 
 #include "chat-accounts.hpp"
+#include "sound-fetch.hpp"
 #include "tts-client.hpp"
 #include "kick-chat.hpp"
 #include "twitch-chat.hpp"
@@ -72,6 +73,26 @@ int main(int argc, char **argv)
 	const QString platform = args[1].toLower();
 
 	/* chat-probe tts "<text>" <out.mp3> [lang]: Google TTS as the Texuguito uses it. */
+	if (platform == QLatin1String("sound")) {
+		/* chat-probe sound <link> [out-dir]: what !addaudio would download. */
+		QNetworkAccessManager soundNet;
+		const QString outDir = args.size() > 3 ? args[3] : QString();
+		SoundFetch::fetch(
+			&soundNet, args[2],
+			[&app, outDir](const SoundFetch::Result &r) {
+				std::printf("error=%d detail='%s' ext=%s name=%s bytes=%lld\n",
+					    static_cast<int>(r.error), qPrintable(r.detail), qPrintable(r.ext),
+					    qPrintable(r.name), static_cast<long long>(r.data.size()));
+				if (!outDir.isEmpty() && !r.data.isEmpty()) {
+					QFile f(outDir + QLatin1Char('/') + r.name + QLatin1Char('.') + r.ext);
+					if (f.open(QIODevice::WriteOnly))
+						f.write(r.data);
+				}
+				app.exit(r.error == SoundFetch::Error::None ? 0 : 1);
+			},
+			&app);
+		return app.exec();
+	}
 	if (platform == QLatin1String("tts") && args.size() > 3) {
 		int rc = 1;
 		GoogleTts::synthesize(

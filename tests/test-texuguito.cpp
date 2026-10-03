@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "bot-engine.hpp"
 #include "overlay-server.hpp"
+#include "sound-fetch.hpp"
 #include "tts-client.hpp"
 
 #include <QFile>
@@ -443,6 +444,97 @@ private slots:
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!pontos")));
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!pontos"), ChatPlatform::Kick));
 		QCOMPARE(said.size(), 5);
+	}
+
+	void soundFetchHelpers()
+	{
+		using namespace SoundFetch;
+		QVERIFY(allowedUrl(QUrl(QStringLiteral("https://www.myinstants.com/pt/instant/x/"))));
+		QVERIFY(!allowedUrl(QUrl(QStringLiteral("http://www.myinstants.com/media/sounds/x.mp3"))));
+		QVERIFY(!allowedUrl(QUrl(QStringLiteral("https://localhost:8902/x.mp3"))));
+		QVERIFY(!allowedUrl(QUrl(QStringLiteral("https://127.0.0.1/x.mp3"))));
+		QVERIFY(!allowedUrl(QUrl(QStringLiteral("https://192.168.0.10/x.mp3"))));
+		QVERIFY(!allowedUrl(QUrl(QStringLiteral("file:///etc/passwd"))));
+
+		QCOMPARE(audioType(QByteArray("ID3\x04", 4)), QStringLiteral("mp3"));
+		QCOMPARE(audioType(QByteArray("\xFF\xFB\x90", 3)), QStringLiteral("mp3"));
+		QCOMPARE(audioType(QByteArray("OggS")), QStringLiteral("ogg"));
+		QCOMPARE(audioType(QByteArray("RIFF\0\0\0\0WAVE", 12)), QStringLiteral("wav"));
+		QVERIFY(audioType(QByteArray("<!DOCTYPE html>")).isEmpty());
+
+		const QUrl page(QStringLiteral("https://www.myinstants.com/pt/instant/vine-boom-sound-70972/"));
+		QCOMPARE(audioUrlInPage("<button onclick=\"play('/media/sounds/vine-boom.mp3', 'loader')\">", page),
+			 QUrl(QStringLiteral("https://www.myinstants.com/media/sounds/vine-boom.mp3")));
+		QCOMPARE(audioUrlInPage("<meta property=\"og:audio\" content=\"https://cdn.x.com/a.ogg\">"
+					"<a href=\"/b.mp3\">",
+					page),
+			 QUrl(QStringLiteral("https://cdn.x.com/a.ogg")));
+		QVERIFY(audioUrlInPage("<p>nothing here</p>", page).isEmpty());
+
+		QCOMPARE(clipName(QStringLiteral("Ação Épica!! (1)")), QStringLiteral("acao-epica-1"));
+		QCOMPARE(clipName(QStringLiteral("vine_boom")), QStringLiteral("vine_boom"));
+		QCOMPARE(clipName(QStringLiteral("../../etc")), QStringLiteral("etc"));
+		QCOMPARE(clipName(QString(40, QLatin1Char('a'))).size(), 32);
+		QCOMPARE(nameFromUrl(QUrl(QStringLiteral("https://x.com/media/sounds/Vine Boom.mp3"))),
+			 QStringLiteral("vine-boom"));
+	}
+
+	void addAudioCommand()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QStringList links;
+		SoundFetch::Result next;
+		bot.setSoundFetch(
+			[&links, &next](const QString &link, std::function<void(const SoundFetch::Result &)> done) {
+				links.append(link);
+				done(next);
+			});
+		const QByteArray mp3("ID3\x04 fake sound", 17);
+		next.data = mp3;
+		next.ext = QStringLiteral("mp3");
+		next.name = QStringLiteral("vine-boom");
+
+		/* Viewers cannot add sounds; nothing is downloaded. */
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!addaudio https://x.com/a.mp3 50")));
+		QVERIFY(links.isEmpty());
+		QCOMPARE(said.size(), 0);
+
+		BotMessage mod = msg(QStringLiteral("mod"), QStringLiteral("!addaudio https://x.com/Vine.mp3"));
+		mod.isMod = true;
+		bot.handleMessage(mod); /* no price */
+		QVERIFY(replies(said).last().contains(QStringLiteral("!addaudio")));
+		QVERIFY(links.isEmpty());
+
+		/* The link keeps its case; the sound lands in audios/<price>/. */
+		mod.text = QStringLiteral("!addaudio https://x.com/Vine.mp3 50");
+		bot.handleMessage(mod);
+		QCOMPARE(links.last(), QStringLiteral("https://x.com/Vine.mp3"));
+		QVERIFY(replies(said).last().contains(QStringLiteral("vine-boom")));
+		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/50/vine-boom.mp3"))));
+		QCOMPARE(bot.clips().at(QStringLiteral("vine-boom")).cost, 50);
+
+		/* Same name again: refused. A name of your own: fine. */
+		bot.handleMessage(mod);
+		QVERIFY(replies(said).last().contains(QStringLiteral("Já existe")));
+		mod.text = QStringLiteral("!addaudio https://x.com/Vine.mp3 100 Bum Alto");
+		bot.handleMessage(mod);
+		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/100/bum-alto.mp3"))));
+
+		/* The streamer too; a page with no sound is reported. */
+		BotMessage owner = msg(QStringLiteral("dono"), QStringLiteral("!addaudio https://x.com/page 10"));
+		owner.isBroadcaster = true;
+		next = SoundFetch::Result();
+		next.error = SoundFetch::Error::NoAudio;
+		bot.handleMessage(owner);
+		QVERIFY(replies(said).last().contains(QStringLiteral("Não achei")));
+
+		/* Not audio, or a price out of range: nothing saved. */
+		QVERIFY(!bot.addClip("<html>", QStringLiteral("mp3"), QStringLiteral("fake"), 10).isEmpty());
+		QVERIFY(!bot.addClip(mp3, QStringLiteral("mp3"), QStringLiteral("caro"), -1).isEmpty());
+		QVERIFY(!QFile::exists(dir.filePath(QStringLiteral("audios/10/fake.mp3"))));
 	}
 
 	void englishReplies()

@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "texuguito-dock.hpp"
 #include "texuguito.h"
+#include "sound-fetch.hpp"
 #include "tts-client.hpp"
 
 #include "../unified-chat/chat-accounts.hpp"
@@ -122,6 +123,9 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 		[this](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
 			GoogleTts::synthesize(&m_net, text, std::move(done), this, lang);
 		});
+	m_engine->setSoundFetch([this](const QString &link, std::function<void(const SoundFetch::Result &)> done) {
+		SoundFetch::fetch(&m_net, link, std::move(done), this);
+	});
 
 	OverlayServer::Routes routes;
 	routes.webDir = webDir();
@@ -187,15 +191,20 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 		QDir().mkpath(m_engine->audioDir());
 		QDesktopServices::openUrl(QUrl::fromLocalFile(m_engine->audioDir()));
 	});
+	auto *addAudio = new QPushButton(T("Texuguito.AddAudio"), this);
+	connect(addAudio, &QPushButton::clicked, this, &TexuguitoDock::addAudio);
 	auto *import = new QPushButton(T("Texuguito.Import"), this);
 	connect(import, &QPushButton::clicked, this, &TexuguitoDock::importOldBot);
 	auto *settings = new QToolButton(this);
 	settings->setText(T("UnifiedChat.Settings"));
 	connect(settings, &QToolButton::clicked, this, &TexuguitoDock::openSettings);
 	row2->addWidget(audios);
-	row2->addWidget(import);
-	row2->addWidget(settings);
+	row2->addWidget(addAudio);
 	layout->addLayout(row2);
+	auto *row3 = new QHBoxLayout();
+	row3->addWidget(import);
+	row3->addWidget(settings);
+	layout->addLayout(row3);
 
 	auto *help = new QLabel(T("Texuguito.Help"), this);
 	help->setWordWrap(true);
@@ -368,6 +377,98 @@ void TexuguitoDock::updateStreamerChannels()
 	if (!numeric) /* a chatroom id, not a name */
 		channels.append({ChatPlatform::Kick, kick});
 	m_engine->setStreamerChannels(channels);
+}
+
+void TexuguitoDock::addAudio()
+{
+	QDialog dialog(this);
+	dialog.setWindowTitle(T("Texuguito.AddAudioTitle"));
+	dialog.setMinimumWidth(460);
+	auto *layout = new QVBoxLayout(&dialog);
+	auto *intro = new QLabel(T("Texuguito.AddAudioIntro"), &dialog);
+	intro->setWordWrap(true);
+	layout->addWidget(intro);
+
+	auto *form = new QFormLayout();
+	auto *linkRow = new QHBoxLayout();
+	auto *link = new QLineEdit(&dialog);
+	link->setPlaceholderText(QStringLiteral("https://www.myinstants.com/pt/instant/..."));
+	auto *pick = new QPushButton(T("Texuguito.AddAudioFile"), &dialog);
+	linkRow->addWidget(link, 1);
+	linkRow->addWidget(pick);
+	form->addRow(T("Texuguito.AddAudioLink"), linkRow);
+	auto *price = new QSpinBox(&dialog);
+	price->setRange(0, BotEngine::kMaxClipCost);
+	const QList<int> costs = m_engine->clipCosts();
+	price->setValue(costs.isEmpty() ? 50 : costs.first());
+	form->addRow(T("Texuguito.AddAudioPrice"), price);
+	auto *name = new QLineEdit(&dialog);
+	form->addRow(T("Texuguito.AddAudioName"), name);
+	layout->addLayout(form);
+
+	auto *status = new QLabel(&dialog);
+	status->setWordWrap(true);
+	layout->addWidget(status);
+	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+	layout->addWidget(buttons);
+
+	connect(pick, &QPushButton::clicked, &dialog, [this, &dialog, link, name]() {
+		const QString file = QFileDialog::getOpenFileName(&dialog, T("Texuguito.AddAudioTitle"), QString(),
+								  T("Texuguito.AddAudioFileFilter"));
+		if (file.isEmpty())
+			return;
+		link->setText(file);
+		if (name->text().trimmed().isEmpty())
+			name->setText(SoundFetch::clipName(QFileInfo(file).completeBaseName()));
+	});
+	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+	/* Saves and closes, or says why not and stays open. */
+	const auto save = [this, &dialog, name, price, status, buttons](const QByteArray &data, const QString &ext,
+									const QString &suggested) {
+		const QString clip = SoundFetch::clipName(name->text().trimmed().isEmpty() ? suggested : name->text());
+		const QString error = m_engine->addClip(data, ext, clip, price->value());
+		buttons->setEnabled(true);
+		if (!error.isEmpty()) {
+			status->setText(error);
+			return;
+		}
+		refreshStatus();
+		QMessageBox::information(&dialog, T("Texuguito.AddAudioTitle"),
+					 T("Texuguito.Bot.AudioAdded").arg(clip).arg(price->value()));
+		dialog.accept();
+	};
+	connect(buttons, &QDialogButtonBox::accepted, &dialog, [this, &dialog, link, status, buttons, save]() {
+		const QString source = link->text().trimmed();
+		if (source.isEmpty())
+			return;
+		const QFileInfo local(source);
+		if (local.isFile()) {
+			QFile file(source);
+			if (local.size() > SoundFetch::kMaxAudioBytes || !file.open(QIODevice::ReadOnly)) {
+				status->setText(T("Texuguito.Bot.AddAudioTooBig")
+							.arg(SoundFetch::kMaxAudioBytes / (1024 * 1024)));
+				return;
+			}
+			const QByteArray data = file.readAll();
+			save(data, SoundFetch::audioType(data.left(16)), local.completeBaseName());
+			return;
+		}
+		buttons->setEnabled(false);
+		status->setText(T("Texuguito.AddAudioDownloading"));
+		SoundFetch::fetch(
+			&m_net, source,
+			[this, status, buttons, save](const SoundFetch::Result &r) {
+				if (r.error != SoundFetch::Error::None) {
+					buttons->setEnabled(true);
+					status->setText(m_engine->soundFetchError(r));
+					return;
+				}
+				save(r.data, r.ext, r.name);
+			},
+			&dialog);
+	});
+	dialog.exec();
 }
 
 void TexuguitoDock::pollChatters()

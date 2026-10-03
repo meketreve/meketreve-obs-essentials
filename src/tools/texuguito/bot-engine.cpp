@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "bot-engine.hpp"
 
 #include <QDir>
+#include <QSaveFile>
 #include <QJsonArray>
 #include <QRegularExpression>
 #include <QUrl>
@@ -134,6 +135,47 @@ int BotEngine::reloadClips()
 		}
 	}
 	return static_cast<int>(m_clips.size());
+}
+
+QString BotEngine::addClip(const QByteArray &data, const QString &ext, const QString &name, int cost)
+{
+	const QString clean = SoundFetch::clipName(name);
+	if (clean.isEmpty())
+		return t("Texuguito.Bot.AddAudioNoName");
+	if (cost < 0 || cost > kMaxClipCost)
+		return t("Texuguito.Bot.AddAudioBadPrice").arg(kMaxClipCost);
+	if (data.size() > SoundFetch::kMaxAudioBytes)
+		return t("Texuguito.Bot.AddAudioTooBig").arg(SoundFetch::kMaxAudioBytes / (1024 * 1024));
+	if (SoundFetch::audioType(data.left(16)) != ext)
+		return t("Texuguito.Bot.AddAudioNoSound");
+	if (m_clips.count(clean))
+		return t("Texuguito.Bot.AddAudioExists").arg(clean);
+	const QDir dir(QDir(m_audioDir).filePath(QString::number(cost)));
+	QSaveFile file(dir.filePath(clean + QLatin1Char('.') + ext));
+	if (!QDir().mkpath(dir.path()) || !file.open(QIODevice::WriteOnly) || file.write(data) != data.size() ||
+	    !file.commit())
+		return t("Texuguito.Bot.AddAudioSaveFailed");
+	reloadClips();
+	return QString();
+}
+
+QString BotEngine::soundFetchError(const SoundFetch::Result &result) const
+{
+	switch (result.error) {
+	case SoundFetch::Error::None:
+		return QString();
+	case SoundFetch::Error::BadLink:
+		return t("Texuguito.Bot.AddAudioBadLink");
+	case SoundFetch::Error::Blocked:
+		return t("Texuguito.Bot.AddAudioBlocked").arg(result.detail);
+	case SoundFetch::Error::NoAudio:
+		return t("Texuguito.Bot.AddAudioNoSound");
+	case SoundFetch::Error::TooBig:
+		return t("Texuguito.Bot.AddAudioTooBig").arg(SoundFetch::kMaxAudioBytes / (1024 * 1024));
+	case SoundFetch::Error::Network:
+		break;
+	}
+	return t("Texuguito.Bot.AddAudioDownloadFailed");
 }
 
 void BotEngine::reloadData()
@@ -685,6 +727,34 @@ void BotEngine::registerCommands()
 			 m_points.add(targetKey, amount);
 			 say(m.platform,
 			     t("Texuguito.Bot.PointsGiven").arg(amount).arg(target).arg(m_points.get(targetKey)));
+		 }},
+		{QStringLiteral("addaudio"),
+		 {QStringLiteral("adicionaraudio"), QStringLiteral("addsom"), QStringLiteral("addsound")},
+		 [this](const BotMessage &m, const QString &, const QStringList &args) {
+			 if (!privileged(m))
+				 return;
+			 bool priceOk = false;
+			 const int cost = args.size() >= 2 ? args[1].toInt(&priceOk) : 0;
+			 if (!priceOk || !m_soundFetch) {
+				 say(m.platform, t("Texuguito.Bot.AddAudioUsage"));
+				 return;
+			 }
+			 const QString wanted = args.size() >= 3 ? args.mid(2).join(QLatin1Char('-')) : QString();
+			 const ChatPlatform platform = m.platform;
+			 QPointer<BotEngine> self = this;
+			 m_soundFetch(args[0], [self, platform, cost, wanted](const SoundFetch::Result &r) {
+				 if (!self)
+					 return;
+				 if (r.error != SoundFetch::Error::None) {
+					 self->say(platform, self->soundFetchError(r));
+					 return;
+				 }
+				 const QString name = SoundFetch::clipName(wanted.isEmpty() ? r.name : wanted);
+				 const QString error = self->addClip(r.data, r.ext, name, cost);
+				 self->say(platform, error.isEmpty()
+							     ? self->t("Texuguito.Bot.AudioAdded").arg(name).arg(cost)
+							     : error);
+			 });
 		 }},
 		{QStringLiteral("tocar"),
 		 {QStringLiteral("p"), QStringLiteral("play")},

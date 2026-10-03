@@ -34,7 +34,12 @@ target_include_directories(chat-core PUBLIC ${_chat} ${CMAKE_SOURCE_DIR}/src/too
 target_link_libraries(chat-core PUBLIC Qt6::Core Qt6::Network)
 set_target_properties(chat-core PROPERTIES AUTOMOC ON POSITION_INDEPENDENT_CODE ON)
 
-add_executable(chat-probe chat-probe.cpp ${CMAKE_SOURCE_DIR}/src/tools/texuguito/tts-client.cpp)
+add_executable(
+  chat-probe
+  chat-probe.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/texuguito/sound-fetch.cpp
+  ${CMAKE_SOURCE_DIR}/src/tools/texuguito/tts-client.cpp
+)
 target_include_directories(chat-probe PRIVATE ${CMAKE_SOURCE_DIR}/src/tools/texuguito)
 target_link_libraries(chat-probe PRIVATE chat-core)
 
@@ -109,6 +114,8 @@ add_executable(
   ${_texuguito}/bot-engine.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
+  ${_texuguito}/sound-fetch.cpp
+  ${_texuguito}/sound-fetch.hpp
   ${_texuguito}/tts-client.cpp
 )
 target_include_directories(test-texuguito PRIVATE ${_texuguito})
