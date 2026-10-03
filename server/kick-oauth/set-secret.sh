@@ -32,6 +32,19 @@ stty echo 2>/dev/null || true
 trap - EXIT INT TERM
 echo
 
+# Keep only the last word: stray keys (Delete, arrows) and spaces typed
+# before a paste end up in front of it.
+last_word() {
+	set -f
+	# shellcheck disable=SC2086
+	set -- $1
+	set +f
+	[ $# -gt 0 ] || return 0
+	eval "printf '%s' \"\${$#}\""
+}
+client_id=$(last_word "$client_id")
+client_secret=$(last_word "$client_secret")
+
 case $client_id$client_secret in
 *[!A-Za-z0-9._~-]*)
 	echo "the id and secret may only have letters, digits and . _ ~ -" >&2
