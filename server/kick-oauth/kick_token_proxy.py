@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""OAuth token exchange for Meketreve OBS Essentials (Kick and Google).
+"""OAuth token exchange for Meketreve OBS Essentials (Kick, Google, Trovo).
 
-Kick and Google only issue tokens to requests that carry the app's client
-secret, and the plugin's source is public. The plugin does the authorization
-itself (PKCE, the browser coming back to a loopback address) and sends the
-code, or a refresh token, to /kick/token or /google/token; this adds that
-app's client id and secret and forwards the request to that provider's token
-endpoint, and nowhere else.
+Kick, Google and Trovo only issue tokens to requests that carry the app's
+client secret, and the plugin's source is public. The plugin does the
+authorization itself (the browser coming back to a loopback address, with
+PKCE where the provider has it) and sends the code, or a refresh token, to
+/kick/token, /google/token or /trovo/token; this adds that app's client id
+and secret and forwards the request to that provider's token endpoint, and
+nowhere else.
 
 Standard library only. Listens on 127.0.0.1 (Caddy in front does HTTPS).
 Configuration comes from the environment:
   KICK_CLIENT_ID, KICK_CLIENT_SECRET       Kick app
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   Google "desktop app" client (YouTube)
+  TROVO_CLIENT_ID, TROVO_CLIENT_SECRET     Trovo app
   LISTEN_PORT                              default 8787
   RATE_PER_MINUTE                          requests per client IP, default 20
 A provider without credentials answers 404. Nothing it receives or returns
@@ -46,6 +48,17 @@ PROVIDERS = {
         # Desktop clients may use any loopback port.
         "redirect": re.compile(r"http://(127\.0\.0\.1|localhost):\d{2,5}(/callback)?"),
     },
+    # Trovo: JSON bodies, the client id in a header, one URL per grant and
+    # no PKCE.
+    "/trovo/token": {
+        "token_url": "https://open-api.trovo.live/openplatform/exchangetoken",
+        "refresh_url": "https://open-api.trovo.live/openplatform/refreshtoken",
+        "json": True,
+        "pkce": False,
+        "client_id": os.environ.get("TROVO_CLIENT_ID", ""),
+        "client_secret": os.environ.get("TROVO_CLIENT_SECRET", ""),
+        "redirect": re.compile(r"http://localhost:53684/callback"),
+    },
 }
 PROVIDERS = {path: p for path, p in PROVIDERS.items() if p["client_id"] and p["client_secret"]}
 PORT = int(os.environ.get("LISTEN_PORT", "8787"))
@@ -73,20 +86,20 @@ def allowed(ip: str) -> bool:
 def upstream_form(provider: dict, fields: dict[str, str]) -> dict[str, str] | None:
     """What goes to the provider, or None when the request is not one we forward."""
     grant = fields.get("grant_type")
-    credentials = {"client_id": provider["client_id"], "client_secret": provider["client_secret"]}
+    credentials = {"client_secret": provider["client_secret"]}
+    if not provider.get("json"):  # Trovo takes the client id as a header
+        credentials["client_id"] = provider["client_id"]
+    pkce = provider.get("pkce", True)
     if grant == "authorization_code":
-        if not fields.get("code") or not fields.get("code_verifier"):
+        if not fields.get("code") or (pkce and not fields.get("code_verifier")):
             return None
         redirect = fields.get("redirect_uri", "")
         if not provider["redirect"].fullmatch(redirect):
             return None
-        return {
-            "grant_type": grant,
-            "code": fields["code"],
-            "code_verifier": fields["code_verifier"],
-            "redirect_uri": redirect,
-            **credentials,
-        }
+        form = {"grant_type": grant, "code": fields["code"], "redirect_uri": redirect, **credentials}
+        if pkce:
+            form["code_verifier"] = fields["code_verifier"]
+        return form
     if grant == "refresh_token":
         if not fields.get("refresh_token"):
             return None
@@ -137,13 +150,7 @@ class Handler(BaseHTTPRequestHandler):
         if form is None:
             self.reply(400, {"error": "invalid_request"})
             return
-        req = urllib.request.Request(
-            provider["token_url"],
-            data=urllib.parse.urlencode(form).encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json",
-                     "User-Agent": "meketreve-obs-essentials-oauth"},
-            method="POST",
-        )
+        req = upstream_request(provider, form)
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 self.reply(resp.status, resp.read())
@@ -154,13 +161,28 @@ class Handler(BaseHTTPRequestHandler):
         print(f"{self.path} {grant_label(form)} -> done", file=sys.stderr, flush=True)
 
 
+def upstream_request(provider: dict, form: dict[str, str]) -> urllib.request.Request:
+    headers = {"Accept": "application/json", "User-Agent": "meketreve-obs-essentials-oauth"}
+    url = provider["token_url"]
+    if provider.get("json"):
+        headers["Content-Type"] = "application/json"
+        headers["client-id"] = provider["client_id"]
+        if form["grant_type"] == "refresh_token":
+            url = provider["refresh_url"]
+        data = json.dumps(form).encode()
+    else:
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+        data = urllib.parse.urlencode(form).encode()
+    return urllib.request.Request(url, data=data, headers=headers, method="POST")
+
+
 def grant_label(form: dict[str, str]) -> str:
     return "code" if form["grant_type"] == "authorization_code" else "refresh"
 
 
 def main() -> None:
     if not PROVIDERS:
-        sys.exit("set KICK_CLIENT_ID/KICK_CLIENT_SECRET and/or GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET")
+        sys.exit("set KICK_, GOOGLE_ and/or TROVO_ CLIENT_ID and CLIENT_SECRET")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"listening on 127.0.0.1:{PORT} for {', '.join(sorted(PROVIDERS))}", file=sys.stderr, flush=True)
     server.serve_forever()
