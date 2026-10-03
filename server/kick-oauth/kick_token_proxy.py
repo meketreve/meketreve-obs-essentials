@@ -49,7 +49,8 @@ PROVIDERS = {
         "redirect": re.compile(r"http://(127\.0\.0\.1|localhost):\d{2,5}(/callback)?"),
     },
     # Trovo: JSON bodies, the client id in a header, one URL per grant and
-    # no PKCE.
+    # no PKCE. It only accepts https redirects, so the login comes back to
+    # /trovo/callback here, which sends the browser on to the plugin.
     "/trovo/token": {
         "token_url": "https://open-api.trovo.live/openplatform/exchangetoken",
         "refresh_url": "https://open-api.trovo.live/openplatform/refreshtoken",
@@ -57,9 +58,12 @@ PROVIDERS = {
         "pkce": False,
         "client_id": os.environ.get("TROVO_CLIENT_ID", ""),
         "client_secret": os.environ.get("TROVO_CLIENT_SECRET", ""),
-        "redirect": re.compile(r"http://localhost:53684/callback"),
+        "redirect": re.compile(r"https://[A-Za-z0-9.-]+/trovo/callback"),
     },
 }
+# Where /trovo/callback sends the browser: the plugin's loopback listener.
+TROVO_LOOPBACK = "http://localhost:53684/callback"
+CALLBACK_PARAMS = ("code", "state", "error", "error_description", "scope")
 PROVIDERS = {path: p for path, p in PROVIDERS.items() if p["client_id"] and p["client_secret"]}
 PORT = int(os.environ.get("LISTEN_PORT", "8787"))
 RATE = int(os.environ.get("RATE_PER_MINUTE", "20"))
@@ -128,8 +132,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path == "/health":
+        path, _, query = self.path.partition("?")
+        if path == "/health":
             self.reply(200, b"ok\n", "text/plain")
+        elif path == "/trovo/callback":
+            # Only the OAuth answer goes on, to a fixed local address.
+            fields = urllib.parse.parse_qs(query)
+            kept = {k: fields[k][0] for k in CALLBACK_PARAMS if k in fields}
+            self.send_response(302)
+            self.send_header("Location", TROVO_LOOPBACK + "?" + urllib.parse.urlencode(kept))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
         else:
             self.reply(404, {"error": "not_found"})
 

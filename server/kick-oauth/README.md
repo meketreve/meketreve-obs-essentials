@@ -10,8 +10,11 @@ id and secret and forwards it to `https://id.kick.com/oauth/token` only.
 - Accepts only `authorization_code` (with the plugin's redirect URI, and
   `code_verifier` for Kick and Google) and `refresh_token`; 20 requests a
   minute per IP. Google is `POST /google/token`; Trovo is `POST /trovo/token`
-  (redirect `http://localhost:53684/callback`, no PKCE: Trovo has none),
-  forwarded as JSON to Trovo's `exchangetoken` / `refreshtoken`.
+  (no PKCE: Trovo has none), forwarded as JSON to Trovo's `exchangetoken` /
+  `refreshtoken`. Trovo only takes https redirect URLs, so the app's OAuth
+  URL is `https://<host>/trovo/callback`: it answers with a redirect to the
+  plugin's `http://localhost:53684/callback`, passing on only `code`,
+  `state` and the error fields.
 - Logs nothing it receives or returns.
 
 ## Install or update (Ubuntu, as root)
