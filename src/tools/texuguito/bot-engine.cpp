@@ -325,6 +325,16 @@ QStringList BotEngine::presentTwins(const QString &base) const
 	return keys;
 }
 
+QStringList BotEngine::lookKeys(const QString &key) const
+{
+	/* The parade draws one avatar per name, so a look command from any
+	 * platform changes every present twin: the drawn one included. */
+	QStringList keys = presentTwins(baseName(key));
+	if (!keys.contains(key))
+		keys.append(key);
+	return keys;
+}
+
 void BotEngine::emitAvatar(const QString &type, const QString &key)
 {
 	emit overlayMessage(
@@ -677,13 +687,15 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.ColorInvalid").arg(m.user));
 				 return;
 			 }
-			 m_viewers.setColor(key, *cor);
+			 for (const QString &k : lookKeys(key))
+				 m_viewers.setColor(k, *cor);
 			 updated(key);
 		 }},
 		{QStringLiteral("resetcor"),
 		 {QStringLiteral("resetcolor")},
 		 [this, updated](const BotMessage &, const QString &key, const QStringList &) {
-			 m_viewers.resetColor(key);
+			 for (const QString &k : lookKeys(key))
+				 m_viewers.resetColor(k);
 			 updated(key);
 		 }},
 		{QStringLiteral("chapeu"),
@@ -702,7 +714,8 @@ void BotEngine::registerCommands()
 					     .arg(m.user, BotData::hatNames(listEnglish).join(QStringLiteral(", "))));
 				 return;
 			 }
-			 m_viewers.setHat(key, value);
+			 for (const QString &k : lookKeys(key))
+				 m_viewers.setHat(k, value);
 			 updated(key);
 		 }},
 		{QStringLiteral("acessorio"),
@@ -722,7 +735,8 @@ void BotEngine::registerCommands()
 						  BotData::accessoryNames(listEnglish).join(QStringLiteral(", "))));
 				 return;
 			 }
-			 m_viewers.setAccessory(key, value);
+			 for (const QString &k : lookKeys(key))
+				 m_viewers.setAccessory(k, value);
 			 updated(key);
 		 }},
 		{QStringLiteral("apelido"),
@@ -738,7 +752,8 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.NickInvalid").arg(m.user));
 				 return;
 			 }
-			 m_viewers.setNick(key, nick);
+			 for (const QString &k : lookKeys(key))
+				 m_viewers.setNick(k, nick);
 			 updated(key);
 		 }},
 		{QStringLiteral("dança"),
@@ -766,7 +781,8 @@ void BotEngine::registerCommands()
 			 while (target.startsWith(QLatin1Char('@')))
 				 target.remove(0, 1);
 			 const QString targetKey = keyFor(m.platform, target);
-			 m_viewers.setColor(targetKey, *cor);
+			 for (const QString &k : lookKeys(targetKey))
+				 m_viewers.setColor(k, *cor);
 			 updated(targetKey);
 		 }},
 		{QStringLiteral("comandos"),

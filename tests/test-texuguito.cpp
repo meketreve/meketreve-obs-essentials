@@ -666,6 +666,32 @@ private slots:
 			 QStringLiteral("kick:ana"));
 	}
 
+	void lookCommandReachesTheDrawnTwin()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
+		/* Kick is drawn; the streamer changes the look from Twitch. */
+		bot.setStreamerChannels({{ChatPlatform::Kick, QStringLiteral("meketreve")}});
+		bot.setStreamerChannels({{ChatPlatform::Kick, QStringLiteral("meketreve")},
+					 {ChatPlatform::Twitch, QStringLiteral("meketreve")}});
+		const auto drawn = [&bot]() {
+			return bot.snapshot().value(QStringLiteral("viewers")).toArray().at(0).toObject();
+		};
+		QCOMPARE(drawn().value(QStringLiteral("username")).toString(), QStringLiteral("kick:meketreve"));
+
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!cor vermelho")));
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!chapeu boné")));
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!apelido Chefe")));
+		bot.handleMessage(msg(QStringLiteral("Meketreve"), QStringLiteral("!dança")));
+		const QJsonObject avatar = drawn();
+		QCOMPARE(avatar.value(QStringLiteral("username")).toString(), QStringLiteral("kick:meketreve"));
+		QCOMPARE(avatar.value(QStringLiteral("cor")).toString(), QStringLiteral("#ff0000"));
+		QCOMPARE(avatar.value(QStringLiteral("chapeu")).toString(), QStringLiteral("boné"));
+		QCOMPARE(avatar.value(QStringLiteral("nick")).toString(), QStringLiteral("Chefe"));
+		QVERIFY(avatar.value(QStringLiteral("dance_remaining")).toDouble() > 0);
+	}
+
 	void raffle()
 	{
 		QTemporaryDir dir;

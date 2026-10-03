@@ -184,6 +184,8 @@ private:
 	void emitAvatar(const QString &type, const QString &key);
 	static QString baseName(const QString &key);
 	QStringList presentTwins(const QString &base) const;
+	/* key plus its present twins: the records a look command changes. */
+	QStringList lookKeys(const QString &key) const;
 	QJsonObject viewerPayload(const QString &key);
 	QString displayName(const QString &key);
 	bool privileged(const BotMessage &msg) const { return msg.isMod || msg.isBroadcaster; }
