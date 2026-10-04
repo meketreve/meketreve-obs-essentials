@@ -60,6 +60,16 @@
       ]
     },
     {
+      "title": {"pt": "Enquete", "en": "Poll"},
+      "intro": {"pt": "O streamer abre a enquete pelo painel web dos Overlays; vale em Twitch, YouTube e Kick.",
+                "en": "The streamer opens the poll from the Overlays web panel; it works on Twitch, YouTube and Kick."},
+      "commands": [
+        {"pt": "!voto <número>", "en": "!vote <number>", "who": "all",
+         "desc": {"pt": "Vota na opção com esse número. Um voto por pessoa em cada plataforma; mandar de novo troca o voto.",
+                  "en": "Votes for the option with that number. One vote per person on each platform; sending it again changes the vote."}}
+      ]
+    },
+    {
       "title": {"pt": "Comandos do canal", "en": "Channel commands"},
       "intro": {"pt": "Moderadores criam respostas prontas pelo próprio chat. Na resposta, <code>{user}</code> vira o nome de quem usou o comando e <code>{args}</code> o que veio depois dele.",
                 "en": "Moderators create ready-made replies from the chat itself. In the reply, <code>{user}</code> becomes the name of whoever used the command and <code>{args}</code> whatever came after it."},

@@ -16,9 +16,9 @@ required, though building locally on Linux is a one-liner (see
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube and Kick chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
-| **Texuguito** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
-| **Alerts** | Dock + overlay + web editor | Follows, subs, gift subs, bits, Super Chats, raids and Kick gifts from every chat as on-screen alerts, set up in an editor that opens in your browser. |
-| **Outputs** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
+| **Chat bot (Texuguito)** | Dock + overlay | Chat bot with a pixel-art parade of the viewers, channel points, soundboard, TTS, raffles and chat-made commands, for every Unified Chat platform. |
+| **Overlays** | Dock + Browser Sources + web panel | Alerts, chat on screen, events on screen, goals, chat poll, subathon timer, the chat parade and Now Playing, all fed by the events of every chat and set up in one web panel that opens in your browser. |
+| **Multistream** | Dock | Stream to more platforms at once (Twitch, YouTube, Kick, any RTMP(S) or SRT server), reusing the main stream's encoder or with its own. |
 | **Vertical canvas** | Docks | A second 9:16 canvas with its own scenes, sources, preview, recording, backtrack and streaming. Port of Aitum Vertical Canvas. Needs OBS 32+. |
 | **Layout Tabs** | Toolbar | Tabs under the menu that switch the whole dock layout: **Live**, **Build** and your own. Needs OBS 32+. |
 
@@ -26,7 +26,7 @@ required, though building locally on Linux is a one-liner (see
 
 A tab bar sits under the menu. Each tab remembers where every dock is:
 
-- **Live** shows the preview, Unified Chat with Texuguito and Alerts under it, the audio mixer and the controls.
+- **Live** shows the preview, Unified Chat with the Chat bot and Overlays under it, the audio mixer and the controls.
 - **Build** shows the preview, scenes, sources, transitions and the mixer.
 - **+** makes a new tab from the current layout. Right-click a tab to rename or
   remove it, or to bring Live/Build back to their default layout.
@@ -41,12 +41,13 @@ can place it anywhere. Hotkeys for *next tab*, *previous tab* and *go to tab
 **Tools → Meketreve: Layout tabs**: your original layout comes back, and after
 a restart the preview is back in the center.
 
-### Texuguito (chat bot and parade overlay)
+### Chat bot (Texuguito) and chat parade
 
 The [texuguito-seu-bot-amigo](https://github.com/meketreve/texuguito-seu-bot-amigo)
-bot now runs inside OBS: no Python, no separate window. Open **Docks →
-Texuguito** and click **Add overlay to scene** (or copy the URL
-`http://localhost:8901/overlay` into a Browser Source).
+bot now runs inside OBS: no Python, no separate window. Its panel is
+**Docks → Chat bot (Texuguito)**; the parade is added from the **Overlays**
+panel (**Chat parade → Add to scene**, or the URL
+`http://localhost:8901/overlay` in a Browser Source).
 
 - **Parade:** everyone chatting walks along the bottom of the stream with an
   LPC pixel-art avatar they customize with `!cor`, `!chapeu`, `!acessorio`,
@@ -57,12 +58,17 @@ Texuguito** and click **Add overlay to scene** (or copy the URL
   price has its own wait between sounds, set in the dock's **Settings**
   (defaults: up to 20 pts 10 s, up to 100 pts 30 s, up to 200 pts 60 s,
   above that 120 s); a cheap sound can play right after an expensive one.
+  The web panel's **Chat bot** tab lists the sounds with their price (changing
+  it moves the file to the new price folder), plays one on the parade to test,
+  removes one (to an `audios/removidos` folder) and sets the volume and the
+  waits.
 - **Adding sounds:** mods and the streamer can type `!addaudio <link> <price>
   [name]` with a [myinstants](https://www.myinstants.com) page or a link to an
   `.mp3`/`.wav`/`.ogg` file (https, up to 3 MB); the dock's **Add sound** does
   the same, or takes a file from your computer.
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
-  `!entrar`, `!comando add|edit|del <name> <reply>` for mods, `!comandos` for
+  `!entrar`, `!comando add|edit|del <name> <reply>` for mods (or the web
+  panel's **Chat bot** tab), `!comandos` for
   the link to the [command list](https://meketreve.github.io/meketreve-obs-essentials/commands.html)
   (`!comandos` opens it in Portuguese, `!commands` in English). Every command
   also has an English alias (`!color`, `!play`…).
@@ -78,42 +84,74 @@ With a Twitch login as the
 broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
 message. The streamer's own avatar (the Twitch and Kick channels set in
-Unified Chat, or whoever chats with the broadcaster badge) never leaves. Coming from the Python bot? **Import old bot** copies its `data/`
+Unified Chat, or whoever chats with the broadcaster badge) never leaves. The
+web panel's **Chat parade** tab sets the avatar size, walking speed and the
+names above the heads. Coming from the Python bot? **Import old bot** copies its `data/`
 and `audios/` folders. Clips and TTS play through the Browser Source, so they
 show up in the OBS mixer.
 
-### Alerts
+### Overlays
 
-Open **Docks → Alerts**. **Add to scene** creates a Browser Source the size of
-your canvas (`http://localhost:8902/alertas`); **Customize** opens the editor in
-your web browser. It runs on your own computer, and changes are saved and reach
-OBS as you make them.
+Open **Docks → Overlays**. Each overlay has **Add to scene** (a Browser Source
+of the right size) and **Copy link**; **Open web panel** opens one page in
+your web browser with a tab per overlay. It runs on your own computer, and
+changes are saved and reach OBS as you make them. Every overlay counts the
+same events from Twitch, YouTube and Kick (a gift of many subs counts once);
+alert tests never count.
 
-- **Events:** follow, sub, resub, gift sub (a gift of many shows once), bits,
-  Super Chat / Super Sticker, raid / host, YouTube member and Kick gifts.
-  Each one has its own on/off switch and a minimum (bits, months, viewers,
-  amount paid, Kicks…).
-- **Look:** text with `{name}` `{amount}` `{message}` `{detail}` `{platform}`
-  (or `{nome}` `{quantidade}` `{mensagem}` `{detalhe}` `{plataforma}`), any
-  Google Fonts font, colors, size, layout, entrance and exit animations, time
-  on screen and position on screen. The viewer's message can be read aloud
-  (Google TTS).
-- **Images and sounds:** a default kit of animated drawings and synthesized
-  sounds that works offline, your own files (GIF, PNG, JPG, WebP, WebM video,
-  MP3, WAV, OGG; kept in the plugin's config folder), a link, or a **GIPHY /
-  Tenor** search (paste your own free API key in the editor; it stays on your
-  computer).
-- Alerts wait in line and show one at a time. The dock can **Test** any type
-  and **Skip** the one on screen. Alert sounds play through the Browser Source,
-  so they show up in the OBS mixer.
-- The editor's API only answers the link the dock opens (a token after `#`),
-  so other websites open in your browser cannot change your alerts.
-- **Share configuration** takes the alert setup along (without API keys; your
-  own files have to be copied by hand).
+| Overlay | Link | What it shows |
+|---------|------|---------------|
+| Alerts | `/alertas` | One alert at a time for follows, subs, gift subs, bits, Super Chats, raids, YouTube members and Kick gifts. |
+| Chat on screen | `/chat` | The chat of the platforms you pick (`?p=twitch,kick` fixes it for one source), optionally with events as marked lines. |
+| Events on screen | `/eventos` | The latest events, or one label such as *Last sub* or *Top donor* (`?mostrar=ultimo-sub`). |
+| Goals | `/metas` | Progress bars for follows, subs, bits, donations, YouTube members or gifts (`?meta=<id>` for one goal). |
+| Poll | `/enquete` | A chat poll: viewers vote with `!voto N` or `!vote N`, one vote per person per platform. |
+| Subathon | `/subathon` | A countdown that subs, bits, donations and members push forward. |
+| Chat parade | port 8901 | The Chat bot's pixel-art viewers walking along the bottom. |
+| Now Playing | port 8903 | Audio bars from an OBS source and, on Linux, the song playing (Spotify, browsers, VLC). |
 
-### Outputs (multistream)
+The links above are on `http://localhost:8902`.
 
-Open **Docks → Outputs** and click **+** for each extra destination: pick the
+- **Alerts:** each event has its own switch and a minimum (bits, months,
+  viewers, amount paid, Kicks…). Text with `{name}` `{amount}` `{message}`
+  `{detail}` `{platform}` (or `{nome}` `{quantidade}` `{mensagem}` `{detalhe}`
+  `{plataforma}`), any Google Fonts font, colors, layout, animations, time and
+  position on screen; the viewer's message can be read aloud (Google TTS).
+  Images and sounds: a default kit that works offline, your own files (GIF,
+  PNG, JPG, WebP, WebM, MP3, WAV, OGG), a link, or a **GIPHY / Tenor** search
+  with your own free API key (it stays on your computer). Alerts wait in line;
+  the panel can **Test** any type and **Skip** the one on screen.
+- **Chat on screen:** commands and bots stay off screen, and messages deleted,
+  timed out or banned — from the chat panel or on the platform itself — leave
+  it. Twitch emotes are animated.
+- **Events on screen:** the history is kept on disk, so labels survive a
+  restart; *top donor* and *top bits* count from the start of the stream (or a
+  reset).
+- **Goals:** each goal has a title, what counts, a target and an optional text
+  before the number (`R$`); add or take away by hand, and reset it when the
+  live starts if you want. Donations add the amount as it comes, without
+  converting currency.
+- **Poll:** 2 to 6 options and a time limit (or none). The result stays on
+  screen for a while. Announcing the poll and its result in the chats is
+  optional and off by default (on YouTube each message uses API quota). An
+  open poll survives an OBS restart.
+- **Subathon:** start with any time, pause, add, take away or set the time
+  left, and choose the seconds per sub, gifted sub, 100 bits, unit of money,
+  YouTube member and follow. The end is saved as a time of day, so the clock
+  keeps running while OBS is closed.
+- **Theme:** the **Tema** tab writes one font, text color, accent and
+  background into the overlays you pick. It is a copy: each overlay can still
+  be changed in its own tab.
+- Sounds of alerts, the parade and TTS play through their Browser Source, so
+  they show up in the OBS mixer.
+- The panel's API only answers the link the dock opens (a token after `#`),
+  so other websites open in your browser cannot change your overlays.
+- **Share configuration** takes the alerts, chat on screen and events setup
+  along (without API keys; your own files have to be copied by hand).
+
+### Multistream
+
+Open **Docks → Multistream** and click **+** for each extra destination: pick the
 platform (the server is filled in), paste the stream key and choose the
 encoder:
 
@@ -129,6 +167,13 @@ dot shows the state (hover it for errors) and a timer counts the time live.
 A warning appears when the bitrate is above what the platform accepts. Stream
 keys stay in the profile folder on this computer and are never exported.
 
+YouTube only shows video sent to a key when a live broadcast is waiting for
+it, and today only the YouTube Studio page makes one. With the YouTube
+account logged in (see [Chat login](#chat-login)), a YouTube output finds
+the broadcast bound to its key, or makes one like your last live (title,
+description, privacy) that starts and stops with the video, so the Studio
+page does not need to be open.
+
 Based on the idea of [Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream) (GPL-2.0).
 
 ### Vertical canvas
@@ -137,12 +182,12 @@ The toolkit includes a port of [Aitum Vertical Canvas](https://github.com/Aitum/
 (GPL-2.0): a vertical canvas with its own scene list (**Vertical Scenes**),
 sources, transitions and a preview dock with stream, record, backtrack and
 virtual camera buttons. Its settings (gear button in the Vertical dock) cover
-resolution, streaming servers and recording. In the **Outputs** dock you can
+resolution, streaming servers and recording. In the **Multistream** dock you can
 also pick the vertical canvas as the source of an extra output (it always uses
 its own encoder).
 
 The canvas is called **Meketreve Vertical** (pick it as the extra canvas for
-multitrack video in OBS, or in the Outputs dock). Its obs-websocket vendor is
+multitrack video in OBS, or in the Multistream dock). Its obs-websocket vendor is
 `meketreve-vertical-canvas` and its procedures are `meketreve_vertical_*`, so
 tools written for Aitum's plugin (Aitum Multistream, vendor requests to
 `aitum-vertical-canvas`) do not drive this copy.
@@ -184,7 +229,7 @@ checked again every minute, so the chat connects on its own when the stream
 starts, and dropped connections retry with backoff. Hover the colored dots at
 the top to see each platform's status.
 
-**Activity** (Docks → Activity) lists subs, gifted subs, raids, bits,
+**Stream events** (Docks → Stream events) lists subs, gifted subs, raids, bits,
 follows, Super Chats/stickers, memberships and Kick gifts from every
 platform; they are also highlighted in the chat (turn that off in Settings).
 Twitch follows need a login
@@ -198,9 +243,9 @@ web browser when clicked.
 
 Without logging in the chat is read-only and nothing is sent to any platform.
 
-#### Stream info
+#### Title and category
 
-**Docks → Stream info** sets the stream **title** and **category/game** on
+**Docks → Title and category** sets the stream **title** and **category/game** on
 every logged-in platform at once (Twitch, YouTube and Kick). On YouTube it applies to the live broadcast (or
 the next scheduled one) and the category is the video category: YouTube's
 game title cannot be set through the API. It opens with what is live now; search a
@@ -214,7 +259,7 @@ permissions: log out and in again once after updating.
 Logging in to Twitch, YouTube and/or Kick adds a message box under the chat (send to
 one platform or all) and a menu on each author's name: timeout 1 or 10 minutes,
 ban, unban / lift timeout, delete message. On Twitch it also brings follows
-into Activity (you must be the broadcaster or a moderator), and the **Viewers**
+into Stream events (you must be the broadcaster or a moderator), and the **Viewers**
 button lists who is in chat (broadcaster or moderator) and who is banned
 (broadcaster only), with timeout, ban and unban right there; Kick and YouTube do
 not offer these lists. On YouTube, sending and moderation go to your
