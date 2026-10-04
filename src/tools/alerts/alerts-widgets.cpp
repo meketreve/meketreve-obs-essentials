@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
-/* The overlays the events and the chat fill (goals, poll), apart from
+/* The overlays the events and the chat fill (goals, poll, subathon), apart from
  * alerts-dock.cpp: they share its server, token and events. */
 
 #include "alerts-dock.hpp"
@@ -100,6 +100,35 @@ void AlertsDock::loadWidgets()
 	/* Open when OBS closed: it goes on, or closes now if its time is up. */
 	if (m_poll.isOpen())
 		m_pollTimer->start();
+
+	/* The end is a time of day: a running subathon kept running meanwhile. */
+	const QJsonObject subathon = readJson(QDir(m_dir).filePath(QStringLiteral("subathon.json")));
+	m_subathonConfig = Subathon::normalizeConfig(subathon.value(QStringLiteral("config")).toObject());
+	m_subathon.load(subathon.value(QStringLiteral("timer")).toObject());
+}
+
+void AlertsDock::saveSubathon()
+{
+	const QJsonObject stored{{QStringLiteral("config"), m_subathonConfig},
+				 {QStringLiteral("timer"), m_subathon.save()}};
+	if (!writeJson(QDir(m_dir).filePath(QStringLiteral("subathon.json")), stored))
+		obs_log(LOG_WARNING, "[alerts] could not save subathon.json");
+}
+
+QJsonObject AlertsDock::subathonMessage(qint64 added) const
+{
+	return QJsonObject{{QStringLiteral("type"), QStringLiteral("subathon")},
+			   {QStringLiteral("config"), m_subathonConfig},
+			   {QStringLiteral("timer"), m_subathon.toJson(now())},
+			   {QStringLiteral("added"), static_cast<double>(added)},
+			   {QStringLiteral("texts"),
+			    QJsonObject{{QStringLiteral("ended"), T("Subathon.Overlay.Ended")},
+					{QStringLiteral("paused"), T("Subathon.Overlay.Paused")}}}};
+}
+
+void AlertsDock::broadcastSubathon(qint64 added)
+{
+	m_server->broadcast(subathonMessage(added));
 }
 
 void AlertsDock::saveGoals()
@@ -125,6 +154,11 @@ void AlertsDock::widgetsEvent(const Alerts::Event &event)
 	if (Goals::apply(m_goals, event)) {
 		saveGoals();
 		broadcastGoals();
+	}
+	const qint64 seconds = Subathon::secondsFor(m_subathonConfig, event);
+	if (seconds > 0 && m_subathon.add(seconds, now())) {
+		saveSubathon();
+		broadcastSubathon(seconds);
 	}
 }
 
@@ -211,6 +245,7 @@ void AlertsDock::widgetsSnapshot(QJsonObject &snapshot) const
 {
 	snapshot.insert(QStringLiteral("goals"), goalsMessage());
 	snapshot.insert(QStringLiteral("poll"), pollMessage());
+	snapshot.insert(QStringLiteral("subathon"), subathonMessage());
 }
 
 bool AlertsDock::widgetsPage(const QString &path, OverlayServer::Reply &reply) const
@@ -223,6 +258,10 @@ bool AlertsDock::widgetsPage(const QString &path, OverlayServer::Reply &reply) c
 		reply.file = webFile("poll.html");
 	else if (path == QLatin1String("/enquete-editor"))
 		reply.file = webFile("poll-editor.html");
+	else if (path == QLatin1String("/subathon"))
+		reply.file = webFile("subathon.html");
+	else if (path == QLatin1String("/subathon-editor"))
+		reply.file = webFile("subathon-editor.html");
 	else
 		return false;
 	return true;
@@ -236,7 +275,8 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 	const QJsonDocument doc = post ? QJsonDocument::fromJson(request.body) : QJsonDocument();
 	/* An empty body is {}: stop and clear need nothing. */
 	if (post && !request.body.trimmed().isEmpty() && !doc.isObject() &&
-	    (path.startsWith(QLatin1String("/api/goals")) || path.startsWith(QLatin1String("/api/poll")))) {
+	    (path.startsWith(QLatin1String("/api/goals")) || path.startsWith(QLatin1String("/api/poll")) ||
+	     path.startsWith(QLatin1String("/api/subathon")))) {
 		errorReply(reply, 400, QStringLiteral("bad json"));
 		return true;
 	}
@@ -298,6 +338,33 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 		savePoll();
 		broadcastPoll();
 		jsonReply(reply, 200, pollMessage());
+	} else if (get && path == QLatin1String("/api/subathon")) {
+		jsonReply(reply, 200, subathonMessage());
+	} else if (post && path == QLatin1String("/api/subathon-config")) {
+		m_subathonConfig = Subathon::normalizeConfig(body);
+		saveSubathon();
+		broadcastSubathon();
+		jsonReply(reply, 200, subathonMessage());
+	} else if (post && path == QLatin1String("/api/subathon-control")) {
+		/* {action: start|pause|resume|add|set|reset, seconds}. */
+		const QString action = body.value(QStringLiteral("action")).toString();
+		const auto seconds = static_cast<qint64>(body.value(QStringLiteral("seconds")).toDouble());
+		const qint64 at = now();
+		if (action == QLatin1String("start"))
+			m_subathon.start(seconds, at);
+		else if (action == QLatin1String("pause"))
+			m_subathon.pause(at);
+		else if (action == QLatin1String("resume"))
+			m_subathon.resume(at);
+		else if (action == QLatin1String("add"))
+			m_subathon.add(seconds, at);
+		else if (action == QLatin1String("set"))
+			m_subathon.set(seconds, at);
+		else if (action == QLatin1String("reset"))
+			m_subathon.reset();
+		saveSubathon();
+		broadcastSubathon(action == QLatin1String("add") ? seconds : 0);
+		jsonReply(reply, 200, subathonMessage());
 	} else {
 		return false;
 	}

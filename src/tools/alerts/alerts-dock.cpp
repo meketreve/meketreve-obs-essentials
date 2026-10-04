@@ -287,6 +287,13 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		[this]() { return pollOverlayUrl(); });
 	section("Poll.Title", "Poll.Help", pollRow);
 
+	auto *subathonRow = new QHBoxLayout();
+	sourceButtons(
+		subathonRow,
+		[this]() { addBrowserSource(T("Subathon.SourceName"), subathonOverlayUrl(), 600, 200, false); },
+		[this]() { return subathonOverlayUrl(); });
+	section("Subathon.Title", "Subathon.Help", subathonRow);
+
 	/* Overlays with their own server (the chat parade, now playing). */
 	m_extraSections = new QVBoxLayout();
 	m_extraSections->setContentsMargins(0, 0, 0, 0);
@@ -348,6 +355,11 @@ QString AlertsDock::goalsOverlayUrl() const
 QString AlertsDock::pollOverlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/enquete").arg(m_port);
+}
+
+QString AlertsDock::subathonOverlayUrl() const
+{
+	return QStringLiteral("http://localhost:%1/subathon").arg(m_port);
 }
 
 void AlertsDock::loadSettings()
@@ -823,7 +835,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
 					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
 					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals.") ||
-					       line.startsWith("Poll."))) {
+					       line.startsWith("Poll.") || line.startsWith("Subathon."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}

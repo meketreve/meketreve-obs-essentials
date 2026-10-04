@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meketreve · Subathon</title>
+  <link rel="stylesheet" href="/static/editor.css" />
+  <link rel="stylesheet" href="/static/subathon-render.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">M</span><span data-i18n="Title">Subathon</span></div>
+    <div class="save" id="saveState"></div>
+  </header>
+
+  <div class="error" id="fatal" hidden></div>
+
+  <div class="layout two" id="app" hidden>
+    <main class="form" id="form"></main>
+    <aside class="preview">
+      <div class="events-frame" id="frame"><div id="pscale"><div id="ptimer"></div></div></div>
+      <p class="hint" id="previewHint"></p>
+    </aside>
+  </div>
+
+  <script src="/static/chat-render.js"></script>
+  <script src="/static/subathon-render.js"></script>
+  <script src="/static/subathon-editor.js"></script>
+</body>
+</html>

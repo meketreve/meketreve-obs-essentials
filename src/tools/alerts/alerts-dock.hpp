@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "event-history.hpp"
 #include "goals.hpp"
 #include "poll.hpp"
+#include "subathon.hpp"
 #include "../texuguito/overlay-server.hpp"
 
 #include <obs-frontend-api.h>
@@ -71,6 +72,7 @@ public:
 	QString eventsOverlayUrl() const;
 	QString goalsOverlayUrl() const;
 	QString pollOverlayUrl() const;
+	QString subathonOverlayUrl() const;
 	/* The web panel, open on one tab: alertas, chat, eventos, tocando. */
 	QString panelUrl(const QString &tab) const;
 	QJsonObject shareableConfig() const;
@@ -132,6 +134,10 @@ private:
 	void pollTick();
 	/* Closed by hand or by the time: saved, sent and the result announced. */
 	void pollClosed();
+	void saveSubathon();
+	/* added: the seconds an event just put on the clock, for the "+1:00". */
+	void broadcastSubathon(qint64 added = 0);
+	QJsonObject subathonMessage(qint64 added = 0) const;
 	/* To every chat with a login, when "announce" is on. */
 	void announce(const QString &text);
 	void apiMediaList(OverlayServer::Reply &reply) const;
@@ -154,6 +160,8 @@ private:
 	Poll::Session m_poll;
 	QTimer *m_pollTimer = nullptr;
 	bool m_pollDirty = false;
+	QJsonObject m_subathonConfig;
+	Subathon::Timer m_subathon;
 	QString m_token;
 	quint16 m_port = 8902;
 	bool m_enabled = true;

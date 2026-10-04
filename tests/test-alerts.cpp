@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "event-history.hpp"
 #include "goals.hpp"
 #include "poll.hpp"
+#include "subathon.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
@@ -597,6 +598,72 @@ private slots:
 		const QJsonObject config = Poll::normalizeConfig(QJsonObject{{key("resultSeconds"), -3}});
 		QCOMPARE(config.value(key("resultSeconds")).toDouble(), 0.0);
 		QCOMPARE(config.value(key("announce")).toBool(), false);
+	}
+
+	void subathon()
+	{
+		using Subathon::Timer;
+		const QJsonObject config = Subathon::normalizeConfig(QJsonObject{{key("perSub"), 60},
+										 {key("perBits100"), 12},
+										 {key("perDonation"), 10},
+										 {key("perGiftSub"), 30},
+										 {key("perFollow"), -5}});
+		QCOMPARE(config.value(key("perFollow")).toDouble(), 0.0);
+		const auto event = [](const char *type, double value) {
+			Event e;
+			e.type = QString::fromLatin1(type);
+			e.value = value;
+			return e;
+		};
+		QCOMPARE(Subathon::secondsFor(config, event("resub", 24)), qint64(60));
+		QCOMPARE(Subathon::secondsFor(config, event("giftsub", 5)), qint64(150));
+		QCOMPARE(Subathon::secondsFor(config, event("bits", 250)), qint64(30));
+		QCOMPARE(Subathon::secondsFor(config, event("donation", 10.5)), qint64(105));
+		QCOMPARE(Subathon::secondsFor(config, event("follow", 1)), qint64(0));
+		QCOMPARE(Subathon::secondsFor(config, event("raid", 50)), qint64(0));
+		Event test = event("sub", 1);
+		test.test = true;
+		QCOMPARE(Subathon::secondsFor(config, test), qint64(0));
+
+		/* Nothing counts before it starts. */
+		Timer timer;
+		QCOMPARE(timer.state(0), Timer::State::Idle);
+		QVERIFY(!timer.add(60, 0));
+		QVERIFY(!timer.set(60, 0));
+
+		timer.start(3600, 1000);
+		QCOMPARE(timer.state(1000), Timer::State::Running);
+		QCOMPARE(timer.remainingMs(601000), qint64(3000000));
+		QVERIFY(timer.add(60, 601000));
+		QCOMPARE(timer.remainingMs(601000), qint64(3060000));
+
+		/* Paused: the time stands still, events still add. */
+		QVERIFY(timer.pause(601500));
+		QCOMPARE(timer.state(9999999), Timer::State::Paused);
+		QCOMPARE(timer.remainingMs(9999999), qint64(3059500));
+		QVERIFY(timer.add(30, 9999999));
+		QCOMPARE(timer.remainingMs(9999999), qint64(3089500));
+		QVERIFY(!timer.pause(9999999));
+		QVERIFY(timer.resume(10000000));
+		QCOMPARE(timer.remainingMs(10000500), qint64(3089000));
+
+		/* Saved as the end: what passed while OBS was closed counts. */
+		Timer copy;
+		copy.load(timer.save());
+		QCOMPARE(copy.remainingMs(10089000 + 1000), qint64(3000000 - 1000 + 500));
+
+		/* Taking away more than is left ends it; then events add nothing. */
+		QVERIFY(timer.add(-99999, 10000500));
+		QCOMPARE(timer.state(10000500), Timer::State::Ended);
+		QVERIFY(!timer.add(60, 10000600));
+		QCOMPARE(timer.toJson(10000600).value(key("state")).toString(), key("ended"));
+		/* Setting time on an ended timer starts it again. */
+		QVERIFY(timer.set(120, 10001000));
+		QCOMPARE(timer.state(10001000), Timer::State::Running);
+		QCOMPARE(timer.remainingMs(10002000), qint64(119000));
+
+		timer.reset();
+		QCOMPARE(timer.state(0), Timer::State::Idle);
 	}
 
 	void chatOverlayJson()

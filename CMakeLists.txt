@@ -75,6 +75,8 @@ target_sources(
     src/tools/alerts/goals.hpp
     src/tools/alerts/poll.cpp
     src/tools/alerts/poll.hpp
+    src/tools/alerts/subathon.cpp
+    src/tools/alerts/subathon.hpp
     src/tools/alerts/alerts-dock.cpp
     src/tools/alerts/alerts-dock.hpp
     src/tools/alerts/alerts-widgets.cpp

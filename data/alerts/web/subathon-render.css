@@ -1,0 +1,41 @@
+/* The subathon overlay (/subathon) and the subathon editor's preview. */
+.sb-box {
+  box-sizing: border-box;
+  padding: 10px;
+  font-family: var(--sb-font, "Poppins", sans-serif);
+  font-size: var(--sb-size, 64px);
+  line-height: 1.1;
+  color: var(--sb-text, #fff);
+}
+.sb-box.sb-shadow { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6); }
+.sb-card {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05em;
+  padding: 0.15em 0.4em;
+  border-radius: 0.2em;
+  border-bottom: 0.06em solid var(--sb-accent, #8b5cf6);
+  background: var(--sb-bubble, rgba(0, 0, 0, 0.45));
+}
+.sb-title { font-size: 0.35em; font-weight: 700; }
+.sb-clock { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-note { font-size: 0.3em; color: var(--sb-accent, #8b5cf6); font-weight: 700; }
+.sb-ended .sb-clock, .sb-paused .sb-clock { opacity: 0.6; }
+.sb-added {
+  position: absolute;
+  right: 0.2em;
+  top: -0.2em;
+  font-size: 0.4em;
+  font-weight: 700;
+  color: var(--sb-accent, #8b5cf6);
+  animation: sb-up 2.4s ease-out forwards;
+}
+
+@keyframes sb-up {
+  0% { opacity: 0; transform: translateY(0.6em); }
+  15% { opacity: 1; transform: none; }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-0.8em); }
+}
