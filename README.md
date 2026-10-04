@@ -58,10 +58,12 @@ panel (**Chat parade → Add to scene**, or the URL
   price has its own wait between sounds, set in the dock's **Settings**
   (defaults: up to 20 pts 10 s, up to 100 pts 30 s, up to 200 pts 60 s,
   above that 120 s); a cheap sound can play right after an expensive one.
-  The web panel's **Chat bot** tab lists the sounds with their price (changing
-  it moves the file to the new price folder), plays one on the parade to test,
-  removes one (to an `audios/removidos` folder) and sets the volume and the
-  waits.
+  The web panel's **Chat bot** tab lists the sounds grouped by price, each
+  price with its wait: changing a sound's price moves the file to that price's
+  folder, **Test** plays it on the parade, **Rename** renames the file (and the
+  `!tocar` name) and **Remove** deletes it. Its **Import a sound** card takes
+  a link, a price and the name the file gets, and downloads it the same way
+  as `!addaudio`.
 - **Adding sounds:** mods and the streamer can type `!addaudio <link> <price>
   [name]` with a [myinstants](https://www.myinstants.com) page or a link to an
   `.mp3`/`.wav`/`.ogg` file (https, up to 3 MB); the dock's **Add sound** does

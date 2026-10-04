@@ -44,6 +44,9 @@ button, input, select { font: inherit; color: inherit; }
 .list-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inline.grow > input[type=text] { flex: 1; min-width: 120px; }
 input.num { width: 90px; }
+.price-group { margin-top: 12px; }
+.price-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+.price-head h4 { margin: 0; font-size: 13px; color: var(--accent); }
 .muted { color: var(--muted); font-size: 13px; }
 @media (max-width: 720px) { .list-row { grid-template-columns: 1fr; } }
 .parade-frame { width: 100%; aspect-ratio: 16 / 5; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);

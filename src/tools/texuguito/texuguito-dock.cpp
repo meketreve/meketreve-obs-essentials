@@ -306,6 +306,8 @@ QJsonObject TexuguitoDock::botPanelState() const
 			   {QStringLiteral("sounds"), sounds},
 			   {QStringLiteral("cooldowns"), cooldowns},
 			   {QStringLiteral("commands"), commands},
+			   {QStringLiteral("import"), m_import},
+			   {QStringLiteral("maxPrice"), BotEngine::kMaxClipCost},
 			   {QStringLiteral("listeners"), m_server->clientCount()}};
 }
 
@@ -342,13 +344,60 @@ QJsonObject TexuguitoDock::applyBotPanel(const QJsonObject &panel)
 			error = T("Texuguito.BotPanel.MoveFailed");
 		m_engine->reloadClips();
 	} else if (action == QLatin1String("remove") && known) {
-		/* Out of the price folders, not deleted: the bot only reads numbered
-		 * folders, and the file can still be put back by hand. */
-		const QDir removed(QDir(m_engine->audioDir()).filePath(QStringLiteral("removidos")));
-		if (!QDir().mkpath(removed.path()) ||
-		    !QFile::rename(file, removed.filePath(QFileInfo(file).fileName())))
+		/* Deleted from disk: the page asks first. */
+		if (!QFile::remove(file))
+			error = T("Texuguito.BotPanel.DeleteFailed");
+		m_engine->reloadClips();
+	} else if (action == QLatin1String("rename") && known) {
+		/* Same folder and type, new name: "!tocar <new name>". */
+		const QString renamed = SoundFetch::clipName(panel.value(QStringLiteral("newName")).toString());
+		const QFileInfo info(file);
+		if (renamed.isEmpty())
+			error = T("Texuguito.Bot.AddAudioNoName");
+		else if (renamed != name && m_engine->clips().count(renamed))
+			error = T("Texuguito.Bot.AddAudioExists").arg(renamed);
+		else if (renamed != name &&
+			 !QFile::rename(file, info.dir().filePath(renamed + QLatin1Char('.') + info.suffix())))
 			error = T("Texuguito.BotPanel.MoveFailed");
 		m_engine->reloadClips();
+	} else if (action == QLatin1String("import")) {
+		const QString link = panel.value(QStringLiteral("url")).toString().trimmed();
+		const int price = panel.value(QStringLiteral("price")).toInt(-1);
+		const QString wanted = panel.value(QStringLiteral("name")).toString();
+		if (m_import.value(QStringLiteral("state")).toString() == QLatin1String("downloading"))
+			error = T("Texuguito.BotPanel.ImportBusy");
+		else if (link.isEmpty())
+			error = T("Texuguito.Bot.AddAudioBadLink");
+		else if (price < 0 || price > BotEngine::kMaxClipCost)
+			error = T("Texuguito.Bot.AddAudioBadPrice").arg(BotEngine::kMaxClipCost);
+		else if (!wanted.trimmed().isEmpty() && SoundFetch::clipName(wanted).isEmpty())
+			error = T("Texuguito.Bot.AddAudioNoName");
+		else if (!wanted.trimmed().isEmpty() && m_engine->clips().count(SoundFetch::clipName(wanted)))
+			error = T("Texuguito.Bot.AddAudioExists").arg(SoundFetch::clipName(wanted));
+		if (error.isEmpty()) {
+			m_import = QJsonObject{{QStringLiteral("state"), QStringLiteral("downloading")},
+					       {QStringLiteral("url"), link}};
+			SoundFetch::fetch(
+				&m_net, link,
+				[this, price, wanted](const SoundFetch::Result &r) {
+					QString failed = m_engine->soundFetchError(r);
+					/* No name typed: the one the link suggests. */
+					const QString clip =
+						SoundFetch::clipName(wanted.trimmed().isEmpty() ? r.name : wanted);
+					if (failed.isEmpty())
+						failed = m_engine->addClip(r.data, r.ext, clip, price);
+					m_import =
+						failed.isEmpty()
+							? QJsonObject{{QStringLiteral("state"), QStringLiteral("done")},
+								      {QStringLiteral("name"), clip},
+								      {QStringLiteral("price"), price}}
+							: QJsonObject{{QStringLiteral("state"),
+								       QStringLiteral("error")},
+								      {QStringLiteral("message"), failed}};
+					refreshStatus();
+				},
+				this);
+		}
 	} else if (action == QLatin1String("test") && known) {
 		if (m_server->clientCount() <= 0)
 			error = T("Texuguito.BotPanel.NoParade");
