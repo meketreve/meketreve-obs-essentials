@@ -165,6 +165,9 @@ OutputsDock::OutputsDock(QWidget *parent) : QWidget(parent)
 	m_list->addWidget(m_empty);
 	m_list->addStretch();
 	scroll->setWidget(listWidget);
+	/* The list scrolls; a tall minimum stacked with other panels keeps the
+	 * OBS window from getting smaller. */
+	scroll->setMinimumHeight(30);
 	layout->addWidget(scroll);
 
 	m_timer.setInterval(1000);

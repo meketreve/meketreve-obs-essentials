@@ -60,6 +60,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QLineEdit>
 #include <QMainWindow>
 #include <QPointer>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QTextBrowser>
 #include <QTime>
@@ -869,6 +870,9 @@ ActivityDock::ActivityDock(QWidget *parent) : QWidget(parent)
 	m_view = new ChatView(this);
 	m_view->setOpenLinks(false);
 	m_view->document()->setMaximumBlockCount(kMaxLines);
+	/* Short is fine (it scrolls): a tall minimum stacked with other panels
+	 * keeps the OBS window from getting smaller. */
+	m_view->setMinimumHeight(40);
 	layout->addWidget(m_view);
 	showPlaceholder();
 }
@@ -920,10 +924,19 @@ void unified_chat_register(void)
 	else
 		delete activity;
 
-	/* Title and category for every logged-in platform at once. */
+	/* Title and category for every logged-in platform at once. In a scroll
+	 * area: the form is tall, and its full height as the panel's minimum
+	 * kept the OBS window from shrinking. */
 	auto *streamInfo = new StreamInfoDock(dock->accounts(), main);
-	if (!obs_frontend_add_dock_by_id(kStreamInfoDockId, obs_module_text("StreamInfo.Title"), streamInfo))
-		delete streamInfo;
+	auto *streamScroll = new QScrollArea(main);
+	streamScroll->setWidget(streamInfo);
+	streamScroll->setWidgetResizable(true);
+	streamScroll->setFrameShape(QFrame::NoFrame);
+	streamScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	streamScroll->setMinimumWidth(streamInfo->minimumSizeHint().width() +
+				      streamScroll->verticalScrollBar()->sizeHint().width());
+	if (!obs_frontend_add_dock_by_id(kStreamInfoDockId, obs_module_text("StreamInfo.Title"), streamScroll))
+		delete streamScroll;
 
 	configShareAddSection({QStringLiteral("chat"), "Config.Section.Chat",
 			       []() { return g_dock ? QJsonValue(g_dock->exportChannels()) : QJsonValue(); },
