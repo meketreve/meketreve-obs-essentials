@@ -60,10 +60,10 @@ public slots:
 	void switchRelative(int delta);
 
 private:
-	void loadProfile();
+	void loadProfile(bool startup = false);
 	void saveProfile();
 	void rebuildTabBar();
-	void captureCurrent();
+	void captureCurrent(const QByteArray &state = QByteArray());
 	void applyTab(int configIndex);
 	void applyDockList(const QString &id, const QList<DockPlacement> &docks);
 	void fillCentralSpace();

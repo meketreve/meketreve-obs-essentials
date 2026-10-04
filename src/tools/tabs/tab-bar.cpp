@@ -72,6 +72,15 @@ QString globalConfigPath()
 	return path;
 }
 
+/* The layout OBS restored at startup and saves on close. OBS writes it
+ * before SCRIPTING_SHUTDOWN, while every plugin dock still exists. */
+QByteArray obsDockState()
+{
+	config_t *uc = obs_frontend_get_user_config();
+	const char *state = uc ? config_get_string(uc, "BasicWindow", "DockState") : nullptr;
+	return state ? QByteArray::fromBase64(QByteArray(state)) : QByteArray();
+}
+
 bool readEnabledFlag()
 {
 	obs_data_t *data = obs_data_create_from_json_file_safe(globalConfigPath().toUtf8().constData(), "bak");
@@ -180,7 +189,7 @@ void TabsController::onFrontendEvent(enum obs_frontend_event event)
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
 		if (m_enabled)
-			loadProfile();
+			loadProfile(true);
 		if (qEnvironmentVariableIsSet("MEKETREVE_SELFTEST_DIR"))
 			QTimer::singleShot(2000, this, [this]() { runSelfTest(0); });
 		break;
@@ -196,7 +205,10 @@ void TabsController::onFrontendEvent(enum obs_frontend_event event)
 		break;
 	case OBS_FRONTEND_EVENT_EXIT:
 		if (m_loaded) {
-			captureCurrent();
+			/* Not saveState(): by now the vertical port has removed its
+			 * docks and the layout around them has collapsed. Keep what
+			 * OBS saved, so both files describe the same layout. */
+			captureCurrent(obsDockState());
 			saveProfile();
 		}
 		saveGlobal();
@@ -222,7 +234,7 @@ int TabsController::configIndexForTab(int tabIndex) const
 	return static_cast<int>(m_cfg.indexOf(m_tabBar->tabData(tabIndex).toString()));
 }
 
-void TabsController::loadProfile()
+void TabsController::loadProfile(bool startup)
 {
 	char *dir = obs_frontend_get_current_profile_path();
 	m_profilePath = QString::fromUtf8(dir ? dir : "") + QLatin1Char('/') + QLatin1String(kProfileFile);
@@ -251,7 +263,11 @@ void TabsController::loadProfile()
 	m_loaded = true;
 	rebuildTabBar();
 	const qsizetype ci = m_cfg.indexOf(m_cfg.current);
-	if (ci >= 0 && !m_cfg.tabs[ci].state.isEmpty() && m_cfg.tabs[ci].state != m_main->saveState())
+	/* At startup OBS has just restored the layout it saved on close, which
+	 * is the current tab's: applying the tab's copy over it would only
+	 * bring back an older one. */
+	const bool obsRestored = startup && !obsDockState().isEmpty();
+	if (ci >= 0 && !obsRestored && !m_cfg.tabs[ci].state.isEmpty() && m_cfg.tabs[ci].state != m_main->saveState())
 		applyTab(static_cast<int>(ci));
 	obs_log(LOG_INFO, "[tabs] loaded %d tab(s), current \"%s\"", static_cast<int>(m_cfg.tabs.size()),
 		m_cfg.current.toUtf8().constData());
@@ -286,13 +302,13 @@ void TabsController::rebuildTabBar()
 	m_switching = false;
 }
 
-void TabsController::captureCurrent()
+void TabsController::captureCurrent(const QByteArray &state)
 {
 	if (!m_loaded || !m_enabled)
 		return;
 	const qsizetype ci = m_cfg.indexOf(m_cfg.current);
 	if (ci >= 0)
-		m_cfg.tabs[ci].state = m_main->saveState();
+		m_cfg.tabs[ci].state = state.isEmpty() ? m_main->saveState() : state;
 }
 
 void TabsController::onCurrentChanged(int index)
