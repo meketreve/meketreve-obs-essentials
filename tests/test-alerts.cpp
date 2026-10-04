@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "alert-logic.hpp"
 #include "chat-overlay.hpp"
+#include "event-history.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
@@ -334,6 +335,67 @@ private slots:
 		QVERIFY(!ChatOverlay::passes(config,
 					     chat(ChatPlatform::Twitch, ChatEvent::Sub, 1, QString(), key("oi"))));
 		QVERIFY(!ChatOverlay::passes(config, chat(ChatPlatform::Kick, ChatEvent::None)));
+	}
+
+	void eventsOverlay()
+	{
+		const TextLookup text = [](const char *k) {
+			return QString::fromLatin1(k);
+		};
+		const QJsonObject d = EventsOverlay::defaults(text);
+		QCOMPARE(d.value(key("labels")).toObject().value(key("ultimo-sub")).toString(),
+			 key("EventsOverlay.Default.LastSub"));
+		QVERIFY(d.value(key("list")).toObject().value(key("types")).toObject().value(key("raid")).toBool());
+		QCOMPARE(EventsOverlay::normalize(QJsonObject{{key("list"), QJsonObject{{key("max"), 99}}}}, text)
+				 .value(key("list"))
+				 .toObject()
+				 .value(key("max"))
+				 .toDouble(),
+			 20.0);
+
+		EventsOverlay::History h;
+		const auto add = [&h](ChatPlatform p, ChatEvent e, const char *who, int amount, const char *detail) {
+			ChatMessage m = chat(p, e, amount, QString::fromUtf8(detail));
+			m.author = QString::fromUtf8(who);
+			h.add(EventsOverlay::entryFrom(fromChat(m), key("linha"), QString(), 1));
+		};
+		QVERIFY(h.labels().isEmpty());
+		add(ChatPlatform::Twitch, ChatEvent::Sub, "Ana", 1, "1000");
+		add(ChatPlatform::YouTube, ChatEvent::Donation, "@Rico", 0, "R$ 10,00");
+		add(ChatPlatform::YouTube, ChatEvent::Donation, "@Rico", 0, "R$ 15,50");
+		add(ChatPlatform::Kick, ChatEvent::Raid, "Vizinha", 42, "");
+		add(ChatPlatform::YouTube, ChatEvent::Donation, "@Outra", 0, "R$ 20,00");
+		add(ChatPlatform::Twitch, ChatEvent::Bits, "Bia", 300, "");
+		add(ChatPlatform::Twitch, ChatEvent::Bits, "Bia", 200, "");
+
+		QJsonObject labels = h.labels();
+		QCOMPARE(labels.value(key("ultimo-sub")).toObject().value(key("name")).toString(), key("Ana"));
+		QCOMPARE(labels.value(key("ultimo-raid")).toObject().value(key("amount")).toString(), key("42"));
+		QCOMPARE(labels.value(key("ultima-doacao")).toObject().value(key("name")).toString(), key("@Outra"));
+		/* @Rico's two Super Chats add up past @Outra's one. */
+		const QJsonObject top = labels.value(key("top-doador")).toObject();
+		QCOMPARE(top.value(key("name")).toString(), key("@Rico"));
+		QVERIFY(top.value(key("amount")).toString().startsWith(key("R$ ")));
+		QVERIFY(top.value(key("amount")).toString().contains(key("25")));
+		QCOMPARE(labels.value(key("top-bits")).toObject().value(key("amount")).toString(), key("500"));
+		QVERIFY(!labels.contains(key("ultimo-follow")));
+
+		/* Newest first, and a restart keeps all of it. */
+		QCOMPARE(h.recent(2).at(0).toObject().value(key("type")).toString(), key("bits"));
+		EventsOverlay::History again;
+		again.load(h.save());
+		QCOMPARE(again.labels(), labels);
+
+		/* A raid stays the last raid after the list fills with follows. */
+		for (int i = 0; i < EventsOverlay::History::kKeep + 5; i++)
+			add(ChatPlatform::Twitch, ChatEvent::Follow, "seguidor", 0, "");
+		QCOMPARE(h.labels().value(key("ultimo-raid")).toObject().value(key("name")).toString(), key("Vizinha"));
+		QCOMPARE(h.recent(500).size(), EventsOverlay::History::kKeep);
+
+		/* A new live starts the tops over; the latest ones stay. */
+		again.resetTop();
+		QVERIFY(!again.labels().contains(key("top-doador")));
+		QVERIFY(again.labels().contains(key("ultimo-sub")));
 	}
 
 	void chatOverlayEvents()

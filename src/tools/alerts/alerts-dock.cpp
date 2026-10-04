@@ -132,7 +132,8 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		/* Alert pages read "config", chat pages "chat". */
 		return QJsonObject{{QStringLiteral("type"), QStringLiteral("config")},
 				   {QStringLiteral("config"), overlayConfig()},
-				   {QStringLiteral("chat"), m_chatConfig}};
+				   {QStringLiteral("chat"), m_chatConfig},
+				   {QStringLiteral("events"), historyMessage(QStringLiteral("events-history"))}};
 	};
 	routes.handler = [this](const OverlayServer::Request &request, OverlayServer::Reply &reply) {
 		return route(request, reply);
@@ -143,6 +144,7 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	connect(m_chat, &UnifiedChatDock::incoming, this, &AlertsDock::onChat);
 	connect(m_chat, &UnifiedChatDock::shown, this, &AlertsDock::onShown);
 	connect(m_chat, &UnifiedChatDock::activity, this, &AlertsDock::onActivity);
+	obs_frontend_add_event_callback(frontendEvent, this);
 	connect(m_chat, &UnifiedChatDock::removed, this, &AlertsDock::onRemoved);
 
 	auto *layout = new QVBoxLayout(this);
@@ -235,6 +237,33 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	chatHelp->setWordWrap(true);
 	chatHelp->setStyleSheet(QStringLiteral("color: gray"));
 	layout->addWidget(chatHelp);
+
+	auto *eventsTitle = new QLabel(QStringLiteral("<b>%1</b>").arg(T("EventsOverlay.Title").toHtmlEscaped()), this);
+	layout->addSpacing(6);
+	layout->addWidget(eventsTitle);
+	auto *row4 = new QHBoxLayout();
+	auto *eventsCustomize = new QPushButton(T("Alerts.Customize"), this);
+	connect(eventsCustomize, &QPushButton::clicked, this, [this]() {
+		if (!m_server->isListening()) {
+			refreshStatus();
+			return;
+		}
+		QDesktopServices::openUrl(QUrl(eventsEditorUrl()));
+	});
+	auto *eventsAdd = new QPushButton(T("Alerts.AddSource"), this);
+	connect(eventsAdd, &QPushButton::clicked, this,
+		[this]() { addBrowserSource(T("EventsOverlay.SourceName"), eventsOverlayUrl(), 420, 400, false); });
+	auto *eventsCopy = new QPushButton(T("Alerts.CopyUrl"), this);
+	connect(eventsCopy, &QPushButton::clicked, this,
+		[this]() { QApplication::clipboard()->setText(eventsOverlayUrl()); });
+	row4->addWidget(eventsCustomize);
+	row4->addWidget(eventsAdd);
+	row4->addWidget(eventsCopy);
+	layout->addLayout(row4);
+	auto *eventsHelp = new QLabel(T("EventsOverlay.Help"), this);
+	eventsHelp->setWordWrap(true);
+	eventsHelp->setStyleSheet(QStringLiteral("color: gray"));
+	layout->addWidget(eventsHelp);
 	layout->addStretch();
 
 	applyEnabled();
@@ -242,7 +271,20 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 
 AlertsDock::~AlertsDock()
 {
+	obs_frontend_remove_event_callback(frontendEvent, this);
 	m_server->close();
+}
+
+void AlertsDock::frontendEvent(enum obs_frontend_event event, void *data)
+{
+	auto *self = static_cast<AlertsDock *>(data);
+	/* A new live: "top donor" and "top bits" count from zero. */
+	if (event == OBS_FRONTEND_EVENT_STREAMING_STARTED &&
+	    self->m_eventsConfig.value(QStringLiteral("resetTopOnLive")).toBool()) {
+		self->m_history.resetTop();
+		self->saveHistory();
+		self->broadcastHistory();
+	}
 }
 
 QString AlertsDock::overlayUrl() const
@@ -264,6 +306,16 @@ QString AlertsDock::chatOverlayUrl() const
 QString AlertsDock::chatEditorUrl() const
 {
 	return QStringLiteral("http://localhost:%1/chat-editor#t=%2").arg(m_port).arg(m_token);
+}
+
+QString AlertsDock::eventsOverlayUrl() const
+{
+	return QStringLiteral("http://localhost:%1/eventos").arg(m_port);
+}
+
+QString AlertsDock::eventsEditorUrl() const
+{
+	return QStringLiteral("http://localhost:%1/eventos-editor#t=%2").arg(m_port).arg(m_token);
 }
 
 void AlertsDock::loadSettings()
@@ -310,6 +362,47 @@ void AlertsDock::loadConfig()
 	if (chatFile.open(QIODevice::ReadOnly))
 		chatStored = QJsonDocument::fromJson(chatFile.readAll()).object();
 	m_chatConfig = ChatOverlay::normalize(chatStored);
+
+	QFile eventsFile(QDir(m_dir).filePath(QStringLiteral("events-overlay.json")));
+	QJsonObject eventsStored;
+	if (eventsFile.open(QIODevice::ReadOnly))
+		eventsStored = QJsonDocument::fromJson(eventsFile.readAll()).object();
+	m_eventsConfig = EventsOverlay::normalize(eventsStored, T);
+
+	QFile historyFile(QDir(m_dir).filePath(QStringLiteral("event-history.json")));
+	if (historyFile.open(QIODevice::ReadOnly))
+		m_history.load(QJsonDocument::fromJson(historyFile.readAll()).object());
+}
+
+void AlertsDock::saveHistory()
+{
+	QSaveFile file(QDir(m_dir).filePath(QStringLiteral("event-history.json")));
+	if (!file.open(QIODevice::WriteOnly) ||
+	    file.write(QJsonDocument(m_history.save()).toJson(QJsonDocument::Compact)) < 0 || !file.commit())
+		obs_log(LOG_WARNING, "[alerts] could not save event-history.json");
+}
+
+QJsonObject AlertsDock::historyMessage(const QString &type) const
+{
+	return QJsonObject{{QStringLiteral("type"), type},
+			   {QStringLiteral("config"), m_eventsConfig},
+			   {QStringLiteral("recent"), m_history.recent(20)},
+			   {QStringLiteral("labels"), m_history.labels()}};
+}
+
+void AlertsDock::broadcastHistory()
+{
+	m_server->broadcast(historyMessage(QStringLiteral("events-history")));
+}
+
+void AlertsDock::importEventsConfig(const QJsonObject &config)
+{
+	m_eventsConfig = EventsOverlay::normalize(config, T);
+	QSaveFile file(QDir(m_dir).filePath(QStringLiteral("events-overlay.json")));
+	if (!file.open(QIODevice::WriteOnly) ||
+	    file.write(QJsonDocument(m_eventsConfig).toJson(QJsonDocument::Indented)) < 0 || !file.commit())
+		obs_log(LOG_WARNING, "[alerts] could not save events-overlay.json");
+	broadcastHistory();
 }
 
 void AlertsDock::saveChatConfig()
@@ -349,7 +442,10 @@ void AlertsDock::onActivity(const ChatMessage &msg, const QString &description)
 			    {QStringLiteral("event"), ChatOverlay::eventToJson(event, description, msg.id)}});
 }
 
-QJsonArray AlertsDock::chatEventSamples() const
+namespace {
+
+/* Made-up events for the editors' previews and "test" buttons. */
+QList<ChatMessage> sampleEventMessages()
 {
 	const auto make = [](ChatPlatform platform, ChatEvent kind, const char *who, int amount, const char *detail,
 			     const char *text) {
@@ -359,14 +455,34 @@ QJsonArray AlertsDock::chatEventSamples() const
 		m.detail = QString::fromUtf8(detail);
 		return m;
 	};
+	return {make(ChatPlatform::Twitch, ChatEvent::Sub, "Texuguito", 3, "1000", "três meses!"),
+		make(ChatPlatform::Kick, ChatEvent::GiftSub, "Generoso", 5, "", ""),
+		make(ChatPlatform::Twitch, ChatEvent::Raid, "Vizinha", 42, "", ""),
+		make(ChatPlatform::YouTube, ChatEvent::Donation, "@Fulana", 0, "R$ 10,00", "valeu pela live!"),
+		make(ChatPlatform::YouTube, ChatEvent::Membership, "@Ciclano", 1, "", ""),
+		make(ChatPlatform::Twitch, ChatEvent::Bits, "Bia", 500, "", "toma!"),
+		make(ChatPlatform::Twitch, ChatEvent::Follow, "novato", 0, "", "")};
+}
+
+} // namespace
+
+QJsonObject AlertsDock::eventsSamples() const
+{
+	EventsOverlay::History sample;
+	for (const ChatMessage &m : sampleEventMessages()) {
+		const Alerts::Event event = Alerts::fromChat(m);
+		if (!event.type.isEmpty())
+			sample.add(EventsOverlay::entryFrom(event, UnifiedChatDock::describeEvent(m),
+							    QStringLiteral("sample-") + event.type, 0));
+	}
+	return QJsonObject{{QStringLiteral("recent"), sample.recent(EventsOverlay::History::kKeep)},
+			   {QStringLiteral("labels"), sample.labels()}};
+}
+
+QJsonArray AlertsDock::chatEventSamples() const
+{
 	QJsonArray out;
-	for (const ChatMessage &m :
-	     {make(ChatPlatform::Twitch, ChatEvent::Sub, "Texuguito", 3, "1000", "três meses!"),
-	      make(ChatPlatform::Kick, ChatEvent::GiftSub, "Generoso", 5, "", ""),
-	      make(ChatPlatform::Twitch, ChatEvent::Raid, "Vizinha", 42, "", ""),
-	      make(ChatPlatform::YouTube, ChatEvent::Donation, "@Fulana", 0, "R$ 10,00", "valeu pela live!"),
-	      make(ChatPlatform::YouTube, ChatEvent::Membership, "@Ciclano", 1, "", ""),
-	      make(ChatPlatform::Twitch, ChatEvent::Follow, "novato", 0, "", "")}) {
+	for (const ChatMessage &m : sampleEventMessages()) {
 		const Alerts::Event event = Alerts::fromChat(m);
 		if (!event.type.isEmpty())
 			out.append(ChatOverlay::eventToJson(event, UnifiedChatDock::describeEvent(m),
@@ -450,10 +566,15 @@ void AlertsDock::onChat(const ChatMessage &msg)
 	if (!m_enabled || msg.event == ChatEvent::None)
 		return;
 	const Alerts::Event event = Alerts::fromChat(msg);
-	if (event.type.isEmpty() || m_dedup.swallow(event, QDateTime::currentMSecsSinceEpoch()) ||
-	    !Alerts::passes(m_config, event))
+	const qint64 now = QDateTime::currentMSecsSinceEpoch();
+	/* One gift dedup for alerts and history, so both see the same events. */
+	if (event.type.isEmpty() || m_dedup.swallow(event, now))
 		return;
-	fire(event);
+	m_history.add(EventsOverlay::entryFrom(event, UnifiedChatDock::describeEvent(msg), msg.id, now));
+	saveHistory();
+	broadcastHistory();
+	if (Alerts::passes(m_config, event))
+		fire(event);
 }
 
 void AlertsDock::fire(const Alerts::Event &event)
@@ -504,6 +625,14 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 	}
 	if (get && path == QLatin1String("/chat-editor")) {
 		reply.file = QDir(webDir()).filePath(QStringLiteral("chat-editor.html"));
+		return true;
+	}
+	if (get && path == QLatin1String("/eventos")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("events.html"));
+		return true;
+	}
+	if (get && path == QLatin1String("/eventos-editor")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("events-editor.html"));
 		return true;
 	}
 	if (get && path.startsWith(QLatin1String("/media/"))) {
@@ -560,6 +689,32 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		}
 		importChatConfig(doc.object());
 		jsonReply(reply, 200, m_chatConfig);
+	} else if (get && path == QLatin1String("/api/events-config")) {
+		jsonReply(reply, 200, m_eventsConfig);
+	} else if (post && path == QLatin1String("/api/events-config")) {
+		const QJsonDocument doc = QJsonDocument::fromJson(request.body);
+		if (!doc.isObject()) {
+			errorReply(reply, 400, QStringLiteral("bad json"));
+			return true;
+		}
+		importEventsConfig(doc.object());
+		jsonReply(reply, 200, m_eventsConfig);
+	} else if (get && path == QLatin1String("/api/events-sample")) {
+		jsonReply(reply, 200, eventsSamples());
+	} else if (post && path == QLatin1String("/api/events-test")) {
+		/* Shown by the open pages only: the history and the labels stay real. */
+		const QJsonArray recent = eventsSamples().value(QStringLiteral("recent")).toArray();
+		QJsonObject entry =
+			recent.at(QRandomGenerator::global()->bounded(static_cast<int>(recent.size()))).toObject();
+		entry.insert(QStringLiteral("id"), QStringLiteral("test-%1").arg(QDateTime::currentMSecsSinceEpoch()));
+		m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("events-test")},
+						{QStringLiteral("entry"), entry}});
+		jsonReply(reply, 200, QJsonObject{{QStringLiteral("overlays"), m_server->clientCount()}});
+	} else if (post && path == QLatin1String("/api/events-reset")) {
+		m_history.resetTop();
+		saveHistory();
+		broadcastHistory();
+		jsonReply(reply, 200, QJsonObject{{QStringLiteral("ok"), true}});
 	} else if (get && path == QLatin1String("/api/chat-sample")) {
 		jsonReply(reply, 200,
 			  QJsonObject{{QStringLiteral("messages"), ChatOverlay::samples()},
@@ -593,7 +748,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 			while (!file.atEnd()) {
 				const QByteArray line = file.readLine();
 				const qsizetype eq = line.indexOf('=');
-				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay."))) {
+				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
+					       line.startsWith("EventsOverlay."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}
@@ -744,6 +900,15 @@ void alerts_register(void)
 				 on += types.value(type).toObject().value(QStringLiteral("enabled")).toBool() ? 1 : 0;
 			 return T("Alerts.Describe").arg(on).arg(Alerts::types().size());
 		 }});
+	configShareAddSection({QStringLiteral("eventsOverlay"), "Config.Section.EventsOverlay",
+			       []() { return g_dock ? QJsonValue(g_dock->eventsConfig()) : QJsonValue(); },
+			       [](const QJsonValue &v) {
+				       if (g_dock && v.isObject())
+					       g_dock->importEventsConfig(v.toObject());
+			       },
+			       [](const QJsonValue &) {
+				       return T("EventsOverlay.Describe");
+			       }});
 	configShareAddSection(
 		{QStringLiteral("chatOverlay"), "Config.Section.ChatOverlay",
 		 []() { return g_dock ? QJsonValue(g_dock->chatConfig()) : QJsonValue(); },

@@ -156,6 +156,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 }
 .chat-frame #pbox { position: absolute; left: 0; top: 0; width: 480px; height: 720px; transform-origin: 0 0; }
 .row .inline .cr-icon { width: 20px; height: 20px; }
+.events-frame {
+  display: flex; flex-direction: column; gap: 8px; padding: 6px; overflow: hidden;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: repeating-conic-gradient(#2a2d38 0% 25%, #23252e 0% 50%) 0 0 / 24px 24px;
+}
+.events-frame .ev-box { padding: 4px; }
+.events-frame #pscale { width: 480px; transform-origin: 0 0; }
 
 @media (max-width: 1180px) {
   .layout { grid-template-columns: 200px 1fr; }

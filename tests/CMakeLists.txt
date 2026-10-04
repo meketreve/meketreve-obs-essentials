@@ -141,6 +141,8 @@ add_executable(
   ${_alerts}/alert-logic.hpp
   ${_alerts}/chat-overlay.cpp
   ${_alerts}/chat-overlay.hpp
+  ${_alerts}/event-history.cpp
+  ${_alerts}/event-history.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
 )

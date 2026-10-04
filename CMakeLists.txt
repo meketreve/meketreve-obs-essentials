@@ -69,6 +69,8 @@ target_sources(
     src/tools/alerts/alert-logic.hpp
     src/tools/alerts/chat-overlay.cpp
     src/tools/alerts/chat-overlay.hpp
+    src/tools/alerts/event-history.cpp
+    src/tools/alerts/event-history.hpp
     src/tools/alerts/alerts-dock.cpp
     src/tools/alerts/alerts-dock.hpp
     src/tools/alerts/alerts.h

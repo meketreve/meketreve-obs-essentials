@@ -1,0 +1,36 @@
+/* The events overlay (/eventos) and the events editor's preview. */
+.ev-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 10px;
+  font-family: var(--ev-font, "Poppins", sans-serif);
+  font-size: var(--ev-size, 24px);
+  line-height: 1.3;
+  color: var(--ev-text, #fff);
+}
+.ev-box.ev-shadow { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6); }
+
+.ev-item, .ev-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.25em 0.6em;
+  border-radius: 0.5em;
+  border-left: 0.22em solid var(--ev-accent, #8b5cf6);
+  background: var(--ev-bubble, rgba(0, 0, 0, 0.45));
+}
+.ev-item .cr-icon, .ev-label .cr-icon { width: 0.95em; height: 0.95em; flex: none; }
+.ev-mark { color: var(--ev-accent, #8b5cf6); font-weight: 700; flex: none; }
+.ev-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-label { font-weight: 700; white-space: nowrap; }
+.ev-new { animation: ev-in 0.4s ease-out; }
+
+@keyframes ev-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: none; }
+}

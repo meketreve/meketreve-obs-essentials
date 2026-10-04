@@ -18,7 +18,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 #include "alert-logic.hpp"
+#include "event-history.hpp"
 #include "../texuguito/overlay-server.hpp"
+
+#include <obs-frontend-api.h>
 
 #include <QHash>
 #include <QJsonObject>
@@ -41,10 +44,14 @@ public:
 	QString editorUrl() const;
 	QString chatOverlayUrl() const;
 	QString chatEditorUrl() const;
+	QString eventsOverlayUrl() const;
+	QString eventsEditorUrl() const;
 	QJsonObject shareableConfig() const;
 	void importConfig(const QJsonObject &config);
 	QJsonObject chatConfig() const { return m_chatConfig; }
 	void importChatConfig(const QJsonObject &config);
+	QJsonObject eventsConfig() const { return m_eventsConfig; }
+	void importEventsConfig(const QJsonObject &config);
 
 private:
 	void loadSettings();
@@ -52,6 +59,14 @@ private:
 	void loadConfig();
 	void saveConfig();
 	void saveChatConfig();
+	void saveHistory();
+	/* The latest events and the labels, to every events overlay. */
+	void broadcastHistory();
+	QJsonObject historyMessage(const QString &type) const;
+	/* One made-up event of each kind and the labels they make, for the
+	 * events editor's preview. */
+	QJsonObject eventsSamples() const;
+	static void frontendEvent(enum obs_frontend_event event, void *data);
 	void onShown(const ChatMessage &msg);
 	void onActivity(const ChatMessage &msg, const QString &description);
 	/* One made-up event of each kind, as the chat on screen shows them. */
@@ -78,6 +93,8 @@ private:
 	QString m_mediaDir;
 	QJsonObject m_config;
 	QJsonObject m_chatConfig;
+	QJsonObject m_eventsConfig;
+	EventsOverlay::History m_history;
 	QString m_token;
 	quint16 m_port = 8902;
 	bool m_enabled = true;
