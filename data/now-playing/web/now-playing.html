@@ -1,0 +1,198 @@
+<!doctype html>
+<!-- Meketreve OBS Essentials - Now Playing overlay (Browser Source).
+     Options in the link: ?color=3987e5 (bars), ?card=0 (only the bars),
+     ?bars=0 (only the card), ?always=1 (never hides when nothing plays). -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Now Playing</title>
+<style>
+  :root {
+    --surface: rgba(20, 20, 19, 0.82);
+    --border: rgba(255, 255, 255, 0.10);
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --muted: #898781;
+    --accent: #3987e5;
+    --track: rgba(255, 255, 255, 0.14);
+  }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  body { font-family: "Inter", "Segoe UI", "Noto Sans", system-ui, sans-serif; color: var(--text); }
+  .player {
+    box-sizing: border-box; height: 100vh; padding: 14px 20px; gap: 28px;
+    display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  .player.idle { opacity: 0; transform: translateY(12px); }
+  .player.no-card { grid-template-columns: minmax(0, 1fr); background: none; border: 0; }
+  .player.no-card .np { display: none; }
+  .player.no-bars { grid-template-columns: minmax(0, 1fr); }
+  .player.no-bars .viz-wrap { display: none; }
+  .np { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; min-width: 0; }
+  .art { height: min(104px, calc(100vh - 30px)); aspect-ratio: 1; border-radius: 10px; background: #262625; display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 40px; }
+  .art img { width: 100%; height: 100%; object-fit: cover; }
+  .np-text { min-width: 0; }
+  .np-src { font-size: 16px; color: var(--muted); }
+  .np-title { font-size: 24px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-artist { font-size: 18px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.3em; }
+  .np-prog { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 8px; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meter { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .meter > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; transition: width 1s linear; }
+  .viz-wrap { position: relative; min-width: 0; }
+  #viz { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<section class="player idle" id="player">
+  <div class="np">
+    <div class="art"><img id="np-art" alt="" hidden><span id="np-noart">♪</span></div>
+    <div class="np-text">
+      <div class="np-src" id="np-src"></div>
+      <div class="np-title" id="np-title"></div>
+      <div class="np-artist" id="np-artist"></div>
+      <div class="np-prog" id="np-prog" hidden><div class="meter"><i id="np-bar"></i></div><span id="np-time"></span></div>
+    </div>
+  </div>
+  <div class="viz-wrap"><canvas id="viz"></canvas></div>
+</section>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const color = (params.get("color") || "").replace(/[^0-9a-fA-F]/g, "");
+if (color.length === 3 || color.length === 6) document.documentElement.style.setProperty("--accent", "#" + color);
+if (params.get("card") === "0") $("player").classList.add("no-card");
+if (params.get("bars") === "0") $("player").classList.add("no-bars");
+const ALWAYS = params.get("always") === "1";
+
+const TEXT = {
+  pt: { now: "Tocando agora", playing: "tocando", paused: "pausado", nothing: "Nada tocando", pc: "Som do PC", noInfo: "sem informação da música", untitled: "Sem título" },
+  en: { now: "Now playing", playing: "playing", paused: "paused", nothing: "Nothing playing", pc: "Computer audio", noInfo: "no song information", untitled: "Untitled" },
+};
+let L = TEXT.en;
+
+/* ---------- Bars: dB per band from the plugin -> smoothing, auto gain ---------- */
+const BARS = 64;
+const barV = new Float32Array(BARS), barPeak = new Float32Array(BARS);
+let bandsDb = new Float32Array(BARS).fill(-120), rmsDb = -120, bandsAt = 0, refDb = -30;
+const audio = { playing: false, loudSince: 0, quietSince: 0 };
+
+function analyse(now, dt) {
+  const alive = now - bandsAt < 1000;
+  const rms = alive ? rmsDb : -120;
+  const gate = rms > -62;
+  let frameMax = -120;
+  for (let i = 0; i < BARS; i++) frameMax = Math.max(frameMax, bandsDb[i]);
+  // Auto gain: the tallest bar stays near the top at any volume
+  if (gate) refDb += frameMax > refDb ? (frameMax - refDb) * Math.min(1, dt * 8) : -dt * 4;
+  refDb = Math.min(0, Math.max(-45, refDb));
+  const RANGE = 40;
+  for (let i = 0; i < BARS; i++) {
+    // 1.5 curve opens the contrast: only the peaks touch the top
+    const target = gate ? Math.pow(Math.min(1, Math.max(0, (bandsDb[i] - refDb + RANGE) / RANGE)), 1.5) : 0;
+    barV[i] = target > barV[i] ? barV[i] + (target - barV[i]) * Math.min(1, dt * 25) : Math.max(target, barV[i] - dt * 1.8);
+    barPeak[i] = barV[i] >= barPeak[i] ? barV[i] : Math.max(barV[i], barPeak[i] - dt * 0.45);
+  }
+  const loud = gate && rms > -48;
+  if (loud) { audio.quietSince = 0; audio.loudSince ||= now; } else { audio.loudSince = 0; audio.quietSince ||= now; }
+  if (!audio.playing && audio.loudSince && now - audio.loudSince > 600) { audio.playing = true; renderMedia(media); }
+  if (audio.playing && audio.quietSince && now - audio.quietSince > 1500) { audio.playing = false; renderMedia(media); }
+}
+
+const viz = $("viz");
+function drawViz() {
+  const w = viz.clientWidth, h = viz.clientHeight;
+  if (!w || !h) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (viz.width !== Math.round(w * dpr) || viz.height !== Math.round(h * dpr)) { viz.width = Math.round(w * dpr); viz.height = Math.round(h * dpr); }
+  const ctx = viz.getContext("2d");
+  const css = getComputedStyle(document.documentElement);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const base = h - 1, top = 6, band = w / BARS, bw = Math.max(1, Math.min(16, band - 2));
+  ctx.fillStyle = css.getPropertyValue("--accent").trim();
+  for (let i = 0; i < BARS; i++) {
+    const x = i * band + (band - bw) / 2, bh = Math.max(2, (base - top) * barV[i]);
+    const r = Math.min(4, bw / 2, bh);
+    ctx.beginPath(); ctx.roundRect(x, base - bh, bw, bh, [r, r, 0, 0]); ctx.fill();
+  }
+  ctx.fillStyle = css.getPropertyValue("--muted").trim();
+  for (let i = 0; i < BARS; i++) if (barPeak[i] > 0.03) ctx.fillRect(i * band + (band - bw) / 2, base - (base - top) * barPeak[i] - 4, bw, 2);
+}
+
+/* ---------- Now playing (system media controls via the plugin) ---------- */
+/* Position comes every 2 s; in between, it is interpolated. */
+let media = null, mediaAt = 0, idleSince = performance.now();
+const pad2 = n => String(Math.floor(n)).padStart(2, "0");
+const fmtMin = s => s >= 3600 ? `${Math.floor(s / 3600)}:${pad2(s % 3600 / 60)}:${pad2(s % 60)}` : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+function renderMedia(m) {
+  if (!m || !media || m.position !== media.position || m.title !== media.title || m.playing !== media.playing) {
+    media = m; mediaAt = performance.now();
+  }
+  if (m) {
+    const player = m.player.charAt(0).toUpperCase() + m.player.slice(1);
+    $("np-src").textContent = `${player} · ${m.playing ? L.playing : L.paused}`;
+    $("np-title").textContent = m.title || L.untitled;
+    $("np-artist").textContent = [m.artist, m.album].filter(Boolean).join(" · ");
+  } else {
+    $("np-src").textContent = L.now;
+    $("np-title").textContent = audio.playing ? L.pc : L.nothing;
+    $("np-artist").textContent = audio.playing ? L.noInfo : "";
+  }
+  const img = $("np-art");
+  const art = m && /^(https?:|\/art\?)/.test(m.art) ? m.art : "";
+  if (img.dataset.src !== art) {
+    img.dataset.src = art; img.hidden = true; $("np-noart").hidden = false;
+    if (art) img.src = art;
+  }
+  mediaProgress();
+}
+$("np-art").addEventListener("load", e => { e.target.hidden = false; $("np-noart").hidden = true; });
+function mediaProgress() {
+  const prog = $("np-prog");
+  prog.hidden = !(media && media.length > 0);
+  if (prog.hidden) return;
+  const pos = Math.min(media.length, media.position + (media.playing ? (performance.now() - mediaAt) / 1000 : 0));
+  $("np-bar").style.width = (100 * pos / media.length) + "%";
+  $("np-time").textContent = `${fmtMin(pos)} / ${fmtMin(media.length)}`;
+}
+
+/* Hides after 5 s with nothing playing (unless ?always=1). */
+function updateIdle(now) {
+  const active = (media && media.playing) || audio.playing;
+  if (active) idleSince = 0; else idleSince ||= now;
+  $("player").classList.toggle("idle", !ALWAYS && !!idleSince && now - idleSince > 5000);
+}
+
+/* ---------- WebSocket ---------- */
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = event => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+    if (msg.type === "bands" && Array.isArray(msg.bands)) {
+      for (let i = 0; i < BARS; i++) bandsDb[i] = +msg.bands[i] || -120;
+      rmsDb = +msg.rms || -120; bandsAt = performance.now();
+    } else if (msg.type === "media") {
+      if (msg.lang) L = String(msg.lang).startsWith("pt") ? TEXT.pt : TEXT.en;
+      renderMedia(msg.media || null);
+    }
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+
+let last = performance.now(), lastProg = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  analyse(now, dt);
+  drawViz();
+  if (now - lastProg > 500) { lastProg = now; mediaProgress(); updateIdle(now); }
+  requestAnimationFrame(frame);
+}
+renderMedia(null);
+connect();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

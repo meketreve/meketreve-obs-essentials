@@ -33,6 +33,12 @@ if(ENABLE_QT)
     ${CMAKE_PROJECT_NAME}
     PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
   )
+  # Now Playing reads the song from MPRIS; OBS on Linux already ships QtDBus.
+  if(OS_LINUX)
+    find_package(Qt6 REQUIRED COMPONENTS DBus)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::DBus)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MEKETREVE_HAVE_DBUS)
+  endif()
   # The vertical canvas preview needs a private Qt header for Wayland on Qt < 6.9.
   if(OS_LINUX AND Qt6_VERSION VERSION_LESS "6.9.0")
     find_package(Qt6 QUIET COMPONENTS GuiPrivate)
@@ -105,6 +111,13 @@ target_sources(
     src/tools/outputs/output-store.hpp
     src/tools/outputs/outputs-dock.cpp
     src/tools/outputs/outputs-dock.hpp
+    src/tools/now-playing/media-info.cpp
+    src/tools/now-playing/media-info.hpp
+    src/tools/now-playing/now-playing-dock.cpp
+    src/tools/now-playing/now-playing-dock.hpp
+    src/tools/now-playing/now-playing.h
+    src/tools/now-playing/spectrum.cpp
+    src/tools/now-playing/spectrum.hpp
     src/tools/tabs/layout-store.cpp
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp

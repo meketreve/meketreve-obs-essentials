@@ -146,3 +146,17 @@ target_include_directories(test-alerts PRIVATE ${_alerts} ${_texuguito})
 target_link_libraries(test-alerts PRIVATE chat-core Qt6::Test)
 set_target_properties(test-alerts PROPERTIES AUTOMOC ON)
 add_test(NAME alerts COMMAND test-alerts)
+
+set(_now_playing "${CMAKE_SOURCE_DIR}/src/tools/now-playing")
+add_executable(
+  test-now-playing
+  test-now-playing.cpp
+  ${_now_playing}/media-info.cpp
+  ${_now_playing}/media-info.hpp
+  ${_now_playing}/spectrum.cpp
+  ${_now_playing}/spectrum.hpp
+)
+target_include_directories(test-now-playing PRIVATE ${_now_playing})
+target_link_libraries(test-now-playing PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-now-playing PROPERTIES AUTOMOC ON)
+add_test(NAME now-playing COMMAND test-now-playing)

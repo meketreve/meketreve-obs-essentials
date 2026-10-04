@@ -28,6 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/vertical/vertical.h"
 #include "tools/texuguito/texuguito.h"
 #include "tools/alerts/alerts.h"
+#include "tools/now-playing/now-playing.h"
 #include "tools/updater/updater.h"
 
 OBS_DECLARE_MODULE()
@@ -58,6 +59,7 @@ bool obs_module_load(void)
 	outputs_register();
 	texuguito_register();
 	alerts_register();
+	now_playing_register();
 
 	canvas_tools = obs_supports_canvas_tools();
 	if (canvas_tools)
