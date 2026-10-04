@@ -20,6 +20,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * alerts-dock.cpp: they share its server, token and events. */
 
 #include "alerts-dock.hpp"
+#include "chat-overlay.hpp"
+#include "theme.hpp"
 
 #include "../unified-chat/unified-chat-dock.hpp"
 
@@ -262,6 +264,8 @@ bool AlertsDock::widgetsPage(const QString &path, OverlayServer::Reply &reply) c
 		reply.file = webFile("subathon.html");
 	else if (path == QLatin1String("/subathon-editor"))
 		reply.file = webFile("subathon-editor.html");
+	else if (path == QLatin1String("/tema-editor"))
+		reply.file = webFile("theme-editor.html");
 	else
 		return false;
 	return true;
@@ -276,7 +280,7 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 	/* An empty body is {}: stop and clear need nothing. */
 	if (post && !request.body.trimmed().isEmpty() && !doc.isObject() &&
 	    (path.startsWith(QLatin1String("/api/goals")) || path.startsWith(QLatin1String("/api/poll")) ||
-	     path.startsWith(QLatin1String("/api/subathon")))) {
+	     path.startsWith(QLatin1String("/api/subathon")) || path.startsWith(QLatin1String("/api/theme")))) {
 		errorReply(reply, 400, QStringLiteral("bad json"));
 		return true;
 	}
@@ -365,6 +369,42 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 		saveSubathon();
 		broadcastSubathon(action == QLatin1String("add") ? seconds : 0);
 		jsonReply(reply, 200, subathonMessage());
+	} else if (get && path == QLatin1String("/api/theme")) {
+		jsonReply(reply, 200, Theme::normalize(readJson(QDir(m_dir).filePath(QStringLiteral("theme.json")))));
+	} else if (post && path == QLatin1String("/api/theme-apply")) {
+		/* Written into each overlay picked, as if typed in its own tab. */
+		const QJsonObject theme = Theme::normalize(body);
+		if (!writeJson(QDir(m_dir).filePath(QStringLiteral("theme.json")), theme))
+			obs_log(LOG_WARNING, "[alerts] could not save theme.json");
+		const QJsonObject on = theme.value(QStringLiteral("targets")).toObject();
+		const auto picked = [&on](const char *target) {
+			return on.value(QLatin1String(target)).toBool();
+		};
+		if (picked("alertas")) {
+			m_config = Alerts::normalize(Theme::applyToAlerts(m_config, theme), T);
+			saveConfig();
+			broadcastConfig();
+		}
+		if (picked("chat"))
+			importChatConfig(Theme::applyTo(m_chatConfig, theme, QStringLiteral("eventColor")));
+		if (picked("eventos"))
+			importEventsConfig(Theme::applyTo(m_eventsConfig, theme));
+		if (picked("metas")) {
+			m_goals = Goals::normalize(Theme::applyTo(m_goals, theme), T, m_goals);
+			saveGoals();
+			broadcastGoals();
+		}
+		if (picked("enquete")) {
+			m_pollConfig = Poll::normalizeConfig(Theme::applyTo(m_pollConfig, theme));
+			savePoll();
+			broadcastPoll();
+		}
+		if (picked("subathon")) {
+			m_subathonConfig = Subathon::normalizeConfig(Theme::applyTo(m_subathonConfig, theme));
+			saveSubathon();
+			broadcastSubathon();
+		}
+		jsonReply(reply, 200, theme);
 	} else {
 		return false;
 	}

@@ -149,6 +149,8 @@ add_executable(
   ${_alerts}/poll.hpp
   ${_alerts}/subathon.cpp
   ${_alerts}/subathon.hpp
+  ${_alerts}/theme.cpp
+  ${_alerts}/theme.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
 )

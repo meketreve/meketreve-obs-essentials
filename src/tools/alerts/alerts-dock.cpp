@@ -835,7 +835,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
 					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
 					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals.") ||
-					       line.startsWith("Poll.") || line.startsWith("Subathon."))) {
+					       line.startsWith("Poll.") || line.startsWith("Subathon.") ||
+					       line.startsWith("Theme."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}

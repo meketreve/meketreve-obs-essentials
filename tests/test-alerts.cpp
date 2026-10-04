@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "goals.hpp"
 #include "poll.hpp"
 #include "subathon.hpp"
+#include "theme.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
@@ -664,6 +665,36 @@ private slots:
 
 		timer.reset();
 		QCOMPARE(timer.state(0), Timer::State::Idle);
+	}
+
+	void theme()
+	{
+		const QJsonObject theme =
+			Theme::normalize(QJsonObject{{key("font"), key("Rubik")},
+						     {key("accent"), key("#00FF00")},
+						     {key("bubbleOpacity"), 300},
+						     {key("targets"), QJsonObject{{key("chat"), false}}}});
+		QCOMPARE(theme.value(key("bubbleOpacity")).toDouble(), 100.0);
+		QCOMPARE(theme.value(key("textColor")).toString(), key("#FFFFFF"));
+		QCOMPARE(theme.value(key("targets")).toObject().value(key("chat")).toBool(), false);
+		QCOMPARE(theme.value(key("targets")).toObject().value(key("metas")).toBool(), true);
+
+		/* Only the keys the overlay has; the rest of its config stays. */
+		const QJsonObject chat = Theme::applyTo(ChatOverlay::normalize(QJsonObject{{key("maxMessages"), 7}}),
+							theme, key("eventColor"));
+		QCOMPARE(chat.value(key("font")).toString(), key("Rubik"));
+		QCOMPARE(chat.value(key("eventColor")).toString(), key("#00FF00"));
+		QVERIFY(!chat.contains(key("accent")));
+		QCOMPARE(chat.value(key("maxMessages")).toDouble(), 7.0);
+
+		const TextLookup text = [](const char *k) {
+			return QString::fromLatin1(k);
+		};
+		const QJsonObject alerts = Theme::applyToAlerts(Alerts::defaults(text), theme);
+		QCOMPARE(typeOf(alerts, "sub").value(key("font")).toString(), key("Rubik"));
+		QCOMPARE(typeOf(alerts, "raid").value(key("accent")).toString(), key("#00FF00"));
+		QVERIFY(!typeOf(alerts, "sub").contains(key("bubbleColor")));
+		QCOMPARE(Alerts::normalize(alerts, text), alerts);
 	}
 
 	void chatOverlayJson()
