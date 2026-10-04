@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "alert-logic.hpp"
 #include "chat-overlay.hpp"
 #include "event-history.hpp"
+#include "goals.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
@@ -420,6 +421,117 @@ private slots:
 		QCOMPARE(j.value(key("platform")).toString(), key("twitch"));
 		QCOMPARE(j.value(key("type")).toString(), key("raid"));
 		QCOMPARE(j.value(key("text")).toString(), key("Fulano fez raid com 42"));
+	}
+
+	void goals()
+	{
+		const TextLookup text = [](const char *k) {
+			return QString::fromLatin1(k);
+		};
+		/* A first start has one follows goal. */
+		QJsonObject config = Goals::normalize(QJsonObject(), text);
+		QJsonArray goals = config.value(key("goals")).toArray();
+		QCOMPARE(goals.size(), 1);
+		QCOMPARE(goals.at(0).toObject().value(key("kind")).toString(), key("follows"));
+		QCOMPARE(goals.at(0).toObject().value(key("id")).toString(), key("meta-1"));
+		/* An empty list stays empty; junk is cleaned. */
+		QCOMPARE(Goals::normalize(QJsonObject{{key("goals"), QJsonArray()}}, text)
+				 .value(key("goals"))
+				 .toArray()
+				 .size(),
+			 0);
+		const QJsonObject junk =
+			Goals::normalize(QJsonObject{{key("goals"), QJsonArray{QJsonObject{{key("id"), key("Bad Id!")},
+											   {key("kind"), key("likes")},
+											   {key("target"), -5},
+											   {key("current"), 1e12}}}},
+						     {key("fontSize"), 500},
+						     {key("accent"), key("red")}},
+					 text);
+		const QJsonObject cleaned = junk.value(key("goals")).toArray().at(0).toObject();
+		QCOMPARE(cleaned.value(key("id")).toString(), key("meta-1"));
+		QCOMPARE(cleaned.value(key("kind")).toString(), key("follows"));
+		QCOMPARE(cleaned.value(key("target")).toDouble(), 1.0);
+		QCOMPARE(cleaned.value(key("current")).toDouble(), 1e9);
+		QCOMPARE(junk.value(key("fontSize")).toDouble(), 72.0);
+		QCOMPARE(junk.value(key("accent")).toString(), key("#8B5CF6"));
+
+		/* What each event adds. */
+		const auto event = [](const char *type, double value) {
+			Event e;
+			e.type = QString::fromLatin1(type);
+			e.value = value;
+			return e;
+		};
+		QCOMPARE(Goals::amountFor(key("subs"), event("resub", 12)), 1.0);
+		QCOMPARE(Goals::amountFor(key("subs"), event("giftsub", 5)), 5.0);
+		QCOMPARE(Goals::amountFor(key("gifts"), event("giftsub", 5)), 5.0);
+		QCOMPARE(Goals::amountFor(key("gifts"), event("gift", 1)), 1.0);
+		QCOMPARE(Goals::amountFor(key("bits"), event("bits", 500)), 500.0);
+		QCOMPARE(Goals::amountFor(key("donations"), event("donation", 10.5)), 10.5);
+		QCOMPARE(Goals::amountFor(key("follows"), event("sub", 1)), 0.0);
+		QCOMPARE(Goals::amountFor(key("members"), event("membership", 3)), 1.0);
+
+		/* Events fill every goal of their kind; tests count nothing. */
+		config = Goals::normalize(
+			QJsonObject{{key("goals"), QJsonArray{QJsonObject{{key("id"), key("subs")},
+									  {key("kind"), key("subs")},
+									  {key("target"), 10},
+									  {key("resetOnLive"), true}},
+							      QJsonObject{{key("id"), key("money")},
+									  {key("kind"), key("donations")},
+									  {key("target"), 500}}}}},
+			text);
+		QVERIFY(Goals::apply(config, event("giftsub", 5)));
+		QVERIFY(Goals::apply(config, event("donation", 10.256)));
+		QVERIFY(!Goals::apply(config, event("follow", 1)));
+		Event test = event("sub", 1);
+		test.test = true;
+		QVERIFY(!Goals::apply(config, test));
+		const auto current = [](const QJsonObject &c, int i) {
+			return c.value(QStringLiteral("goals"))
+				.toArray()
+				.at(i)
+				.toObject()
+				.value(QStringLiteral("current"))
+				.toDouble();
+		};
+		QCOMPARE(current(config, 0), 5.0);
+		QCOMPARE(current(config, 1), 10.26);
+
+		/* The editor saves while events arrive: the counts stay. */
+		QJsonObject edited = config;
+		QJsonArray list = edited.value(key("goals")).toArray();
+		QJsonObject first = list.at(0).toObject();
+		first.insert(key("current"), 0);
+		first.insert(key("title"), key("Subs!"));
+		list.replace(0, first);
+		/* A goal removed and a new one added: the new one starts at zero. */
+		list.removeAt(1);
+		list.append(QJsonObject{{key("kind"), key("bits")}, {key("current"), 0}});
+		edited.insert(key("goals"), list);
+		config = Goals::normalize(edited, text, config);
+		QCOMPARE(current(config, 0), 5.0);
+		QCOMPARE(config.value(key("goals")).toArray().at(0).toObject().value(key("title")).toString(),
+			 key("Subs!"));
+		QCOMPARE(current(config, 1), 0.0);
+
+		/* Buttons: add, take away (never below zero), set. */
+		QVERIFY(Goals::adjust(config, key("subs"), 2, false));
+		QCOMPARE(current(config, 0), 7.0);
+		QVERIFY(Goals::adjust(config, key("subs"), -20, false));
+		QCOMPARE(current(config, 0), 0.0);
+		QVERIFY(Goals::adjust(config, key("subs"), 3, true));
+		QVERIFY(!Goals::adjust(config, key("nope"), 1, false));
+
+		/* A new live resets only the goals marked for it. */
+		const QString bitsId =
+			config.value(key("goals")).toArray().at(1).toObject().value(key("id")).toString();
+		QVERIFY(Goals::adjust(config, bitsId, 100, true));
+		QVERIFY(Goals::resetForLive(config));
+		QCOMPARE(current(config, 0), 0.0);
+		QCOMPARE(current(config, 1), 100.0);
+		QVERIFY(!Goals::resetForLive(config));
 	}
 
 	void chatOverlayJson()

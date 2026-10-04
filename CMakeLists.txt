@@ -71,8 +71,11 @@ target_sources(
     src/tools/alerts/chat-overlay.hpp
     src/tools/alerts/event-history.cpp
     src/tools/alerts/event-history.hpp
+    src/tools/alerts/goals.cpp
+    src/tools/alerts/goals.hpp
     src/tools/alerts/alerts-dock.cpp
     src/tools/alerts/alerts-dock.hpp
+    src/tools/alerts/alerts-widgets.cpp
     src/tools/alerts/alerts.h
     src/tools/bass-shake.c
     src/tools/vertical/audio-wrapper-source.c

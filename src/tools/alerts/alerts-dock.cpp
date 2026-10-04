@@ -156,6 +156,7 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	QDir().mkpath(m_mediaDir);
 	loadSettings();
 	loadConfig();
+	loadWidgets();
 
 	OverlayServer::Routes routes;
 	routes.webDir = webDir();
@@ -164,10 +165,12 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	};
 	routes.snapshot = [this]() {
 		/* Alert pages read "config", chat pages "chat". */
-		return QJsonObject{{QStringLiteral("type"), QStringLiteral("config")},
-				   {QStringLiteral("config"), overlayConfig()},
-				   {QStringLiteral("chat"), m_chatConfig},
-				   {QStringLiteral("events"), historyMessage(QStringLiteral("events-history"))}};
+		QJsonObject snapshot{{QStringLiteral("type"), QStringLiteral("config")},
+				     {QStringLiteral("config"), overlayConfig()},
+				     {QStringLiteral("chat"), m_chatConfig},
+				     {QStringLiteral("events"), historyMessage(QStringLiteral("events-history"))}};
+		widgetsSnapshot(snapshot);
+		return snapshot;
 	};
 	routes.handler = [this](const OverlayServer::Request &request, OverlayServer::Reply &reply) {
 		return route(request, reply);
@@ -272,6 +275,12 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		[this]() { return eventsOverlayUrl(); });
 	section("EventsOverlay.Title", "EventsOverlay.Help", eventsRow);
 
+	auto *goalsRow = new QHBoxLayout();
+	sourceButtons(
+		goalsRow, [this]() { addBrowserSource(T("Goals.SourceName"), goalsOverlayUrl(), 600, 300, false); },
+		[this]() { return goalsOverlayUrl(); });
+	section("Goals.Title", "Goals.Help", goalsRow);
+
 	/* Overlays with their own server (the chat parade, now playing). */
 	m_extraSections = new QVBoxLayout();
 	m_extraSections->setContentsMargins(0, 0, 0, 0);
@@ -293,13 +302,15 @@ AlertsDock::~AlertsDock()
 void AlertsDock::frontendEvent(enum obs_frontend_event event, void *data)
 {
 	auto *self = static_cast<AlertsDock *>(data);
+	if (event != OBS_FRONTEND_EVENT_STREAMING_STARTED)
+		return;
 	/* A new live: "top donor" and "top bits" count from zero. */
-	if (event == OBS_FRONTEND_EVENT_STREAMING_STARTED &&
-	    self->m_eventsConfig.value(QStringLiteral("resetTopOnLive")).toBool()) {
+	if (self->m_eventsConfig.value(QStringLiteral("resetTopOnLive")).toBool()) {
 		self->m_history.resetTop();
 		self->saveHistory();
 		self->broadcastHistory();
 	}
+	self->widgetsLiveStarted();
 }
 
 QString AlertsDock::overlayUrl() const
@@ -321,6 +332,11 @@ QString AlertsDock::panelUrl(const QString &tab) const
 QString AlertsDock::eventsOverlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/eventos").arg(m_port);
+}
+
+QString AlertsDock::goalsOverlayUrl() const
+{
+	return QStringLiteral("http://localhost:%1/metas").arg(m_port);
 }
 
 void AlertsDock::loadSettings()
@@ -578,6 +594,7 @@ void AlertsDock::onChat(const ChatMessage &msg)
 	m_history.add(EventsOverlay::entryFrom(event, UnifiedChatDock::describeEvent(msg), msg.id, now));
 	saveHistory();
 	broadcastHistory();
+	widgetsEvent(event);
 	if (Alerts::passes(m_config, event))
 		fire(event);
 }
@@ -656,6 +673,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		reply.file = QDir(webDir()).filePath(QStringLiteral("events-editor.html"));
 		return true;
 	}
+	if (get && widgetsPage(path, reply))
+		return true;
 	if (get && path.startsWith(QLatin1String("/media/"))) {
 		reply.file = OverlayServer::resolvePath(m_mediaDir, path.mid(7));
 		if (reply.file.isEmpty())
@@ -676,6 +695,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		return true;
 	}
 
+	if (widgetsApi(request, reply))
+		return true;
 	const QUrlQuery query(request.query);
 	const bool post = request.method == "POST";
 	if (get && path == QLatin1String("/api/config")) {
@@ -787,7 +808,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
 					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
-					       line.startsWith("Texuguito.BotPanel."))) {
+					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}

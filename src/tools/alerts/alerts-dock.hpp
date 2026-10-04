@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "alert-logic.hpp"
 #include "event-history.hpp"
+#include "goals.hpp"
 #include "../texuguito/overlay-server.hpp"
 
 #include <obs-frontend-api.h>
@@ -66,6 +67,7 @@ public:
 	QString overlayUrl() const;
 	QString chatOverlayUrl() const;
 	QString eventsOverlayUrl() const;
+	QString goalsOverlayUrl() const;
 	/* The web panel, open on one tab: alertas, chat, eventos, tocando. */
 	QString panelUrl(const QString &tab) const;
 	QJsonObject shareableConfig() const;
@@ -104,6 +106,19 @@ private:
 	void addBrowserSource(const QString &name, const QString &url, int width, int height, bool audio);
 	void openSettings();
 	bool route(const OverlayServer::Request &request, OverlayServer::Reply &reply);
+	/* Goals (and the other overlays the events fill), in alerts-widgets.cpp:
+	 * load at start, count a real event, a new live, the snapshot a page gets
+	 * when it connects, and their pages and /api routes (after the token
+	 * check). */
+	void loadWidgets();
+	void widgetsEvent(const Alerts::Event &event);
+	void widgetsLiveStarted();
+	void widgetsSnapshot(QJsonObject &snapshot) const;
+	bool widgetsPage(const QString &path, OverlayServer::Reply &reply) const;
+	bool widgetsApi(const OverlayServer::Request &request, OverlayServer::Reply &reply);
+	void saveGoals();
+	void broadcastGoals();
+	QJsonObject goalsMessage() const;
 	void apiMediaList(OverlayServer::Reply &reply) const;
 	void apiMediaUpload(const QString &name, const QByteArray &data, OverlayServer::Reply &reply);
 
@@ -119,6 +134,7 @@ private:
 	QJsonObject m_chatConfig;
 	QJsonObject m_eventsConfig;
 	EventsOverlay::History m_history;
+	QJsonObject m_goals;
 	QString m_token;
 	quint16 m_port = 8902;
 	bool m_enabled = true;

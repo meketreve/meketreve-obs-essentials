@@ -1,0 +1,37 @@
+/* The goals overlay (/metas) and the goals editor's preview. */
+.gl-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  box-sizing: border-box;
+  padding: 10px;
+  font-family: var(--gl-font, "Poppins", sans-serif);
+  font-size: var(--gl-size, 24px);
+  line-height: 1.25;
+  color: var(--gl-text, #fff);
+}
+.gl-box.gl-shadow { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6); }
+
+.gl-goal { display: flex; flex-direction: column; gap: 0.25em; }
+.gl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6em; }
+.gl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-count { flex: none; font-variant-numeric: tabular-nums; font-size: 0.85em; }
+.gl-bar {
+  position: relative;
+  height: 0.75em;
+  border-radius: 0.4em;
+  overflow: hidden;
+  background: var(--gl-bubble, rgba(0, 0, 0, 0.45));
+}
+.gl-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gl-accent, #8b5cf6);
+  transition: width 0.8s ease-out;
+}
+.gl-done .gl-fill { animation: gl-glow 1.6s ease-in-out infinite alternate; }
+
+@keyframes gl-glow {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.35); }
+}
