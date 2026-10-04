@@ -20,6 +20,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "outputs.h"
 
 #include "../config/config-share.hpp"
+#include "../unified-chat/chat-accounts.hpp"
+#include "../unified-chat/unified-chat-dock.hpp"
 
 #include <obs-module.h>
 #include <plugin-support.h>
@@ -48,6 +50,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -285,7 +288,7 @@ void OutputsDock::rebuildRows()
 		const QString id = c.id;
 		connect(r.toggle, &QPushButton::clicked, this, [this, id]() {
 			const auto it = m_running.constFind(id);
-			if (it != m_running.constEnd() && it->output)
+			if ((it != m_running.constEnd() && it->output) || m_preparing.contains(id))
 				stopOutput(id);
 			else
 				startOutput(id, true);
@@ -356,7 +359,7 @@ void OutputsDock::refreshRow(const QString &id)
 		tip += QStringLiteral(" (%1)").arg(T("Outputs.Disabled"));
 	r.dot->setText(QStringLiteral("<span style=\"color:%1\">&#9679;</span>").arg(QLatin1String(color)));
 	r.dot->setToolTip(tip);
-	const bool active = run.output != nullptr;
+	const bool active = run.output != nullptr || m_preparing.contains(id);
 	r.toggle->setText(active ? T("Outputs.Stop") : T("Outputs.Start"));
 	r.time->setText(run.state == State::Live || run.state == State::Stalled
 				? formatElapsed(QDateTime::currentMSecsSinceEpoch() - run.liveSince)
@@ -415,6 +418,42 @@ bool OutputsDock::startOutput(const QString &id, bool interactive)
 		return failWith(T("Outputs.Error.NoServer"));
 	if (c.key.isEmpty() && !c.isSrt())
 		return failWith(T("Outputs.Error.NoKey"));
+
+	/* YouTube only goes live when a broadcast takes the key's video, and it
+	 * no longer makes one unless the Studio page is open: with the account
+	 * logged in, find or make it first, then start for real. */
+	const bool youtube = c.platform == QLatin1String("youtube") ||
+			     QUrl(c.server).host().endsWith(QLatin1String("youtube.com"));
+	if (youtube && !m_prepared.remove(id)) {
+		UnifiedChatDock *chat = unifiedChatDock();
+		ChatAccounts *accounts = chat ? chat->accounts() : nullptr;
+		if (accounts && accounts->account(ChatPlatform::YouTube).loggedIn()) {
+			if (m_preparing.contains(id))
+				return true;
+			m_preparing.insert(id);
+			run.state = State::Starting;
+			run.error.clear();
+			refreshRow(id);
+			QPointer<OutputsDock> self(this);
+			const QByteArray name = c.name.toUtf8();
+			accounts->youtubePrepareBroadcast(c.key, [self, id, interactive, name](const QString &broadcast,
+											       const QString &error) {
+				/* Stopped while waiting: nothing to start. */
+				if (!self || !self->m_preparing.remove(id))
+					return;
+				if (error.isEmpty())
+					obs_log(LOG_INFO, "[outputs] '%s': YouTube broadcast %s takes the video",
+						name.constData(), broadcast.toUtf8().constData());
+				else
+					obs_log(LOG_WARNING,
+						"[outputs] '%s': no YouTube broadcast (%s), starting anyway",
+						name.constData(), error.toUtf8().constData());
+				self->m_prepared.insert(id);
+				self->startOutput(id, interactive);
+			});
+			return true;
+		}
+	}
 
 	obs_encoder_t *venc = nullptr;
 	obs_encoder_t *aenc = nullptr;
@@ -513,6 +552,11 @@ bool OutputsDock::startOutput(const QString &id, bool interactive)
 
 void OutputsDock::stopOutput(const QString &id)
 {
+	if (m_preparing.remove(id)) {
+		m_running[id].state = State::Stopped;
+		refreshRow(id);
+		return;
+	}
 	auto it = m_running.find(id);
 	if (it == m_running.end() || !it->output)
 		return;

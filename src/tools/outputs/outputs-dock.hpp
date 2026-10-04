@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs.h>
 
 #include <QHash>
+#include <QSet>
 #include <QTimer>
 #include <QWidget>
 
@@ -95,6 +96,10 @@ private:
 	QList<OutputConfig> m_outputs;
 	QHash<QString, Running> m_running;
 	QHash<QString, Row> m_rows;
+	/* YouTube outputs waiting for their broadcast, and the ones that have it
+	 * (startOutput takes the mark on the next call). */
+	QSet<QString> m_preparing;
+	QSet<QString> m_prepared;
 	QVBoxLayout *m_list = nullptr;
 	QLabel *m_empty = nullptr;
 	QTimer m_timer;

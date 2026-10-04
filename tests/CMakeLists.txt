@@ -29,6 +29,8 @@ target_sources(
     ${_chat}/ws-client.hpp
     ${_chat}/youtube-chat.cpp
     ${_chat}/youtube-chat.hpp
+    ${_chat}/youtube-broadcast.cpp
+    ${_chat}/youtube-broadcast.hpp
 )
 target_include_directories(chat-core PUBLIC ${_chat} ${CMAKE_SOURCE_DIR}/src/tools/config)
 target_link_libraries(chat-core PUBLIC Qt6::Core Qt6::Network)

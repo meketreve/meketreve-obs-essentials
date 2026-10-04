@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "kick-chat.hpp"
 #include "oauth-util.hpp"
 #include "twitch-chat.hpp"
+#include "youtube-broadcast.hpp"
 #include "youtube-chat.hpp"
 
 #include <QJsonArray>
@@ -411,6 +412,89 @@ private slots:
 					 QJsonObject{{QStringLiteral("updateViewershipAction"), viewership}}};
 		QCOMPARE(YouTubeChat::viewersFromMetadata(QJsonObject{{QStringLiteral("actions"), actions}}), 3990);
 		QCOMPARE(YouTubeChat::viewersFromMetadata(QJsonObject()), -1);
+	}
+
+	void youtubeBroadcastChoices()
+	{
+		using namespace YouTubeBroadcast;
+		const auto stream = [](const char *id, const char *key) {
+			return QJsonObject{
+				{QStringLiteral("id"), QString::fromLatin1(id)},
+				{QStringLiteral("cdn"),
+				 QJsonObject{{QStringLiteral("ingestionInfo"),
+					      QJsonObject{{QStringLiteral("streamName"), QString::fromLatin1(key)}}}}}};
+		};
+		const QJsonObject streams{
+			{QStringLiteral("items"), QJsonArray{stream("s1", "aaaa-bbbb"), stream("s2", "cccc-dddd")}}};
+		QCOMPARE(streamIdForKey(streams, QStringLiteral(" cccc-dddd ")), QStringLiteral("s2"));
+		QCOMPARE(streamIdForKey(streams, QStringLiteral("zzzz")), QString());
+		QCOMPARE(streamIdForKey(streams, QString()), QString());
+
+		const auto broadcast = [](const char *id, const char *bound, const char *life, const char *title,
+					  const char *end, const char *privacy) {
+			return QJsonObject{
+				{QStringLiteral("id"), QString::fromLatin1(id)},
+				{QStringLiteral("snippet"),
+				 QJsonObject{{QStringLiteral("title"), QString::fromUtf8(title)},
+					     {QStringLiteral("description"),
+					      QStringLiteral("desc ") + QString::fromLatin1(id)},
+					     {QStringLiteral("actualEndTime"), QString::fromLatin1(end)}}},
+				{QStringLiteral("status"),
+				 QJsonObject{{QStringLiteral("lifeCycleStatus"), QString::fromLatin1(life)},
+					     {QStringLiteral("privacyStatus"), QString::fromLatin1(privacy)}}},
+				{QStringLiteral("contentDetails"),
+				 QJsonObject{{QStringLiteral("boundStreamId"), QString::fromLatin1(bound)}}}};
+		};
+		/* Two finished lives and one ready on another key: nothing to reuse for s2. */
+		QJsonObject list{
+			{QStringLiteral("items"),
+			 QJsonArray{broadcast("b1", "s2", "complete", "Velha", "2026-10-01T02:00:00Z", "public"),
+				    broadcast("b2", "s2", "complete", "Última live", "2026-10-03T23:00:00Z", "unlisted"),
+				    broadcast("b3", "s1", "ready", "Outra chave", "", "public")}}};
+		QCOMPARE(reusable(list, QStringLiteral("s2")), QString());
+		QCOMPARE(reusable(list, QStringLiteral("s1")), QStringLiteral("b3"));
+		QCOMPARE(lastFinished(list).value(QStringLiteral("id")).toString(), QStringLiteral("b2"));
+
+		/* The new one copies the last live and starts and stops with the video. */
+		const QDateTime now = QDateTime::fromString(QStringLiteral("2026-10-04T20:00:00Z"), Qt::ISODate);
+		const QJsonObject body = newBroadcast(lastFinished(list), QStringLiteral("Canal · 04/10"), now);
+		QCOMPARE(body.value(QStringLiteral("snippet")).toObject().value(QStringLiteral("title")).toString(),
+			 QStringLiteral("Última live"));
+		QCOMPARE(
+			body.value(QStringLiteral("snippet")).toObject().value(QStringLiteral("description")).toString(),
+			QStringLiteral("desc b2"));
+		QCOMPARE(body.value(QStringLiteral("status"))
+				 .toObject()
+				 .value(QStringLiteral("privacyStatus"))
+				 .toString(),
+			 QStringLiteral("unlisted"));
+		QVERIFY(!body.value(QStringLiteral("status"))
+				 .toObject()
+				 .value(QStringLiteral("selfDeclaredMadeForKids"))
+				 .toBool());
+		QVERIFY(body.value(QStringLiteral("contentDetails"))
+				.toObject()
+				.value(QStringLiteral("enableAutoStart"))
+				.toBool());
+		QVERIFY(body.value(QStringLiteral("contentDetails"))
+				.toObject()
+				.value(QStringLiteral("enableAutoStop"))
+				.toBool());
+		QVERIFY(body.value(QStringLiteral("snippet"))
+				.toObject()
+				.value(QStringLiteral("scheduledStartTime"))
+				.toString()
+				.startsWith(QStringLiteral("2026-10-04T20:00:00")));
+
+		/* First live ever: the fallback title, public. */
+		const QJsonObject first = newBroadcast(QJsonObject(), QStringLiteral("Canal · 04/10"), now);
+		QCOMPARE(first.value(QStringLiteral("snippet")).toObject().value(QStringLiteral("title")).toString(),
+			 QStringLiteral("Canal · 04/10"));
+		QCOMPARE(first.value(QStringLiteral("status"))
+				 .toObject()
+				 .value(QStringLiteral("privacyStatus"))
+				 .toString(),
+			 QStringLiteral("public"));
 	}
 
 	void pkceMatchesRfc7636()

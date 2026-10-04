@@ -155,6 +155,13 @@ public:
 			      std::function<void(const QList<StreamCategory> &found, const QString &error)> done);
 	void updateStreamInfo(ChatPlatform p, const QString &title, const QString &categoryId, ActionDone done);
 
+	/* Before a YouTube output starts: the broadcast that takes the video of
+	 * streamKey, reused or made like the last one (title, description,
+	 * privacy) with auto start and stop, so the Studio page need not be
+	 * open. ~102 quota units when it makes one, 2 when it reuses. */
+	void youtubePrepareBroadcast(const QString &streamKey,
+				     std::function<void(const QString &broadcastId, const QString &error)> done);
+
 	/* People watching the Twitch channel now (Helix streams, any login);
 	 * -1 when it is offline or nobody is logged in. */
 	void twitchViewers(const QString &channel, std::function<void(int viewers)> done);

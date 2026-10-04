@@ -169,6 +169,8 @@ target_sources(
     src/tools/unified-chat/ws-client.hpp
     src/tools/unified-chat/youtube-chat.cpp
     src/tools/unified-chat/youtube-chat.hpp
+    src/tools/unified-chat/youtube-broadcast.cpp
+    src/tools/unified-chat/youtube-broadcast.hpp
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

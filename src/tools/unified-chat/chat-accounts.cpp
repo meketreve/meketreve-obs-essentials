@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "kick-chat.hpp"
 #include "oauth-util.hpp"
 #include "twitch-chat.hpp"
+#include "youtube-broadcast.hpp"
 
 #include <QDateTime>
 #include <QFile>
@@ -1228,6 +1229,80 @@ void ChatAccounts::twitchChatters(const QString &channel,
 			    done(logins, status, error);
 		    });
 	});
+}
+
+void ChatAccounts::youtubePrepareBroadcast(const QString &streamKey,
+					   std::function<void(const QString &, const QString &)> done)
+{
+	if (!account(ChatPlatform::YouTube).loggedIn()) {
+		done(QString(), QStringLiteral("not logged in"));
+		return;
+	}
+	const auto findStream =
+		youtubeUrl(QStringLiteral("liveStreams"), {{QStringLiteral("part"), QStringLiteral("id,cdn")},
+							   {QStringLiteral("mine"), QStringLiteral("true")},
+							   {QStringLiteral("maxResults"), QStringLiteral("50")}});
+	api(ChatPlatform::YouTube, "GET", findStream, QJsonObject(),
+	    [this, streamKey, done](int, const QJsonObject &streams, const QString &error) {
+		    if (!error.isEmpty()) {
+			    done(QString(), error);
+			    return;
+		    }
+		    const QString streamId = YouTubeBroadcast::streamIdForKey(streams, streamKey);
+		    if (streamId.isEmpty()) {
+			    done(QString(), QStringLiteral("the stream key is not one of this YouTube account's"));
+			    return;
+		    }
+		    /* One list gives both a broadcast to reuse and the last one to copy. */
+		    const QUrl list =
+			    youtubeUrl(QStringLiteral("liveBroadcasts"),
+				       {{QStringLiteral("part"), QStringLiteral("id,snippet,contentDetails,status")},
+					{QStringLiteral("broadcastStatus"), QStringLiteral("all")},
+					{QStringLiteral("broadcastType"), QStringLiteral("all")},
+					{QStringLiteral("maxResults"), QStringLiteral("50")}});
+		    api(ChatPlatform::YouTube, "GET", list, QJsonObject(),
+			[this, streamId, done](int, const QJsonObject &broadcasts, const QString &listError) {
+				if (!listError.isEmpty()) {
+					done(QString(), listError);
+					return;
+				}
+				const QString ready = YouTubeBroadcast::reusable(broadcasts, streamId);
+				if (!ready.isEmpty()) {
+					done(ready, QString());
+					return;
+				}
+				const QDateTime now = QDateTime::currentDateTime();
+				const QJsonObject body = YouTubeBroadcast::newBroadcast(
+					YouTubeBroadcast::lastFinished(broadcasts),
+					account(ChatPlatform::YouTube).login + QStringLiteral(" · ") +
+						QLocale().toString(now.date(), QLocale::ShortFormat),
+					now);
+				api(ChatPlatform::YouTube, "POST",
+				    youtubeUrl(QStringLiteral("liveBroadcasts"),
+					       {{QStringLiteral("part"),
+						 QStringLiteral("snippet,status,contentDetails")}}),
+				    body,
+				    [this, streamId, done](int, const QJsonObject &made, const QString &insertError) {
+					    const QString id = made.value(QStringLiteral("id")).toString();
+					    if (!insertError.isEmpty() || id.isEmpty()) {
+						    done(QString(), insertError.isEmpty()
+									    ? QStringLiteral("no broadcast id")
+									    : insertError);
+						    return;
+					    }
+					    api(ChatPlatform::YouTube, "POST",
+						youtubeUrl(
+							QStringLiteral("liveBroadcasts/bind"),
+							{{QStringLiteral("id"), id},
+							 {QStringLiteral("part"), QStringLiteral("id,contentDetails")},
+							 {QStringLiteral("streamId"), streamId}}),
+						QJsonObject(),
+						[id, done](int, const QJsonObject &, const QString &bindError) {
+							done(bindError.isEmpty() ? id : QString(), bindError);
+						});
+				    });
+			});
+	    });
 }
 
 void ChatAccounts::twitchViewers(const QString &channel, std::function<void(int)> done)
