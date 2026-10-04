@@ -24,26 +24,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-module.h>
 #include <plugin-support.h>
 
-#include <QApplication>
-#include <QClipboard>
-#include <QComboBox>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QFrame>
-#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QLabel>
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QPointer>
-#include <QPushButton>
 #include <QRegularExpression>
-#include <QScrollArea>
-#include <QScrollBar>
 #include <QUrl>
-#include <QVBoxLayout>
 
 #include <algorithm>
 #include <cmath>
@@ -51,7 +42,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace {
 
-constexpr const char *kDockId = "meketreve-now-playing";
 constexpr int kFrameMs = 33;
 constexpr int kMediaMs = 2000;
 constexpr qint64 kMaxArt = 10 * 1024 * 1024;
@@ -93,24 +83,9 @@ QByteArray imageType(const QByteArray &data)
 	return {};
 }
 
-/* Combo that lists the audio sources again every time it opens. */
-class SourceCombo : public QComboBox {
-public:
-	using QComboBox::QComboBox;
-	std::function<void()> beforePopup;
-
-protected:
-	void showPopup() override
-	{
-		if (beforePopup)
-			beforePopup();
-		QComboBox::showPopup();
-	}
-};
-
 } // namespace
 
-NowPlayingDock::NowPlayingDock(QWidget *parent) : QWidget(parent)
+NowPlayingDock::NowPlayingDock(QObject *parent) : QObject(parent)
 {
 	m_dir = moduleConfigDir();
 	loadSettings();
@@ -134,46 +109,8 @@ NowPlayingDock::NowPlayingDock(QWidget *parent) : QWidget(parent)
 	m_mediaTimer.setInterval(kMediaMs);
 	connect(&m_mediaTimer, &QTimer::timeout, this, &NowPlayingDock::pollMedia);
 
-	auto *layout = new QVBoxLayout(this);
-	layout->setContentsMargins(6, 6, 6, 6);
-	m_status = new QLabel(this);
-	m_status->setWordWrap(true);
-	m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
-	layout->addWidget(m_status);
-
-	auto *sourceRow = new QHBoxLayout();
-	sourceRow->addWidget(new QLabel(T("NowPlaying.AudioSource"), this));
-	auto *combo = new SourceCombo(this);
-	combo->beforePopup = [this]() {
-		refreshSources();
-	};
-	m_sources = combo;
-	m_sources->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-	m_sources->setMinimumContentsLength(12);
-	sourceRow->addWidget(m_sources, 1);
-	layout->addLayout(sourceRow);
-	refreshSources();
-	connect(m_sources, &QComboBox::activated, this,
-		[this](int index) { setSource(m_sources->itemData(index).toString()); });
-
-	auto *buttons = new QHBoxLayout();
-	auto *add = new QPushButton(T("NowPlaying.AddSource"), this);
-	connect(add, &QPushButton::clicked, this, &NowPlayingDock::addBrowserSource);
-	auto *copy = new QPushButton(T("NowPlaying.CopyUrl"), this);
-	connect(copy, &QPushButton::clicked, this, [this]() { QApplication::clipboard()->setText(overlayUrl()); });
-	buttons->addWidget(add);
-	buttons->addWidget(copy);
-	layout->addLayout(buttons);
-
-	auto *hint = new QLabel(T("NowPlaying.Hint"), this);
-	hint->setWordWrap(true);
-	hint->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
-	layout->addWidget(hint);
-	layout->addStretch(1);
-
 	if (!m_server->listen(m_port))
 		obs_log(LOG_WARNING, "[now-playing] port %d is in use, overlay not available", m_port);
-	refreshStatus();
 }
 
 NowPlayingDock::~NowPlayingDock()
@@ -220,16 +157,6 @@ QString NowPlayingDock::overlayUrl() const
 	return QStringLiteral("http://localhost:%1/tocando").arg(m_port);
 }
 
-void NowPlayingDock::refreshStatus()
-{
-	if (!m_server->isListening())
-		m_status->setText(QStringLiteral("<span style=\"color:#E03C3C\">%1</span>")
-					  .arg(T("NowPlaying.PortInUse").arg(m_port).toHtmlEscaped()));
-	else
-		m_status->setText(
-			T("NowPlaying.Status").arg(overlayUrl().toHtmlEscaped()).arg(m_server->clientCount()));
-}
-
 QStringList NowPlayingDock::audioSourceNames()
 {
 	QStringList names;
@@ -251,7 +178,6 @@ void NowPlayingDock::setSource(const QString &name)
 		return;
 	m_sourceName = name;
 	saveSettings();
-	refreshSources();
 	if (m_frameTimer.isActive()) {
 		stopCapture();
 		startCapture();
@@ -291,24 +217,6 @@ QJsonObject NowPlayingDock::applyPanel(const QJsonObject &panel)
 	return panelState();
 }
 
-void NowPlayingDock::refreshSources()
-{
-	m_sources->clear();
-	m_sources->addItem(T("NowPlaying.DesktopAudio"), QString());
-	const QStringList names = audioSourceNames();
-	for (const QString &name : names)
-		m_sources->addItem(name, name);
-	const int index = m_sources->findData(m_sourceName);
-	if (index >= 0) {
-		m_sources->setCurrentIndex(index);
-	} else if (!m_sourceName.isEmpty()) {
-		/* Kept even when the source is gone: it may come back with the
-		 * scene collection. */
-		m_sources->addItem(m_sourceName, m_sourceName);
-		m_sources->setCurrentIndex(m_sources->count() - 1);
-	}
-}
-
 void NowPlayingDock::onClients(int count)
 {
 	if (count > 0 && !m_frameTimer.isActive()) {
@@ -321,7 +229,6 @@ void NowPlayingDock::onClients(int count)
 		m_mediaTimer.stop();
 		stopCapture();
 	}
-	refreshStatus();
 }
 
 void NowPlayingDock::startCapture()
@@ -482,7 +389,8 @@ void NowPlayingDock::addBrowserSource()
 		obs_data_release(settings);
 	}
 	if (!source) {
-		QMessageBox::information(this, T("NowPlaying.Title"), T("NowPlaying.NoBrowser").arg(overlayUrl()));
+		QMessageBox::information(static_cast<QWidget *>(obs_frontend_get_main_window()), T("NowPlaying.Title"),
+					 T("NowPlaying.NoBrowser").arg(overlayUrl()));
 		return;
 	}
 	obs_source_t *sceneSource = obs_frontend_get_current_scene();
@@ -495,22 +403,17 @@ void NowPlayingDock::addBrowserSource()
 
 void now_playing_register(void)
 {
+	/* No panel of its own: a section in the Overlays panel and a tab in the
+	 * web panel. Its own server keeps the 30 fps bars off the other
+	 * overlays. */
 	auto *main = static_cast<QMainWindow *>(obs_frontend_get_main_window());
-	auto *dock = new NowPlayingDock(main);
-	auto *scroll = new QScrollArea(main);
-	scroll->setWidget(dock);
-	scroll->setWidgetResizable(true);
-	scroll->setFrameShape(QFrame::NoFrame);
-	scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	scroll->setMinimumWidth(dock->minimumSizeHint().width() + scroll->verticalScrollBar()->sizeHint().width());
-	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("NowPlaying.Title"), scroll)) {
-		obs_log(LOG_WARNING, "[now-playing] could not add dock");
-		delete scroll;
-		return;
-	}
-	/* Its own server keeps the 30 fps bars off the other overlays; the
-	 * settings still live in the shared web panel. */
-	QPointer<NowPlayingDock> self(dock);
+	QPointer<NowPlayingDock> self(new NowPlayingDock(main));
+	overlaysAddSection({T("NowPlaying.Title"), T("NowPlaying.Help"),
+			    [self]() { return self ? self->overlayUrl() : QString(); },
+			    [self]() {
+				    if (self)
+					    self->addBrowserSource();
+			    }});
 	overlaysAddPanelTab(QStringLiteral("tocando"), {[self]() { return self ? self->panelState() : QJsonObject(); },
 							[self](const QJsonObject &panel) {
 								return self ? self->applyPanel(panel) : QJsonObject();

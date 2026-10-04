@@ -27,21 +27,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QThreadPool>
 #include <QTimer>
-#include <QWidget>
+#include <QObject>
 
 #include <memory>
-
-class QComboBox;
-class QLabel;
 
 /* "Now playing" overlay: the bars of an OBS audio source plus the song the
  * computer is playing, on a Browser Source served at localhost:8903. The
  * audio is only captured while a page is connected. */
-class NowPlayingDock : public QWidget {
+class NowPlayingDock : public QObject {
 	Q_OBJECT
 
 public:
-	explicit NowPlayingDock(QWidget *parent = nullptr);
+	explicit NowPlayingDock(QObject *parent = nullptr);
 	~NowPlayingDock() override;
 
 	/* The web panel's tab: the audio sources to pick from, the look and the
@@ -49,13 +46,12 @@ public:
 	 * new state. */
 	QJsonObject panelState();
 	QJsonObject applyPanel(const QJsonObject &panel);
+	QString overlayUrl() const;
+	void addBrowserSource();
 
 private:
 	void loadSettings();
 	void saveSettings();
-	QString overlayUrl() const;
-	void refreshStatus();
-	void refreshSources();
 	static QStringList audioSourceNames();
 	void setSource(const QString &name);
 	void onClients(int count);
@@ -66,7 +62,6 @@ private:
 	void onMedia(const MediaInfo &media);
 	QJsonObject mediaMessage() const;
 	bool route(const OverlayServer::Request &request, OverlayServer::Reply &reply);
-	void addBrowserSource();
 
 	static void audioCallback(void *param, obs_source_t *source, const struct audio_data *audio, bool muted);
 
@@ -89,7 +84,4 @@ private:
 	bool m_mediaBusy = false;
 	MediaInfo m_media;
 	QString m_artFile;
-
-	QLabel *m_status = nullptr;
-	QComboBox *m_sources = nullptr;
 };
