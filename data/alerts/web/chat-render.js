@@ -140,8 +140,47 @@ const ChatRender = (() => {
     setTimeout(() => node.remove(), 400);
   }
 
+  // A sub, raid, Super Chat... as a marked line among the messages.
+  const EVENT_MARKS = { follow: "♥", sub: "★", resub: "★", giftsub: "✚", donation: "$", raid: "⚑", membership: "★",
+    gift: "✚" };
+
+  function eventLine(config, ev) {
+    const node = document.createElement("div");
+    node.className = "cr-line cr-event" + (config.animation !== "none" ? " cr-in-" + config.animation : "");
+    node.style.setProperty("--cr-accent", config.eventColor || "#FFB300");
+    node.dataset.platform = ev.platform;
+    node.dataset.id = ev.id || "";
+    node.dataset.user = "";
+    const head = document.createElement("span");
+    head.className = "cr-head";
+    if (config.showPlatform && ICONS[ev.platform]) head.append(icon(ev.platform));
+    const mark = document.createElement("span");
+    mark.className = "cr-mark";
+    mark.textContent = EVENT_MARKS[ev.type] || "★";
+    head.append(mark);
+    node.append(head);
+    const text = document.createElement("span");
+    text.className = "cr-event-text";
+    text.textContent = ev.text || "";
+    node.append(text);
+    if (ev.message) {
+      const said = document.createElement("div");
+      said.className = "cr-event-message";
+      said.textContent = ev.message;
+      node.append(said);
+    }
+    return node;
+  }
+
+  function addEvent(box, config, ev) {
+    return place(box, config, eventLine(config, ev));
+  }
+
   function add(box, config, msg) {
-    const node = line(config, msg);
+    return place(box, config, line(config, msg));
+  }
+
+  function place(box, config, node) {
     if (config.newest === "top") box.prepend(node);
     else box.append(node);
     const lines = [...box.querySelectorAll(".cr-line:not(.cr-out)")];
@@ -164,5 +203,5 @@ const ChatRender = (() => {
     }
   }
 
-  return { apply, add, remove, icon, loadFont };
+  return { apply, add, addEvent, remove, icon, loadFont };
 })();

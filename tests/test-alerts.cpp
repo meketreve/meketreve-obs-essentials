@@ -336,6 +336,30 @@ private slots:
 		QVERIFY(!ChatOverlay::passes(config, chat(ChatPlatform::Kick, ChatEvent::None)));
 	}
 
+	void chatOverlayEvents()
+	{
+		/* Bits come in as a chat line already; everything starts off. */
+		QVERIFY(!ChatOverlay::eventTypes().contains(key("bits")));
+		QVERIFY(ChatOverlay::eventTypes().contains(key("raid")));
+		QJsonObject config = ChatOverlay::defaults();
+		for (const QString &type : ChatOverlay::eventTypes())
+			QVERIFY(!config.value(key("events")).toObject().value(type).toBool());
+
+		const Event raid = fromChat(chat(ChatPlatform::Twitch, ChatEvent::Raid, 42));
+		QCOMPARE(raid.type, key("raid"));
+		QVERIFY(!ChatOverlay::passesEvent(config, raid));
+		config = ChatOverlay::normalize(
+			QJsonObject{{key("events"), QJsonObject{{key("raid"), true}, {key("bits"), true}}}});
+		QVERIFY(ChatOverlay::passesEvent(config, raid));
+		QVERIFY(!config.value(key("events")).toObject().contains(key("bits")));
+		QVERIFY(!ChatOverlay::passesEvent(config, fromChat(chat(ChatPlatform::Twitch, ChatEvent::Bits, 500))));
+
+		const QJsonObject j = ChatOverlay::eventToJson(raid, key("Fulano fez raid com 42"), key("e1"));
+		QCOMPARE(j.value(key("platform")).toString(), key("twitch"));
+		QCOMPARE(j.value(key("type")).toString(), key("raid"));
+		QCOMPARE(j.value(key("text")).toString(), key("Fulano fez raid com 42"));
+	}
+
 	void chatOverlayJson()
 	{
 		ChatMessage msg =

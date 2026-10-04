@@ -28,6 +28,8 @@ function connect() {
       ChatRender.apply(box, config);
     } else if (msg.type === "chat" && config && shows(msg.message.platform)) {
       ChatRender.add(box, config, msg.message);
+    } else if (msg.type === "chat-event" && config && shows(msg.event.platform)) {
+      ChatRender.addEvent(box, config, msg.event);
     } else if (msg.type === "chat-remove") {
       ChatRender.remove(box, msg);
     }

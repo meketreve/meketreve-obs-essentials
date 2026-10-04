@@ -31,6 +31,10 @@
 .cr-name { font-weight: 700; }
 .cr-name::after { content: ":"; color: var(--cr-text, #fff); font-weight: 400; }
 .cr-highlight { margin-right: 0.35em; color: #ffb300; font-weight: 700; }
+.cr-event { border-left: 0.22em solid var(--cr-accent, #ffb300); }
+.cr-mark { margin-right: 0.3em; color: var(--cr-accent, #ffb300); font-weight: 700; }
+.cr-event-text { font-weight: 700; }
+.cr-event-message { margin-top: 0.15em; opacity: 0.9; font-style: italic; }
 .cr-emote { height: 1.5em; vertical-align: middle; margin: -0.3em 0.05em; }
 
 .cr-in-slide { animation: cr-slide 0.3s ease-out; }

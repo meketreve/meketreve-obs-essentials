@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include "alert-logic.hpp"
 #include "../unified-chat/chat-connector.hpp"
 
 #include <QJsonArray>
@@ -42,6 +43,14 @@ bool passes(const QJsonObject &config, const ChatMessage &msg);
 
 /* What the page gets: emote positions are UTF-16 like JavaScript strings. */
 QJsonObject toJson(const ChatMessage &msg);
+
+/* Alert types that can also show up as a line among the messages, all off
+ * by default (the alerts already show them). Bits are left out: their
+ * message already comes in as a chat line marked "500 bits". */
+QStringList eventTypes();
+bool passesEvent(const QJsonObject &config, const Alerts::Event &event);
+/* The line's data: the Activity panel's text and what the person typed. */
+QJsonObject eventToJson(const Alerts::Event &event, const QString &description, const QString &id);
 
 /* Made-up lines for the editor's preview and the "test on stream" button. */
 QJsonArray samples();

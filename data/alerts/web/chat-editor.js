@@ -9,6 +9,8 @@ const FONTS = ["Poppins", "Montserrat", "Nunito", "Fredoka", "Rubik", "Inter", "
 let S = {};
 let config = null;
 let samples = [];
+let eventSamples = [];
+const EVENT_TYPES = ["follow", "sub", "resub", "giftsub", "donation", "raid", "membership", "gift"];
 
 // ---- helpers ----
 function t(key, ...args) {
@@ -75,25 +77,41 @@ async function save() {
 const pbox = document.getElementById("pbox");
 let nextSample = 0;
 
+// Messages, with the events that are turned on mixed in after every other one.
+function previewItems() {
+  const msgs = samples.filter((m) => config.platforms[m.platform]).map((m) => ({ kind: "msg", data: m }));
+  const evs = eventSamples.filter((e) => config.platforms[e.platform] && config.events[e.type]).map((e) => ({ kind: "event", data: e }));
+  const out = [];
+  for (let i = 0; i < Math.max(msgs.length, evs.length * 2); i++) {
+    if (msgs.length) out.push(msgs[i % msgs.length]);
+    if (i % 2 === 1 && evs.length) out.push(evs[((i - 1) / 2) % evs.length]);
+  }
+  return out;
+}
+
+function show(item, cfg) {
+  if (item.kind === "event") ChatRender.addEvent(pbox, cfg, item.data);
+  else ChatRender.add(pbox, cfg, item.data);
+}
+
 function restyle() {
   ChatRender.apply(pbox, config);
   pbox.replaceChildren();
-  const shown = samples.filter((m) => config.platforms[m.platform]);
-  for (const m of shown.slice(-config.maxMessages)) ChatRender.add(pbox, { ...config, animation: "none", fadeAfter: 0 }, m);
+  for (const item of previewItems().slice(-config.maxMessages)) show(item, { ...config, animation: "none", fadeAfter: 0 });
 }
 
 function tick() {
-  const shown = samples.filter((m) => config.platforms[m.platform]);
-  if (shown.length) {
-    const m = shown[nextSample++ % shown.length];
-    ChatRender.add(pbox, config, { ...m, id: "p" + Date.now() });
+  const items = previewItems();
+  if (items.length) {
+    const item = items[nextSample++ % items.length];
+    show({ ...item, data: { ...item.data, id: "p" + Date.now() } }, config);
   }
 }
 
-async function testLive() {
+async function testLive(kind) {
   const hint = document.getElementById("liveHint");
   try {
-    const r = await api("/api/chat-test", { method: "POST" });
+    const r = await api("/api/chat-test" + (kind ? "?kind=" + kind : ""), { method: "POST" });
     hint.textContent = r.overlays > 0 ? t("SentLive", r.overlays) : t("NoOverlay");
   } catch (e) {
     hint.textContent = e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message);
@@ -158,6 +176,19 @@ function copyCtl(getUrl) {
 }
 
 // ---- form ----
+function eventsCard() {
+  const card = el("section", { class: "card" }, el("h3", { text: t("Events") }),
+    el("p", { class: "hint", text: t("EventsNote") }));
+  for (const type of EVENT_TYPES) {
+    card.append(row(S["Alerts.Type." + type] || type, switchCtl(config.events[type], (v) => { config.events[type] = v; changed(); })));
+  }
+  card.append(row(t("EventColor"), colorCtl(config.eventColor, (v) => { config.eventColor = v; changed(); })));
+  const test = el("button", { type: "button", class: "btn small", text: t("TestEvent") });
+  test.addEventListener("click", () => testLive("event"));
+  card.append(row("", test));
+  return card;
+}
+
 function onlyUrl() {
   const on = PLATFORMS.filter(([p]) => config.platforms[p]).map(([p]) => p);
   return location.origin + "/chat?p=" + on.join(",");
@@ -205,6 +236,7 @@ function renderForm() {
       row(t("Shadow"), switchCtl(config.shadow, (v) => { config.shadow = v; changed(); })),
       row(t("ShowPlatform"), switchCtl(config.showPlatform, (v) => { config.showPlatform = v; changed(); })),
       row(t("ShowBadges"), switchCtl(config.showBadges, (v) => { config.showBadges = v; changed(); }))),
+    eventsCard(),
     el("section", { class: "card" }, el("h3", { text: t("Behavior") }),
       row(t("Newest"), segCtl([["bottom", t("NewestBottom")], ["top", t("NewestTop")]], config.newest, (v) => { config.newest = v; changed(); })),
       row(t("Animation"), segCtl([["slide", t("AnimSlide")], ["fade", t("AnimFade")], ["none", t("AnimNone")]], config.animation, (v) => { config.animation = v; changed(); })),
@@ -229,14 +261,16 @@ async function init() {
   }
   try {
     config = await api("/api/chat-config");
-    samples = (await api("/api/chat-sample")).messages || [];
+    const sample = await api("/api/chat-sample");
+    samples = sample.messages || [];
+    eventSamples = sample.events || [];
   } catch (e) {
     fatal(e.message === "forbidden" ? t("BadToken") : t("LoadFailed", e.message));
     return;
   }
   document.body.append(el("datalist", { id: "fonts" }, FONTS.map((f) => el("option", { value: f }))));
   document.getElementById("app").hidden = false;
-  document.getElementById("liveBtn").addEventListener("click", testLive);
+  document.getElementById("liveBtn").addEventListener("click", () => testLive());
   // The preview is the 480×720 source "Add to scene" creates, scaled down.
   const frame = document.getElementById("frame");
   new ResizeObserver(() => { pbox.style.transform = `scale(${frame.clientWidth / 480})`; }).observe(frame);

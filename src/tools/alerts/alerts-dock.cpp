@@ -142,6 +142,7 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	connect(m_server, &OverlayServer::clientsChanged, this, &AlertsDock::refreshStatus);
 	connect(m_chat, &UnifiedChatDock::incoming, this, &AlertsDock::onChat);
 	connect(m_chat, &UnifiedChatDock::shown, this, &AlertsDock::onShown);
+	connect(m_chat, &UnifiedChatDock::activity, this, &AlertsDock::onActivity);
 	connect(m_chat, &UnifiedChatDock::removed, this, &AlertsDock::onRemoved);
 
 	auto *layout = new QVBoxLayout(this);
@@ -335,6 +336,45 @@ void AlertsDock::onShown(const ChatMessage &msg)
 					{QStringLiteral("message"), ChatOverlay::toJson(msg)}});
 }
 
+void AlertsDock::onActivity(const ChatMessage &msg, const QString &description)
+{
+	if (!m_enabled)
+		return;
+	const Alerts::Event event = Alerts::fromChat(msg);
+	if (event.type.isEmpty() || m_chatDedup.swallow(event, QDateTime::currentMSecsSinceEpoch()) ||
+	    !ChatOverlay::passesEvent(m_chatConfig, event))
+		return;
+	m_server->broadcast(
+		QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-event")},
+			    {QStringLiteral("event"), ChatOverlay::eventToJson(event, description, msg.id)}});
+}
+
+QJsonArray AlertsDock::chatEventSamples() const
+{
+	const auto make = [](ChatPlatform platform, ChatEvent kind, const char *who, int amount, const char *detail,
+			     const char *text) {
+		ChatMessage m{platform, QString::fromUtf8(who), QString(), QString::fromUtf8(text), QString()};
+		m.event = kind;
+		m.amount = amount;
+		m.detail = QString::fromUtf8(detail);
+		return m;
+	};
+	QJsonArray out;
+	for (const ChatMessage &m :
+	     {make(ChatPlatform::Twitch, ChatEvent::Sub, "Texuguito", 3, "1000", "três meses!"),
+	      make(ChatPlatform::Kick, ChatEvent::GiftSub, "Generoso", 5, "", ""),
+	      make(ChatPlatform::Twitch, ChatEvent::Raid, "Vizinha", 42, "", ""),
+	      make(ChatPlatform::YouTube, ChatEvent::Donation, "@Fulana", 0, "R$ 10,00", "valeu pela live!"),
+	      make(ChatPlatform::YouTube, ChatEvent::Membership, "@Ciclano", 1, "", ""),
+	      make(ChatPlatform::Twitch, ChatEvent::Follow, "novato", 0, "", "")}) {
+		const Alerts::Event event = Alerts::fromChat(m);
+		if (!event.type.isEmpty())
+			out.append(ChatOverlay::eventToJson(event, UnifiedChatDock::describeEvent(m),
+							    QStringLiteral("sample-") + event.type));
+	}
+	return out;
+}
+
 void AlertsDock::onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId, bool all)
 {
 	if (!m_enabled)
@@ -521,16 +561,20 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		importChatConfig(doc.object());
 		jsonReply(reply, 200, m_chatConfig);
 	} else if (get && path == QLatin1String("/api/chat-sample")) {
-		jsonReply(reply, 200, QJsonObject{{QStringLiteral("messages"), ChatOverlay::samples()}});
+		jsonReply(reply, 200,
+			  QJsonObject{{QStringLiteral("messages"), ChatOverlay::samples()},
+				      {QStringLiteral("events"), chatEventSamples()}});
 	} else if (post && path == QLatin1String("/api/chat-test")) {
-		/* One made-up line, past the filters: the page still picks platforms. */
-		const QJsonArray samples = ChatOverlay::samples();
-		QJsonObject message =
+		/* One made-up line (or event), past the filters: the page still
+		 * picks the platforms. */
+		const bool event = query.queryItemValue(QStringLiteral("kind")) == QLatin1String("event");
+		const QJsonArray samples = event ? chatEventSamples() : ChatOverlay::samples();
+		QJsonObject item =
 			samples.at(QRandomGenerator::global()->bounded(static_cast<int>(samples.size()))).toObject();
-		message.insert(QStringLiteral("id"),
-			       QStringLiteral("test-%1").arg(QDateTime::currentMSecsSinceEpoch()));
-		m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat")},
-						{QStringLiteral("message"), message}});
+		item.insert(QStringLiteral("id"), QStringLiteral("test-%1").arg(QDateTime::currentMSecsSinceEpoch()));
+		m_server->broadcast(QJsonObject{{QStringLiteral("type"),
+						 event ? QStringLiteral("chat-event") : QStringLiteral("chat")},
+						{event ? QStringLiteral("event") : QStringLiteral("message"), item}});
 		jsonReply(reply, 200, QJsonObject{{QStringLiteral("overlays"), m_server->clientCount()}});
 	} else if (get && path == QLatin1String("/api/sample")) {
 		/* The editor's preview uses the same made-up events. */

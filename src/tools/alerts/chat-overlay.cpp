@@ -84,6 +84,13 @@ QString platformKey(ChatPlatform platform)
 	return QString();
 }
 
+QStringList eventTypes()
+{
+	QStringList out = Alerts::types();
+	out.removeAll(QStringLiteral("bits"));
+	return out;
+}
+
 QJsonObject defaults()
 {
 	return normalize(QJsonObject());
@@ -97,6 +104,10 @@ QJsonObject normalize(const QJsonObject &stored)
 		const QJsonValue v = inPlatforms.value(p);
 		outPlatforms.insert(p, v.isBool() ? v.toBool() : true);
 	}
+	const QJsonObject inEvents = stored.value(QStringLiteral("events")).toObject();
+	QJsonObject outEvents;
+	for (const QString &type : eventTypes())
+		outEvents.insert(type, inEvents.value(type).toBool(false));
 	const QString font = stored.value(QStringLiteral("font")).toString().trimmed().left(60);
 	const QJsonValue hidden = stored.value(QStringLiteral("hideUsers"));
 	return QJsonObject{
@@ -118,6 +129,8 @@ QJsonObject normalize(const QJsonObject &stored)
 			{QStringLiteral("slide"), QStringLiteral("fade"), QStringLiteral("none")})},
 		{QStringLiteral("maxMessages"), number(stored, "maxMessages", 15, 1, 50)},
 		{QStringLiteral("fadeAfter"), number(stored, "fadeAfter", 0, 0, 600)},
+		{QStringLiteral("events"), outEvents},
+		{QStringLiteral("eventColor"), color(stored, "eventColor", QStringLiteral("#FFB300"))},
 	};
 }
 
@@ -163,6 +176,21 @@ QJsonObject toJson(const ChatMessage &msg)
 			   {QStringLiteral("sub"), msg.isSub},
 			   {QStringLiteral("broadcaster"), msg.isBroadcaster},
 			   {QStringLiteral("emotes"), emotes}};
+}
+
+bool passesEvent(const QJsonObject &config, const Alerts::Event &event)
+{
+	return eventTypes().contains(event.type) &&
+	       config.value(QStringLiteral("events")).toObject().value(event.type).toBool();
+}
+
+QJsonObject eventToJson(const Alerts::Event &event, const QString &description, const QString &id)
+{
+	return QJsonObject{{QStringLiteral("id"), id},
+			   {QStringLiteral("platform"), event.platform},
+			   {QStringLiteral("type"), event.type},
+			   {QStringLiteral("text"), description},
+			   {QStringLiteral("message"), event.message}};
 }
 
 QJsonArray samples()

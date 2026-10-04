@@ -53,6 +53,9 @@ private:
 	void saveConfig();
 	void saveChatConfig();
 	void onShown(const ChatMessage &msg);
+	void onActivity(const ChatMessage &msg, const QString &description);
+	/* One made-up event of each kind, as the chat on screen shows them. */
+	QJsonArray chatEventSamples() const;
 	void onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId, bool all);
 	void applyEnabled();
 	void refreshStatus();
@@ -79,6 +82,7 @@ private:
 	quint16 m_port = 8902;
 	bool m_enabled = true;
 	Alerts::GiftDedup m_dedup;
+	Alerts::GiftDedup m_chatDedup;
 	QHash<QString, QByteArray> m_tts;
 	QStringList m_ttsOrder;
 	int m_ttsSerial = 0;
