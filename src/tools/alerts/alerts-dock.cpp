@@ -335,14 +335,15 @@ void AlertsDock::onShown(const ChatMessage &msg)
 					{QStringLiteral("message"), ChatOverlay::toJson(msg)}});
 }
 
-void AlertsDock::onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId)
+void AlertsDock::onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId, bool all)
 {
 	if (!m_enabled)
 		return;
 	m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-remove")},
 					{QStringLiteral("platform"), ChatOverlay::platformKey(platform)},
 					{QStringLiteral("id"), messageId},
-					{QStringLiteral("user"), userId}});
+					{QStringLiteral("user"), userId},
+					{QStringLiteral("all"), all}});
 }
 
 void AlertsDock::saveConfig()

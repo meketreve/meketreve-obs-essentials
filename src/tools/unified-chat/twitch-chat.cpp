@@ -165,6 +165,15 @@ void TwitchChat::handleLine(const QByteArray &line)
 		emitFull(msg);
 	} else if (command == "USERNOTICE") {
 		handleUserNotice(irc);
+	} else if (command == "CLEARMSG") {
+		emitRemoval(irc.tag("target-msg-id"), QString());
+	} else if (command == "CLEARCHAT") {
+		/* A user after the channel: timeout or ban; none: the chat was cleared. */
+		const QString user = irc.tag("target-user-id");
+		if (user.isEmpty())
+			emitRemoval(QString(), QString(), true);
+		else
+			emitRemoval(QString(), user);
 	}
 }
 

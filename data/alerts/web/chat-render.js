@@ -155,11 +155,12 @@ const ChatRender = (() => {
     return node;
   }
 
-  // A deleted message (id) or everything from a timed out or banned user.
-  function remove(box, { platform, id, user }) {
+  // A deleted message (id), everything from a timed out or banned user, or
+  // the whole chat of a platform when its moderators clear it (all).
+  function remove(box, { platform, id, user, all }) {
     for (const node of box.querySelectorAll(".cr-line")) {
       if (node.dataset.platform !== platform) continue;
-      if ((id && node.dataset.id === id) || (user && node.dataset.user === user)) node.remove();
+      if (all || (id && node.dataset.id === id) || (user && node.dataset.user === user)) node.remove();
     }
   }
 

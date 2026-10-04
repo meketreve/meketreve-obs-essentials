@@ -227,6 +227,17 @@ void KickChat::handleEvent(const QByteArray &data)
 			chat.isSub |= type == QLatin1String("subscriber") || type == QLatin1String("founder");
 		}
 		emitFull(chat);
+	} else if (event == QLatin1String("App\\Events\\MessageDeletedEvent")) {
+		emitRemoval(payload.value(QStringLiteral("message")).toObject().value(QStringLiteral("id")).toString(),
+			    QString());
+	} else if (event == QLatin1String("App\\Events\\UserBannedEvent")) {
+		/* Timeouts come the same way, only not "permanent". */
+		const qint64 user =
+			payload.value(QStringLiteral("user")).toObject().value(QStringLiteral("id")).toInteger();
+		if (user > 0)
+			emitRemoval(QString(), QString::number(user));
+	} else if (event == QLatin1String("App\\Events\\ChatroomClearEvent")) {
+		emitRemoval(QString(), QString(), true);
 	} else if (event == QLatin1String("App\\Events\\SubscriptionEvent")) {
 		emitEvent(ChatEvent::Sub, str("username"), std::max(1, num("months")));
 	} else if (event == QLatin1String("App\\Events\\GiftedSubscriptionsEvent")) {

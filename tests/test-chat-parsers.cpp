@@ -497,6 +497,73 @@ private slots:
 			 QStringLiteral("public"));
 	}
 
+	void removalsFromPlatforms()
+	{
+		QList<ChatRemoval> got;
+		const auto collect = [&got](ChatConnector &c) {
+			QObject::connect(&c, &ChatConnector::removalReceived,
+					 [&got](const ChatRemoval &r) { got.append(r); });
+		};
+
+		TwitchChat twitch(nullptr, nullptr);
+		collect(twitch);
+		twitch.handleLine("@login=troll;room-id=1;target-msg-id=abc-123;tmi-sent-ts=1 "
+				  ":tmi.twitch.tv CLEARMSG #xqc :bad words");
+		twitch.handleLine("@ban-duration=600;room-id=1;target-user-id=777;tmi-sent-ts=1 "
+				  ":tmi.twitch.tv CLEARCHAT #xqc :troll");
+		twitch.handleLine("@room-id=1;tmi-sent-ts=1 :tmi.twitch.tv CLEARCHAT #xqc");
+		QCOMPARE(got.size(), 3);
+		QCOMPARE(got[0].platform, ChatPlatform::Twitch);
+		QCOMPARE(got[0].messageId, QStringLiteral("abc-123"));
+		QCOMPARE(got[1].userId, QStringLiteral("777"));
+		QVERIFY(!got[1].all);
+		QVERIFY(got[2].all);
+
+		got.clear();
+		KickChat kick(nullptr, nullptr);
+		collect(kick);
+		const auto frame = [](const char *event, const QJsonObject &data) {
+			return QJsonDocument(QJsonObject{{QStringLiteral("event"), QString::fromLatin1(event)},
+							 {QStringLiteral("data"),
+							  QString::fromUtf8(
+								  QJsonDocument(data).toJson(QJsonDocument::Compact))}})
+				.toJson(QJsonDocument::Compact);
+		};
+		kick.handleEvent(frame("App\\Events\\MessageDeletedEvent",
+				       QJsonObject{{QStringLiteral("id"), QStringLiteral("x")},
+						   {QStringLiteral("message"),
+						    QJsonObject{{QStringLiteral("id"), QStringLiteral("m-9")}}}}));
+		kick.handleEvent(
+			frame("App\\Events\\UserBannedEvent",
+			      QJsonObject{{QStringLiteral("user"),
+					   QJsonObject{{QStringLiteral("id"), 57934691},
+						       {QStringLiteral("username"), QStringLiteral("FArg2019")}}},
+					  {QStringLiteral("permanent"), true}}));
+		kick.handleEvent(frame("App\\Events\\ChatroomClearEvent",
+				       QJsonObject{{QStringLiteral("id"), QStringLiteral("c")}}));
+		QCOMPARE(got.size(), 3);
+		QCOMPARE(got[0].platform, ChatPlatform::Kick);
+		QCOMPARE(got[0].messageId, QStringLiteral("m-9"));
+		QCOMPARE(got[1].userId, QStringLiteral("57934691"));
+		QVERIFY(got[2].all);
+
+		got.clear();
+		YouTubeChat youtube(nullptr, nullptr);
+		collect(youtube);
+		const auto action = [](const char *name, const char *key, const char *value) {
+			return QJsonObject{{QString::fromLatin1(name),
+					    QJsonObject{{QString::fromLatin1(key), QString::fromLatin1(value)}}}};
+		};
+		youtube.handleAction(action("markChatItemAsDeletedAction", "targetItemId", "LCC.1"));
+		youtube.handleAction(action("removeChatItemAction", "targetItemId", "LCC.2"));
+		youtube.handleAction(action("markChatItemsByAuthorAsDeletedAction", "externalChannelId", "UCbad"));
+		youtube.handleAction(action("removeChatItemByAuthorAction", "externalChannelId", "UCbad2"));
+		QCOMPARE(got.size(), 4);
+		QCOMPARE(got[0].platform, ChatPlatform::YouTube);
+		QCOMPARE(got[1].messageId, QStringLiteral("LCC.2"));
+		QCOMPARE(got[3].userId, QStringLiteral("UCbad2"));
+	}
+
 	void pkceMatchesRfc7636()
 	{
 		/* RFC 7636 appendix B. */

@@ -56,6 +56,15 @@ struct ChatMessage {
 	QString channelId;       /* Twitch room id (for BTTV/7TV channel emotes) */
 };
 
+/* Something taken off the chat on the platform: one message, everything a
+ * user said (timeout or ban) or, with all, the whole chat. */
+struct ChatRemoval {
+	ChatPlatform platform = ChatPlatform::Twitch;
+	QString messageId;
+	QString userId;
+	bool all = false;
+};
+
 enum class ConnectorState { Idle, Connecting, Connected, Offline, Error };
 
 extern const char *const kBrowserUserAgent;
@@ -78,6 +87,7 @@ signals:
 	void messageReceived(const ChatMessage &msg);
 	void stateChanged(ConnectorState state, const QString &detail);
 	void viewersChanged(int viewers);
+	void removalReceived(const ChatRemoval &removal);
 
 protected:
 	virtual void connectNow() = 0;
@@ -93,6 +103,7 @@ protected:
 	void emitEvent(ChatEvent event, const QString &author, int amount = 0, const QString &detail = QString(),
 		       const QString &text = QString());
 	void emitFull(ChatMessage msg);
+	void emitRemoval(const QString &messageId, const QString &userId, bool all = false);
 	void scheduleRetry(int seconds);
 	void scheduleReconnect();
 	void markHealthy();

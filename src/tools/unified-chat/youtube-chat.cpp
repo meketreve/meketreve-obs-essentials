@@ -421,6 +421,22 @@ void YouTubeChat::onPoll(QNetworkReply *reply)
 
 void YouTubeChat::handleAction(const QJsonObject &action)
 {
+	/* Moderators deleting a message, or everything from a user they hid,
+	 * timed out or banned. */
+	for (const char *key : {"markChatItemAsDeletedAction", "removeChatItemAction"}) {
+		const QString id = path(action, {key, "targetItemId"}).toString();
+		if (!id.isEmpty()) {
+			emitRemoval(id, QString());
+			return;
+		}
+	}
+	for (const char *key : {"markChatItemsByAuthorAsDeletedAction", "removeChatItemByAuthorAction"}) {
+		const QString channel = path(action, {key, "externalChannelId"}).toString();
+		if (!channel.isEmpty()) {
+			emitRemoval(QString(), channel);
+			return;
+		}
+	}
 	const QJsonObject item = path(action, {"addChatItemAction", "item"}).toObject();
 	const auto author = [](const QJsonObject &r) {
 		return path(r, {"authorName", "simpleText"}).toString();

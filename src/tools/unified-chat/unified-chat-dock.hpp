@@ -71,6 +71,9 @@ public:
 
 	/* Entry point for every connector message (public for the harness). */
 	void appendMessage(const ChatMessage &msg);
+	/* Strikes the lines out here and tells the overlays (public for the
+	 * harness). */
+	void onRemoval(const ChatRemoval &removal);
 
 	/* Translated one-line summary of an event ("x gifted 5 subs"). */
 	static QString describeEvent(const ChatMessage &msg);
@@ -89,9 +92,10 @@ signals:
 	void incoming(const ChatMessage &msg);
 	/* A chat line as the dock shows it (BTTV/7TV emotes added). */
 	void shown(const ChatMessage &msg);
-	/* The streamer deleted a message (messageId) or timed out or banned a
-	 * user (userId) from the dock. */
-	void removed(ChatPlatform platform, const QString &messageId, const QString &userId);
+	/* A message (messageId), everything from a user (userId) or, with all,
+	 * the whole chat of a platform came off: moderated from the dock or on
+	 * the platform itself. */
+	void removed(ChatPlatform platform, const QString &messageId, const QString &userId, bool all);
 	/* The channels changed (Settings, import or setTarget). */
 	void targetsChanged();
 

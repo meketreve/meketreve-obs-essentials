@@ -109,6 +109,13 @@ void ChatConnector::emitFull(ChatMessage msg)
 	emit messageReceived(msg);
 }
 
+void ChatConnector::emitRemoval(const QString &messageId, const QString &userId, bool all)
+{
+	if (!all && messageId.isEmpty() && userId.isEmpty())
+		return;
+	emit removalReceived(ChatRemoval{m_platform, messageId, userId, all});
+}
+
 void ChatConnector::scheduleRetry(int seconds)
 {
 	if (!m_running)

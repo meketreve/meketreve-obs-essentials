@@ -48,7 +48,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QGroupBox>
 #include <QPushButton>
 #include <QDialog>
+#include <QColor>
 #include <QTextBlock>
+#include <QTextCursor>
+#include <QTextDocument>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -74,6 +77,9 @@ constexpr const char *kStreamInfoDockId = "meketreve-stream-info";
 constexpr const char *kConfigFile = "unified-chat.json";
 constexpr const char *kAccountsFile = "chat-accounts.json";
 constexpr int kRecentMessages = 500;
+/* On each chat line's block: "platform\nmessage id\nuser id", so a removal
+ * finds the lines it takes off. */
+constexpr int kLineProperty = QTextFormat::UserProperty + 1;
 constexpr int kMaxLines = 500;
 
 struct PlatformInfo {
@@ -261,6 +267,7 @@ UnifiedChatDock::UnifiedChatDock(QWidget *parent) : QWidget(parent)
 			[this, platform](ConnectorState state, const QString &detail) {
 				updateStatus(platform, state, detail);
 			});
+		connect(c, &ChatConnector::removalReceived, this, &UnifiedChatDock::onRemoval);
 		connect(c, &ChatConnector::viewersChanged, this, [this, platform](int) {
 			const size_t i = indexOf(platform);
 			updateStatus(platform, m_states[i], m_stateDetails[i]);
@@ -544,8 +551,34 @@ void UnifiedChatDock::appendMessage(const ChatMessage &incoming)
 					     chatHtml(msg.text, msg.emotes, m_view->emoteHeight()));
 
 	m_view->append(html);
+	QTextCursor line(m_view->document()->lastBlock());
+	QTextBlockFormat format = line.blockFormat();
+	format.setProperty(kLineProperty, QString::number(static_cast<int>(msg.platform)) + QLatin1Char('\n') + msg.id +
+						  QLatin1Char('\n') + msg.userId);
+	line.setBlockFormat(format);
 	if (atBottom)
 		scroll->setValue(scroll->maximum());
+}
+
+void UnifiedChatDock::onRemoval(const ChatRemoval &removal)
+{
+	const QString platform = QString::number(static_cast<int>(removal.platform));
+	QTextCharFormat struck;
+	struck.setFontStrikeOut(true);
+	struck.setForeground(QColor(Qt::gray));
+	for (QTextBlock block = m_view->document()->lastBlock(); block.isValid(); block = block.previous()) {
+		const QStringList key = block.blockFormat().property(kLineProperty).toString().split(QLatin1Char('\n'));
+		if (key.size() != 3 || key[0] != platform)
+			continue;
+		const bool hit = removal.all || (!removal.messageId.isEmpty() && key[1] == removal.messageId) ||
+				 (!removal.userId.isEmpty() && key[2] == removal.userId);
+		if (!hit)
+			continue;
+		QTextCursor cursor(block);
+		cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+		cursor.mergeCharFormat(struck);
+	}
+	emit removed(removal.platform, removal.messageId, removal.userId, removal.all);
 }
 
 void UnifiedChatDock::appendEventLine(const ChatMessage &msg, const QString &description)
@@ -698,24 +731,24 @@ void UnifiedChatDock::onAuthorClicked(const QUrl &url)
 	menu.addSection(msg.author);
 	menu.addAction(T("UnifiedChat.Timeout60"), this, [this, msg, channel]() {
 		m_accounts->timeoutUser(msg.platform, channel, msg.userId, 60);
-		emit removed(msg.platform, QString(), msg.userId);
+		onRemoval(ChatRemoval{msg.platform, QString(), msg.userId});
 	});
 	menu.addAction(T("UnifiedChat.Timeout600"), this, [this, msg, channel]() {
 		m_accounts->timeoutUser(msg.platform, channel, msg.userId, 600);
-		emit removed(msg.platform, QString(), msg.userId);
+		onRemoval(ChatRemoval{msg.platform, QString(), msg.userId});
 	});
 	menu.addAction(T("UnifiedChat.Ban"), this, [this, msg, channel]() {
 		if (QMessageBox::question(this, T("UnifiedChat.Ban"), T("UnifiedChat.BanConfirm").arg(msg.author)) ==
 		    QMessageBox::Yes) {
 			m_accounts->banUser(msg.platform, channel, msg.userId);
-			emit removed(msg.platform, QString(), msg.userId);
+			onRemoval(ChatRemoval{msg.platform, QString(), msg.userId});
 		}
 	});
 	menu.addAction(T("UnifiedChat.Unban"), this,
 		       [this, msg, channel]() { m_accounts->unbanUser(msg.platform, channel, msg.userId); });
 	QAction *del = menu.addAction(T("UnifiedChat.DeleteMessage"), this, [this, msg, channel]() {
 		m_accounts->deleteMessage(msg.platform, channel, msg.id);
-		emit removed(msg.platform, msg.id, QString());
+		onRemoval(ChatRemoval{msg.platform, msg.id, QString()});
 	});
 	del->setEnabled(!msg.id.isEmpty());
 	menu.exec(QCursor::pos());

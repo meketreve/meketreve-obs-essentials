@@ -53,7 +53,7 @@ private:
 	void saveConfig();
 	void saveChatConfig();
 	void onShown(const ChatMessage &msg);
-	void onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId);
+	void onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId, bool all);
 	void applyEnabled();
 	void refreshStatus();
 	void onChat(const ChatMessage &msg);

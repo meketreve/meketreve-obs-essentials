@@ -165,6 +165,28 @@ int main(int argc, char **argv)
 	if (args[1] == QLatin1String("chat")) {
 		chat = new UnifiedChatDock();
 		widget = chat;
+	} else if (args[1] == QLatin1String("removals")) {
+		/* Lines from three users, then a deleted message, a banned user and
+		 * a cleared Kick chat: only those come out struck. */
+		chat = new UnifiedChatDock();
+		widget = chat;
+		const auto say = [chat](ChatPlatform p, const char *who, const char *id, const char *user,
+					const char *text) {
+			ChatMessage m{p, QString::fromUtf8(who), QString(), QString::fromUtf8(text), QString()};
+			m.id = QString::fromLatin1(id);
+			m.userId = QString::fromLatin1(user);
+			chat->appendMessage(m);
+		};
+		say(ChatPlatform::Twitch, "ana", "t1", "1", "fica");
+		say(ChatPlatform::Twitch, "troll", "t2", "2", "apagada pelo mod");
+		say(ChatPlatform::YouTube, "@spammer", "y1", "UCspam", "spam 1 (banido)");
+		say(ChatPlatform::Twitch, "ana", "t3", "1", "fica também");
+		say(ChatPlatform::YouTube, "@spammer", "y2", "UCspam", "spam 2 (banido)");
+		say(ChatPlatform::Kick, "kicker", "k1", "9", "kick limpo");
+		say(ChatPlatform::YouTube, "@Fulana", "y3", "UCok", "fica");
+		chat->onRemoval(ChatRemoval{ChatPlatform::Twitch, QStringLiteral("t2"), QString()});
+		chat->onRemoval(ChatRemoval{ChatPlatform::YouTube, QString(), QStringLiteral("UCspam")});
+		chat->onRemoval(ChatRemoval{ChatPlatform::Kick, QString(), QString(), true});
 	} else if (args[1] == QLatin1String("activity")) {
 		/* Chat and Activity side by side, fed with one event of each kind. */
 		auto *box = new QWidget();
