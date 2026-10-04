@@ -26,6 +26,20 @@ button, input, select { font: inherit; color: inherit; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
 .logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), #ec4899); font-weight: 900; }
 .save { color: var(--muted); font-size: 13px; }
+.embed .top { justify-content: flex-end; padding: 6px 18px; }
+.embed .top .brand { display: none; }
+
+/* The web panel: one page, a tab per overlay, each editor in a frame. */
+.panel { display: flex; flex-direction: column; height: 100vh; }
+.panel .top { position: static; }
+.tabs-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs-bar button { padding: 7px 14px; border: 1px solid transparent; border-radius: 8px; background: none; cursor: pointer; color: var(--muted); }
+.tabs-bar button:hover { background: var(--panel); }
+.tabs-bar button.active { background: var(--panel-2); border-color: var(--line); color: var(--text); }
+.np-frame { width: 100%; aspect-ratio: 16 / 7; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);
+  background: repeating-conic-gradient(#2a2d38 0% 25%, #23252e 0% 50%) 0 0 / 24px 24px; }
+.np-frame iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+.panel iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
 .save.ok { color: var(--ok); }
 .save.bad { color: var(--bad); }
 .error { margin: 40px auto; max-width: 560px; padding: 20px; border: 1px solid var(--bad); border-radius: var(--radius); background: #2a1c1f; }

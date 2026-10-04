@@ -2,6 +2,9 @@
 // a token after "#"; every API call carries it.
 "use strict";
 
+// Inside the web panel (/painel) the panel draws the title and the tabs.
+if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");
+
 const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
 let S = {};
 let config = null;

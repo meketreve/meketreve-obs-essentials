@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "now-playing-dock.hpp"
 #include "now-playing.h"
+#include "../alerts/alerts-dock.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -38,6 +39,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QUrl>
@@ -151,17 +153,8 @@ NowPlayingDock::NowPlayingDock(QWidget *parent) : QWidget(parent)
 	sourceRow->addWidget(m_sources, 1);
 	layout->addLayout(sourceRow);
 	refreshSources();
-	connect(m_sources, &QComboBox::activated, this, [this](int index) {
-		const QString name = m_sources->itemData(index).toString();
-		if (name == m_sourceName)
-			return;
-		m_sourceName = name;
-		saveSettings();
-		if (m_frameTimer.isActive()) {
-			stopCapture();
-			startCapture();
-		}
-	});
+	connect(m_sources, &QComboBox::activated, this,
+		[this](int index) { setSource(m_sources->itemData(index).toString()); });
 
 	auto *buttons = new QHBoxLayout();
 	auto *add = new QPushButton(T("NowPlaying.AddSource"), this);
@@ -198,6 +191,13 @@ void NowPlayingDock::loadSettings()
 	obs_data_set_default_int(data, "port", 8903);
 	m_port = static_cast<quint16>(obs_data_get_int(data, "port"));
 	m_sourceName = QString::fromUtf8(obs_data_get_string(data, "source"));
+	obs_data_set_default_string(data, "color", "#3987E5");
+	obs_data_set_default_bool(data, "card", true);
+	obs_data_set_default_bool(data, "bars", true);
+	m_color = QString::fromUtf8(obs_data_get_string(data, "color"));
+	m_card = obs_data_get_bool(data, "card");
+	m_bars = obs_data_get_bool(data, "bars");
+	m_always = obs_data_get_bool(data, "always");
 	obs_data_release(data);
 }
 
@@ -206,6 +206,10 @@ void NowPlayingDock::saveSettings()
 	obs_data_t *data = obs_data_create();
 	obs_data_set_int(data, "port", m_port);
 	obs_data_set_string(data, "source", m_sourceName.toUtf8().constData());
+	obs_data_set_string(data, "color", m_color.toUtf8().constData());
+	obs_data_set_bool(data, "card", m_card);
+	obs_data_set_bool(data, "bars", m_bars);
+	obs_data_set_bool(data, "always", m_always);
 	const QString path = QDir(m_dir).filePath(QStringLiteral("settings.json"));
 	obs_data_save_json_safe(data, path.toUtf8().constData(), "tmp", "bak");
 	obs_data_release(data);
@@ -226,10 +230,8 @@ void NowPlayingDock::refreshStatus()
 			T("NowPlaying.Status").arg(overlayUrl().toHtmlEscaped()).arg(m_server->clientCount()));
 }
 
-void NowPlayingDock::refreshSources()
+QStringList NowPlayingDock::audioSourceNames()
 {
-	m_sources->clear();
-	m_sources->addItem(T("NowPlaying.DesktopAudio"), QString());
 	QStringList names;
 	obs_enum_sources(
 		[](void *param, obs_source_t *source) {
@@ -240,6 +242,60 @@ void NowPlayingDock::refreshSources()
 		},
 		&names);
 	names.sort(Qt::CaseInsensitive);
+	return names;
+}
+
+void NowPlayingDock::setSource(const QString &name)
+{
+	if (name == m_sourceName)
+		return;
+	m_sourceName = name;
+	saveSettings();
+	refreshSources();
+	if (m_frameTimer.isActive()) {
+		stopCapture();
+		startCapture();
+	}
+}
+
+QJsonObject NowPlayingDock::panelState()
+{
+	QJsonArray sources{QJsonObject{{QStringLiteral("name"), QString()},
+				       {QStringLiteral("label"), T("NowPlaying.DesktopAudio")}}};
+	QStringList names = audioSourceNames();
+	if (!m_sourceName.isEmpty() && !names.contains(m_sourceName))
+		names.append(m_sourceName);
+	for (const QString &name : names)
+		sources.append(QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("label"), name}});
+	return QJsonObject{
+		{QStringLiteral("url"), overlayUrl()},    {QStringLiteral("listening"), m_server->isListening()},
+		{QStringLiteral("source"), m_sourceName}, {QStringLiteral("sources"), sources},
+		{QStringLiteral("color"), m_color},       {QStringLiteral("card"), m_card},
+		{QStringLiteral("bars"), m_bars},         {QStringLiteral("always"), m_always}};
+}
+
+QJsonObject NowPlayingDock::applyPanel(const QJsonObject &panel)
+{
+	static const QRegularExpression hex(QStringLiteral("^#[0-9a-fA-F]{6}$"));
+	const QString color = panel.value(QStringLiteral("color")).toString();
+	if (hex.match(color).hasMatch())
+		m_color = color.toUpper();
+	m_card = panel.value(QStringLiteral("card")).toBool(m_card);
+	m_bars = panel.value(QStringLiteral("bars")).toBool(m_bars);
+	m_always = panel.value(QStringLiteral("always")).toBool(m_always);
+	saveSettings();
+	const QJsonValue source = panel.value(QStringLiteral("source"));
+	if (source.isString())
+		setSource(source.toString());
+	m_server->broadcast(mediaMessage());
+	return panelState();
+}
+
+void NowPlayingDock::refreshSources()
+{
+	m_sources->clear();
+	m_sources->addItem(T("NowPlaying.DesktopAudio"), QString());
+	const QStringList names = audioSourceNames();
 	for (const QString &name : names)
 		m_sources->addItem(name, name);
 	const int index = m_sources->findData(m_sourceName);
@@ -376,7 +432,11 @@ QJsonObject NowPlayingDock::mediaMessage() const
 	}
 	return QJsonObject{{QStringLiteral("type"), QStringLiteral("media")},
 			   {QStringLiteral("media"), media.isEmpty() ? QJsonValue() : QJsonValue(media)},
-			   {QStringLiteral("lang"), QString::fromLatin1(obs_get_locale())}};
+			   {QStringLiteral("lang"), QString::fromLatin1(obs_get_locale())},
+			   {QStringLiteral("look"), QJsonObject{{QStringLiteral("color"), m_color},
+								{QStringLiteral("card"), m_card},
+								{QStringLiteral("bars"), m_bars},
+								{QStringLiteral("always"), m_always}}}};
 }
 
 bool NowPlayingDock::route(const OverlayServer::Request &request, OverlayServer::Reply &reply)
@@ -446,5 +506,13 @@ void now_playing_register(void)
 	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("NowPlaying.Title"), scroll)) {
 		obs_log(LOG_WARNING, "[now-playing] could not add dock");
 		delete scroll;
+		return;
 	}
+	/* Its own server keeps the 30 fps bars off the other overlays; the
+	 * settings still live in the shared web panel. */
+	QPointer<NowPlayingDock> self(dock);
+	overlaysAddPanelTab(QStringLiteral("tocando"), {[self]() { return self ? self->panelState() : QJsonObject(); },
+							[self](const QJsonObject &panel) {
+								return self ? self->applyPanel(panel) : QJsonObject();
+							}});
 }

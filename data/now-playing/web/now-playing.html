@@ -60,11 +60,19 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const color = (params.get("color") || "").replace(/[^0-9a-fA-F]/g, "");
-if (color.length === 3 || color.length === 6) document.documentElement.style.setProperty("--accent", "#" + color);
-if (params.get("card") === "0") $("player").classList.add("no-card");
-if (params.get("bars") === "0") $("player").classList.add("no-bars");
-const ALWAYS = params.get("always") === "1";
+let ALWAYS = false;
+/* The look saved in the web panel; "?color=", "?card=0", "?bars=0" and
+ * "?always=1" in the link win, so one source can differ from the rest. */
+function applyLook(look) {
+  look = look || {};
+  const color = (params.get("color") || look.color || "").replace(/[^0-9a-fA-F]/g, "");
+  if (color.length === 3 || color.length === 6) document.documentElement.style.setProperty("--accent", "#" + color);
+  const off = (key) => (params.has(key) ? params.get(key) === "0" : look[key] === false);
+  $("player").classList.toggle("no-card", off("card"));
+  $("player").classList.toggle("no-bars", off("bars"));
+  ALWAYS = params.has("always") ? params.get("always") === "1" : !!look.always;
+}
+applyLook(null);
 
 const TEXT = {
   pt: { now: "Tocando agora", playing: "tocando", paused: "pausado", nothing: "Nada tocando", pc: "Som do PC", noInfo: "sem informação da música", untitled: "Sem título" },
@@ -176,6 +184,7 @@ function connect() {
       rmsDb = +msg.rms || -120; bandsAt = performance.now();
     } else if (msg.type === "media") {
       if (msg.lang) L = String(msg.lang).startsWith("pt") ? TEXT.pt : TEXT.en;
+      applyLook(msg.look);
       renderMedia(msg.media || null);
     }
   };

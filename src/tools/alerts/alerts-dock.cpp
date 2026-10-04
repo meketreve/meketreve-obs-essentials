@@ -112,8 +112,14 @@ void errorReply(OverlayServer::Reply &reply, int status, const QString &error)
 }
 
 QPointer<AlertsDock> g_dock;
+QHash<QString, PanelTab> g_panelTabs;
 
 } // namespace
+
+void overlaysAddPanelTab(const QString &name, PanelTab tab)
+{
+	g_panelTabs.insert(name, std::move(tab));
+}
 
 AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent), m_chat(chat)
 {
@@ -154,34 +160,51 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	layout->addWidget(m_status);
 
-	auto *row1 = new QHBoxLayout();
+	/* One web panel sets up every overlay; each overlay below only has its
+	 * own "Add to scene" and link. */
+	auto *top = new QHBoxLayout();
+	auto *panel = new QPushButton(T("Overlays.OpenPanel"), this);
+	connect(panel, &QPushButton::clicked, this, [this]() {
+		if (!m_server->isListening()) {
+			refreshStatus();
+			return;
+		}
+		QDesktopServices::openUrl(QUrl(panelUrl(QStringLiteral("alertas"))));
+	});
 	m_toggle = new QPushButton(this);
 	connect(m_toggle, &QPushButton::clicked, this, [this]() {
 		m_enabled = !m_enabled;
 		saveSettings();
 		applyEnabled();
 	});
-	auto *customize = new QPushButton(T("Alerts.Customize"), this);
-	connect(customize, &QPushButton::clicked, this, [this]() {
-		if (!m_server->isListening()) {
-			refreshStatus();
-			return;
-		}
-		QDesktopServices::openUrl(QUrl(editorUrl()));
-	});
-	auto *add = new QPushButton(T("Alerts.AddSource"), this);
-	connect(add, &QPushButton::clicked, this, [this]() {
-		obs_video_info ovi{};
-		obs_get_video_info(&ovi);
-		addBrowserSource(T("Alerts.SourceName"), overlayUrl(), static_cast<int>(ovi.base_width),
-				 static_cast<int>(ovi.base_height), true);
-	});
-	row1->addWidget(m_toggle);
-	row1->addWidget(customize);
-	row1->addWidget(add);
-	layout->addLayout(row1);
+	auto *settings = new QToolButton(this);
+	settings->setText(T("UnifiedChat.Settings"));
+	connect(settings, &QToolButton::clicked, this, &AlertsDock::openSettings);
+	top->addWidget(panel, 1);
+	top->addWidget(m_toggle);
+	top->addWidget(settings);
+	layout->addLayout(top);
 
-	auto *row2 = new QHBoxLayout();
+	const auto section = [this, layout](const char *titleKey, const char *helpKey, QHBoxLayout *buttons) {
+		auto *title = new QLabel(QStringLiteral("<b>%1</b>").arg(T(titleKey).toHtmlEscaped()), this);
+		layout->addSpacing(6);
+		layout->addWidget(title);
+		layout->addLayout(buttons);
+		auto *help = new QLabel(T(helpKey), this);
+		help->setWordWrap(true);
+		help->setStyleSheet(QStringLiteral("color: gray"));
+		layout->addWidget(help);
+	};
+	const auto sourceButtons = [this](QHBoxLayout *row, std::function<void()> add, std::function<QString()> url) {
+		auto *addButton = new QPushButton(T("Alerts.AddSource"), this);
+		connect(addButton, &QPushButton::clicked, this, add);
+		auto *copy = new QPushButton(T("Alerts.CopyUrl"), this);
+		connect(copy, &QPushButton::clicked, this, [url]() { QApplication::clipboard()->setText(url()); });
+		row->addWidget(addButton);
+		row->addWidget(copy);
+	};
+
+	auto *alertsRow = new QHBoxLayout();
 	auto *test = new QToolButton(this);
 	test->setText(T("Alerts.Test"));
 	test->setPopupMode(QToolButton::InstantPopup);
@@ -191,79 +214,35 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		menu->addAction(T(key.constData()), this, [this, type]() { fire(Alerts::sample(type, T)); });
 	}
 	test->setMenu(menu);
-	auto *skip = new QPushButton(T("Alerts.Skip"), this);
-	connect(skip, &QPushButton::clicked, this,
+	auto *skip = new QToolButton(this);
+	skip->setText(T("Alerts.Skip"));
+	connect(skip, &QToolButton::clicked, this,
 		[this]() { m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("skip")}}); });
-	auto *copy = new QPushButton(T("Alerts.CopyUrl"), this);
-	connect(copy, &QPushButton::clicked, this, [this]() { QApplication::clipboard()->setText(overlayUrl()); });
-	auto *settings = new QToolButton(this);
-	settings->setText(T("UnifiedChat.Settings"));
-	connect(settings, &QToolButton::clicked, this, &AlertsDock::openSettings);
-	row2->addWidget(test);
-	row2->addWidget(skip);
-	row2->addWidget(copy);
-	row2->addWidget(settings);
-	layout->addLayout(row2);
+	sourceButtons(
+		alertsRow,
+		[this]() {
+			obs_video_info ovi{};
+			obs_get_video_info(&ovi);
+			addBrowserSource(T("Alerts.SourceName"), overlayUrl(), static_cast<int>(ovi.base_width),
+					 static_cast<int>(ovi.base_height), true);
+		},
+		[this]() { return overlayUrl(); });
+	alertsRow->addWidget(test);
+	alertsRow->addWidget(skip);
+	section("Alerts.Title", "Alerts.Help", alertsRow);
 
-	auto *help = new QLabel(T("Alerts.Help"), this);
-	help->setWordWrap(true);
-	help->setStyleSheet(QStringLiteral("color: gray"));
-	layout->addWidget(help);
+	auto *chatRow = new QHBoxLayout();
+	sourceButtons(
+		chatRow, [this]() { addBrowserSource(T("ChatOverlay.SourceName"), chatOverlayUrl(), 480, 720, false); },
+		[this]() { return chatOverlayUrl(); });
+	section("ChatOverlay.Title", "ChatOverlay.Help", chatRow);
 
-	/* Chat on screen shares the server, the token and the editor look. */
-	auto *chatTitle = new QLabel(QStringLiteral("<b>%1</b>").arg(T("ChatOverlay.Title").toHtmlEscaped()), this);
-	layout->addSpacing(6);
-	layout->addWidget(chatTitle);
-	auto *row3 = new QHBoxLayout();
-	auto *chatCustomize = new QPushButton(T("Alerts.Customize"), this);
-	connect(chatCustomize, &QPushButton::clicked, this, [this]() {
-		if (!m_server->isListening()) {
-			refreshStatus();
-			return;
-		}
-		QDesktopServices::openUrl(QUrl(chatEditorUrl()));
-	});
-	auto *chatAdd = new QPushButton(T("Alerts.AddSource"), this);
-	connect(chatAdd, &QPushButton::clicked, this,
-		[this]() { addBrowserSource(T("ChatOverlay.SourceName"), chatOverlayUrl(), 480, 720, false); });
-	auto *chatCopy = new QPushButton(T("Alerts.CopyUrl"), this);
-	connect(chatCopy, &QPushButton::clicked, this,
-		[this]() { QApplication::clipboard()->setText(chatOverlayUrl()); });
-	row3->addWidget(chatCustomize);
-	row3->addWidget(chatAdd);
-	row3->addWidget(chatCopy);
-	layout->addLayout(row3);
-	auto *chatHelp = new QLabel(T("ChatOverlay.Help"), this);
-	chatHelp->setWordWrap(true);
-	chatHelp->setStyleSheet(QStringLiteral("color: gray"));
-	layout->addWidget(chatHelp);
-
-	auto *eventsTitle = new QLabel(QStringLiteral("<b>%1</b>").arg(T("EventsOverlay.Title").toHtmlEscaped()), this);
-	layout->addSpacing(6);
-	layout->addWidget(eventsTitle);
-	auto *row4 = new QHBoxLayout();
-	auto *eventsCustomize = new QPushButton(T("Alerts.Customize"), this);
-	connect(eventsCustomize, &QPushButton::clicked, this, [this]() {
-		if (!m_server->isListening()) {
-			refreshStatus();
-			return;
-		}
-		QDesktopServices::openUrl(QUrl(eventsEditorUrl()));
-	});
-	auto *eventsAdd = new QPushButton(T("Alerts.AddSource"), this);
-	connect(eventsAdd, &QPushButton::clicked, this,
-		[this]() { addBrowserSource(T("EventsOverlay.SourceName"), eventsOverlayUrl(), 420, 400, false); });
-	auto *eventsCopy = new QPushButton(T("Alerts.CopyUrl"), this);
-	connect(eventsCopy, &QPushButton::clicked, this,
-		[this]() { QApplication::clipboard()->setText(eventsOverlayUrl()); });
-	row4->addWidget(eventsCustomize);
-	row4->addWidget(eventsAdd);
-	row4->addWidget(eventsCopy);
-	layout->addLayout(row4);
-	auto *eventsHelp = new QLabel(T("EventsOverlay.Help"), this);
-	eventsHelp->setWordWrap(true);
-	eventsHelp->setStyleSheet(QStringLiteral("color: gray"));
-	layout->addWidget(eventsHelp);
+	auto *eventsRow = new QHBoxLayout();
+	sourceButtons(
+		eventsRow,
+		[this]() { addBrowserSource(T("EventsOverlay.SourceName"), eventsOverlayUrl(), 420, 400, false); },
+		[this]() { return eventsOverlayUrl(); });
+	section("EventsOverlay.Title", "EventsOverlay.Help", eventsRow);
 	layout->addStretch();
 
 	applyEnabled();
@@ -292,30 +271,20 @@ QString AlertsDock::overlayUrl() const
 	return QStringLiteral("http://localhost:%1/alertas").arg(m_port);
 }
 
-QString AlertsDock::editorUrl() const
-{
-	/* The token goes after "#": browsers never send that part anywhere. */
-	return QStringLiteral("http://localhost:%1/editor#t=%2").arg(m_port).arg(m_token);
-}
-
 QString AlertsDock::chatOverlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/chat").arg(m_port);
 }
 
-QString AlertsDock::chatEditorUrl() const
+QString AlertsDock::panelUrl(const QString &tab) const
 {
-	return QStringLiteral("http://localhost:%1/chat-editor#t=%2").arg(m_port).arg(m_token);
+	/* The token goes after "#": browsers never send that part anywhere. */
+	return QStringLiteral("http://localhost:%1/painel#t=%2&aba=%3").arg(m_port).arg(m_token, tab);
 }
 
 QString AlertsDock::eventsOverlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/eventos").arg(m_port);
-}
-
-QString AlertsDock::eventsEditorUrl() const
-{
-	return QStringLiteral("http://localhost:%1/eventos-editor#t=%2").arg(m_port).arg(m_token);
 }
 
 void AlertsDock::loadSettings()
@@ -627,6 +596,14 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		reply.file = QDir(webDir()).filePath(QStringLiteral("chat-editor.html"));
 		return true;
 	}
+	if (get && path == QLatin1String("/painel")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("panel.html"));
+		return true;
+	}
+	if (get && path == QLatin1String("/tocando-editor")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("nowplaying-editor.html"));
+		return true;
+	}
 	if (get && path == QLatin1String("/eventos")) {
 		reply.file = QDir(webDir()).filePath(QStringLiteral("events.html"));
 		return true;
@@ -689,6 +666,21 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		}
 		importChatConfig(doc.object());
 		jsonReply(reply, 200, m_chatConfig);
+	} else if (path.startsWith(QLatin1String("/api/tab/"))) {
+		const auto tab = g_panelTabs.constFind(path.mid(9));
+		if (tab == g_panelTabs.constEnd()) {
+			errorReply(reply, 404, QStringLiteral("not found"));
+		} else if (get) {
+			jsonReply(reply, 200, tab->get());
+		} else if (post) {
+			const QJsonDocument doc = QJsonDocument::fromJson(request.body);
+			if (!doc.isObject())
+				errorReply(reply, 400, QStringLiteral("bad json"));
+			else
+				jsonReply(reply, 200, tab->set(doc.object()));
+		} else {
+			errorReply(reply, 404, QStringLiteral("not found"));
+		}
 	} else if (get && path == QLatin1String("/api/events-config")) {
 		jsonReply(reply, 200, m_eventsConfig);
 	} else if (post && path == QLatin1String("/api/events-config")) {
@@ -749,7 +741,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 				const QByteArray line = file.readLine();
 				const qsizetype eq = line.indexOf('=');
 				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
-					       line.startsWith("EventsOverlay."))) {
+					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
+					       line.startsWith("Overlays."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}
@@ -879,7 +872,9 @@ void alerts_register(void)
 	scroll->setFrameShape(QFrame::NoFrame);
 	scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	scroll->setMinimumWidth(dock->minimumSizeHint().width() + scroll->verticalScrollBar()->sizeHint().width());
-	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("Alerts.Title"), scroll)) {
+	/* "Overlays" now (alerts, chat on screen, events); same id, so the panel
+	 * keeps its place in saved layouts. */
+	if (!obs_frontend_add_dock_by_id(kDockId, obs_module_text("Overlays.Title"), scroll)) {
 		obs_log(LOG_WARNING, "[alerts] could not add dock");
 		delete scroll;
 		return;

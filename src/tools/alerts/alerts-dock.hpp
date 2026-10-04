@@ -29,6 +29,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QStringList>
 #include <QWidget>
 
+#include <functional>
+
+/* An overlay with its own server (Now Playing) still gets a tab in the web
+ * panel: get answers the tab's state, set applies what the panel saved and
+ * answers the new state. Served at /api/tab/<name>. */
+struct PanelTab {
+	std::function<QJsonObject()> get;
+	std::function<QJsonObject(const QJsonObject &)> set;
+};
+void overlaysAddPanelTab(const QString &name, PanelTab tab);
+
 class QLabel;
 class QPushButton;
 class UnifiedChatDock;
@@ -41,11 +52,10 @@ public:
 	~AlertsDock() override;
 
 	QString overlayUrl() const;
-	QString editorUrl() const;
 	QString chatOverlayUrl() const;
-	QString chatEditorUrl() const;
 	QString eventsOverlayUrl() const;
-	QString eventsEditorUrl() const;
+	/* The web panel, open on one tab: alertas, chat, eventos, tocando. */
+	QString panelUrl(const QString &tab) const;
 	QJsonObject shareableConfig() const;
 	void importConfig(const QJsonObject &config);
 	QJsonObject chatConfig() const { return m_chatConfig; }

@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meketreve · Tocando agora</title>
+  <link rel="stylesheet" href="/static/editor.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">M</span><span data-i18n="NowPlaying.Title">Tocando agora</span></div>
+    <div class="save" id="saveState"></div>
+  </header>
+
+  <div class="error" id="fatal" hidden></div>
+
+  <div class="layout two" id="app" hidden>
+    <main class="form" id="form"></main>
+    <aside class="preview">
+      <div class="np-frame"><iframe id="preview" title="preview"></iframe></div>
+      <p class="hint" data-i18n="NowPlaying.Panel.PreviewNote"></p>
+    </aside>
+  </div>
+
+  <script src="/static/nowplaying-editor.js"></script>
+</body>
+</html>

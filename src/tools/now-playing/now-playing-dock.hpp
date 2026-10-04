@@ -44,12 +44,20 @@ public:
 	explicit NowPlayingDock(QWidget *parent = nullptr);
 	~NowPlayingDock() override;
 
+	/* The web panel's tab: the audio sources to pick from, the look and the
+	 * overlay link; applyPanel takes what the panel saved and answers the
+	 * new state. */
+	QJsonObject panelState();
+	QJsonObject applyPanel(const QJsonObject &panel);
+
 private:
 	void loadSettings();
 	void saveSettings();
 	QString overlayUrl() const;
 	void refreshStatus();
 	void refreshSources();
+	static QStringList audioSourceNames();
+	void setSource(const QString &name);
 	void onClients(int count);
 	void startCapture();
 	void stopCapture();
@@ -65,6 +73,11 @@ private:
 	QString m_dir;
 	quint16 m_port = 8903;
 	QString m_sourceName; /* empty = the Desktop Audio of the OBS settings */
+	/* The look; "?color=", "?card=0"... in the link still win, per source. */
+	QString m_color = QStringLiteral("#3987E5");
+	bool m_card = true;
+	bool m_bars = true;
+	bool m_always = false;
 
 	OverlayServer *m_server = nullptr;
 	std::unique_ptr<Spectrum> m_spectrum;

@@ -2,6 +2,9 @@
 // opens it with a token after "#"; every API call carries it.
 "use strict";
 
+// Inside the web panel (/painel) the panel draws the title and the tabs.
+if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");
+
 const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
 const TYPES = ["follow", "sub", "resub", "giftsub", "bits", "donation", "raid", "membership", "gift"];
 const LABELS = [["ultimo-follow", "LastFollow"], ["ultimo-sub", "LastSub"], ["ultimo-presente", "LastGift"],
