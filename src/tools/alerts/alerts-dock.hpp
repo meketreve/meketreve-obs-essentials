@@ -40,8 +40,20 @@ struct PanelTab {
 };
 void overlaysAddPanelTab(const QString &name, PanelTab tab);
 
+/* An overlay with its own server also gets a section in the Overlays panel:
+ * its title, a line of help, "Add to scene" and "Copy link". Tools that load
+ * before the panel exists are queued. */
+struct OverlaySection {
+	QString title;
+	QString help;
+	std::function<QString()> url;
+	std::function<void()> addToScene;
+};
+void overlaysAddSection(OverlaySection section);
+
 class QLabel;
 class QPushButton;
+class QVBoxLayout;
 class UnifiedChatDock;
 
 class AlertsDock : public QWidget {
@@ -61,6 +73,7 @@ public:
 	QJsonObject chatConfig() const { return m_chatConfig; }
 	void importChatConfig(const QJsonObject &config);
 	QJsonObject eventsConfig() const { return m_eventsConfig; }
+	void addSection(const OverlaySection &section);
 	void importEventsConfig(const QJsonObject &config);
 
 private:
@@ -98,6 +111,7 @@ private:
 	OverlayServer *m_server = nullptr;
 	QNetworkAccessManager m_net;
 	QLabel *m_status = nullptr;
+	QVBoxLayout *m_extraSections = nullptr;
 	QPushButton *m_toggle = nullptr;
 	QString m_dir;
 	QString m_mediaDir;

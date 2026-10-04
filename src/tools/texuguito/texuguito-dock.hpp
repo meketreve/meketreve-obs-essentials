@@ -36,6 +36,12 @@ public:
 	~TexuguitoDock() override;
 
 	QString overlayUrl() const;
+	/* Puts the chat parade in the current scene (from the Overlays panel). */
+	void addBrowserSource();
+	/* The web panel's Parade tab: the look and the link; applyPanel takes
+	 * what the panel saved and answers the new state. */
+	QJsonObject panelState() const;
+	QJsonObject applyPanel(const QJsonObject &panel);
 	QString statusText() const;
 	/* Copies an old texuguito-seu-bot-amigo folder in; returns a summary. */
 	QString importFrom(const QString &dir);
@@ -50,7 +56,7 @@ private:
 	void pollChatters();
 	void updateStreamerChannels();
 	void refreshStatus();
-	void addBrowserSource();
+	QJsonObject lookJson() const;
 	void importOldBot();
 	void addAudio();
 	void openSettings();
@@ -67,6 +73,11 @@ private:
 	QString m_audioDir;
 	quint16 m_port = 8901;
 	double m_volume = 1.0;
+	/* The parade's look, set in the web panel. */
+	double m_scale = 1.0;
+	double m_speed = 1.0;
+	bool m_names = true;
+	int m_nameSize = 10;
 	QHash<int, int> m_cooldowns; /* price -> seconds */
 	bool m_enabled = true;
 	bool m_chattersDenied = false;

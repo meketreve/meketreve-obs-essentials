@@ -12,6 +12,10 @@ const LOOK_MIN_MS = 1000;
 const LOOK_MAX_MS = 2500;
 const FACE_FRONT_CHANCE = 0.5;
 
+// The look set in the web panel (Parade tab): avatar size, walking speed and
+// the names above the heads. It comes with the snapshot and on every change.
+const look = { scale: 1, speed: 1, names: true, nameSize: 10 };
+
 const canvas = document.getElementById("parade");
 const ctx = canvas.getContext("2d");
 
@@ -91,8 +95,10 @@ function laneY() {
 // (per spec), which silently flips imageSmoothingEnabled back to true — so
 // it has to be re-applied here, every time, not just once at module load.
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  // Bigger avatars = a smaller canvas stretched over the window; pixel art
+  // stays sharp because the page draws it with image-rendering: pixelated.
+  canvas.width = Math.max(1, Math.round(window.innerWidth / look.scale));
+  canvas.height = Math.max(1, Math.round(window.innerHeight / look.scale));
   ctx.imageSmoothingEnabled = false; // pixel art: never interpolate between texels
   const y = laneY();
   const maxX = Math.max(0, canvas.width - frameWidth);
@@ -180,7 +186,7 @@ function updateMovement(viewer, now, deltaSeconds) {
   }
 
   const remaining = viewer.targetX - viewer.x;
-  const travelled = Math.min(viewer.speed * deltaSeconds, Math.abs(remaining));
+  const travelled = Math.min(viewer.speed * look.speed * deltaSeconds, Math.abs(remaining));
   viewer.x += Math.sign(remaining) * travelled;
   viewer.distanceWalked += travelled;
   if (Math.abs(viewer.targetX - viewer.x) < 0.5) {
@@ -280,6 +286,17 @@ function stopCurrentAudio() {
   playNextAudio();
 }
 
+function applyLook(next) {
+  if (!next) return;
+  const scale = Number(next.scale);
+  const changed = scale > 0 && scale !== look.scale;
+  if (scale > 0) look.scale = scale;
+  if (Number(next.speed) > 0) look.speed = Number(next.speed);
+  look.names = next.names !== false;
+  if (Number(next.nameSize) > 0) look.nameSize = Number(next.nameSize);
+  if (changed) resizeCanvas();
+}
+
 function connect() {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${protocol}//${location.host}/ws`);
@@ -287,7 +304,10 @@ function connect() {
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.type === "snapshot") {
+      applyLook(message.look);
       applySnapshot(message);
+    } else if (message.type === "look") {
+      applyLook(message.look);
     } else if (message.type === "audio") {
       enqueueAudio(message.url, message.volume);
     } else if (message.type === "audio_stop") {
@@ -500,8 +520,9 @@ function drawViewer(viewer, timestamp) {
 
   drawBadges(viewer, yOffset);
 
+  if (!look.names) return;
   ctx.fillStyle = "#ffffff";
-  ctx.font = "10px monospace";
+  ctx.font = `${look.nameSize}px monospace`;
   ctx.textAlign = "center";
   ctx.fillText(viewer.nick, viewer.x + frameWidth / 2, yOffset - 4);
 }

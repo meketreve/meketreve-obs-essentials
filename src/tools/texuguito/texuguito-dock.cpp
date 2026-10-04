@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "texuguito-dock.hpp"
+#include "../alerts/alerts-dock.hpp"
 #include "texuguito.h"
 #include "sound-fetch.hpp"
 #include "tts-client.hpp"
@@ -56,6 +57,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace {
 
@@ -161,7 +164,9 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 		return m_engine->ttsClip(id);
 	};
 	routes.snapshot = [this]() {
-		return m_engine->snapshot();
+		QJsonObject snapshot = m_engine->snapshot();
+		snapshot.insert(QStringLiteral("look"), lookJson());
+		return snapshot;
 	};
 	m_server = new OverlayServer(routes, this);
 
@@ -201,13 +206,8 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 		saveSettings();
 		applyEnabled();
 	});
-	auto *copy = new QPushButton(T("Texuguito.CopyUrl"), this);
-	connect(copy, &QPushButton::clicked, this, [this]() { QApplication::clipboard()->setText(overlayUrl()); });
-	auto *add = new QPushButton(T("Texuguito.AddSource"), this);
-	connect(add, &QPushButton::clicked, this, &TexuguitoDock::addBrowserSource);
+	/* The parade's "Add to scene" and link are in the Overlays panel. */
 	row1->addWidget(m_toggle);
-	row1->addWidget(copy);
-	row1->addWidget(add);
 	layout->addLayout(row1);
 
 	auto *row2 = new QHBoxLayout();
@@ -258,6 +258,34 @@ QString TexuguitoDock::overlayUrl() const
 	return QStringLiteral("http://localhost:%1/overlay").arg(m_port);
 }
 
+QJsonObject TexuguitoDock::lookJson() const
+{
+	return QJsonObject{{QStringLiteral("scale"), m_scale},
+			   {QStringLiteral("speed"), m_speed},
+			   {QStringLiteral("names"), m_names},
+			   {QStringLiteral("nameSize"), m_nameSize}};
+}
+
+QJsonObject TexuguitoDock::panelState() const
+{
+	QJsonObject state = lookJson();
+	state.insert(QStringLiteral("url"), overlayUrl());
+	state.insert(QStringLiteral("listening"), m_server->isListening());
+	return state;
+}
+
+QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
+{
+	m_scale = std::clamp(panel.value(QStringLiteral("scale")).toDouble(m_scale), 0.5, 4.0);
+	m_speed = std::clamp(panel.value(QStringLiteral("speed")).toDouble(m_speed), 0.25, 3.0);
+	m_names = panel.value(QStringLiteral("names")).toBool(m_names);
+	m_nameSize = std::clamp(panel.value(QStringLiteral("nameSize")).toInt(m_nameSize), 6, 32);
+	saveSettings();
+	m_server->broadcast(
+		QJsonObject{{QStringLiteral("type"), QStringLiteral("look")}, {QStringLiteral("look"), lookJson()}});
+	return panelState();
+}
+
 void TexuguitoDock::loadSettings()
 {
 	const QString path = QDir(m_dataDir).filePath(QStringLiteral("settings.json"));
@@ -270,6 +298,14 @@ void TexuguitoDock::loadSettings()
 	m_enabled = obs_data_get_bool(data, "enabled");
 	m_port = static_cast<quint16>(obs_data_get_int(data, "port"));
 	m_volume = obs_data_get_double(data, "volume");
+	obs_data_set_default_double(data, "paradeScale", 1.0);
+	obs_data_set_default_double(data, "paradeSpeed", 1.0);
+	obs_data_set_default_bool(data, "paradeNames", true);
+	obs_data_set_default_int(data, "paradeNameSize", 10);
+	m_scale = std::clamp(obs_data_get_double(data, "paradeScale"), 0.5, 4.0);
+	m_speed = std::clamp(obs_data_get_double(data, "paradeSpeed"), 0.25, 3.0);
+	m_names = obs_data_get_bool(data, "paradeNames");
+	m_nameSize = std::clamp(static_cast<int>(obs_data_get_int(data, "paradeNameSize")), 6, 32);
 	const QString audio = QString::fromUtf8(obs_data_get_string(data, "audioDir"));
 	if (!audio.isEmpty())
 		m_audioDir = audio;
@@ -290,6 +326,10 @@ void TexuguitoDock::saveSettings()
 	obs_data_set_bool(data, "enabled", m_enabled);
 	obs_data_set_int(data, "port", m_port);
 	obs_data_set_double(data, "volume", m_volume);
+	obs_data_set_double(data, "paradeScale", m_scale);
+	obs_data_set_double(data, "paradeSpeed", m_speed);
+	obs_data_set_bool(data, "paradeNames", m_names);
+	obs_data_set_int(data, "paradeNameSize", m_nameSize);
 	obs_data_set_string(data, "audioDir", m_engine->audioDir().toUtf8().constData());
 	obs_data_t *cooldowns = obs_data_create();
 	for (auto it = m_cooldowns.constBegin(); it != m_cooldowns.constEnd(); ++it)
@@ -711,6 +751,20 @@ void texuguito_register(void)
 		return;
 	}
 	g_dock = dock;
+
+	/* The parade sits with the other overlays: a section in the Overlays
+	 * panel and a tab in the web panel, on its own server as before. */
+	QPointer<TexuguitoDock> self(dock);
+	overlaysAddSection({T("Texuguito.Parade.Title"), T("Texuguito.Parade.Help"),
+			    [self]() { return self ? self->overlayUrl() : QString(); },
+			    [self]() {
+				    if (self)
+					    self->addBrowserSource();
+			    }});
+	overlaysAddPanelTab(QStringLiteral("desfile"), {[self]() { return self ? self->panelState() : QJsonObject(); },
+							[self](const QJsonObject &panel) {
+								return self ? self->applyPanel(panel) : QJsonObject();
+							}});
 
 	/* Developer smoke test, inert unless the variable is set: imports the
 	 * old bot folder it names, then logs what the dock shows. */

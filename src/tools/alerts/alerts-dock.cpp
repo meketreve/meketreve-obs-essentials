@@ -113,12 +113,40 @@ void errorReply(OverlayServer::Reply &reply, int status, const QString &error)
 
 QPointer<AlertsDock> g_dock;
 QHash<QString, PanelTab> g_panelTabs;
+QList<OverlaySection> g_pendingSections;
 
 } // namespace
 
 void overlaysAddPanelTab(const QString &name, PanelTab tab)
 {
 	g_panelTabs.insert(name, std::move(tab));
+}
+
+void overlaysAddSection(OverlaySection section)
+{
+	if (g_dock)
+		g_dock->addSection(section);
+	else
+		g_pendingSections.append(std::move(section));
+}
+
+void AlertsDock::addSection(const OverlaySection &section)
+{
+	auto *title = new QLabel(QStringLiteral("<b>%1</b>").arg(section.title.toHtmlEscaped()), this);
+	m_extraSections->addSpacing(6);
+	m_extraSections->addWidget(title);
+	auto *row = new QHBoxLayout();
+	auto *add = new QPushButton(T("Alerts.AddSource"), this);
+	connect(add, &QPushButton::clicked, this, [section]() { section.addToScene(); });
+	auto *copy = new QPushButton(T("Alerts.CopyUrl"), this);
+	connect(copy, &QPushButton::clicked, this, [section]() { QApplication::clipboard()->setText(section.url()); });
+	row->addWidget(add);
+	row->addWidget(copy);
+	m_extraSections->addLayout(row);
+	auto *help = new QLabel(section.help, this);
+	help->setWordWrap(true);
+	help->setStyleSheet(QStringLiteral("color: gray"));
+	m_extraSections->addWidget(help);
 }
 
 AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent), m_chat(chat)
@@ -243,6 +271,14 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		[this]() { addBrowserSource(T("EventsOverlay.SourceName"), eventsOverlayUrl(), 420, 400, false); },
 		[this]() { return eventsOverlayUrl(); });
 	section("EventsOverlay.Title", "EventsOverlay.Help", eventsRow);
+
+	/* Overlays with their own server (the chat parade, now playing). */
+	m_extraSections = new QVBoxLayout();
+	m_extraSections->setContentsMargins(0, 0, 0, 0);
+	layout->addLayout(m_extraSections);
+	for (const OverlaySection &pending : std::as_const(g_pendingSections))
+		addSection(pending);
+	g_pendingSections.clear();
 	layout->addStretch();
 
 	applyEnabled();
@@ -600,6 +636,10 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		reply.file = QDir(webDir()).filePath(QStringLiteral("panel.html"));
 		return true;
 	}
+	if (get && path == QLatin1String("/desfile-editor")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("parade-editor.html"));
+		return true;
+	}
 	if (get && path == QLatin1String("/tocando-editor")) {
 		reply.file = QDir(webDir()).filePath(QStringLiteral("nowplaying-editor.html"));
 		return true;
@@ -742,7 +782,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 				const qsizetype eq = line.indexOf('=');
 				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
-					       line.startsWith("Overlays."))) {
+					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}
