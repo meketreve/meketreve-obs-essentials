@@ -142,9 +142,15 @@ QJsonObject toJson(const ChatMessage &msg)
 	for (const ChatEmote &e : msg.emotes) {
 		if (e.start < 0 || e.length <= 0 || e.start + e.length > msg.text.size())
 			continue;
+		/* The browser plays GIFs, so Twitch's "default" picture (animated
+		 * when the emote is) instead of the still one the dock asks for.
+		 * BTTV, 7TV and Kick links already point to the animated file. */
+		QString url = e.url;
+		if (url.startsWith(QLatin1String("https://static-cdn.jtvnw.net/emoticons/")))
+			url.replace(QLatin1String("/static/"), QLatin1String("/default/"));
 		emotes.append(QJsonObject{{QStringLiteral("start"), static_cast<qint64>(e.start)},
 					  {QStringLiteral("length"), static_cast<qint64>(e.length)},
-					  {QStringLiteral("url"), e.url}});
+					  {QStringLiteral("url"), url}});
 	}
 	return QJsonObject{{QStringLiteral("id"), msg.id},
 			   {QStringLiteral("user"), msg.userId},

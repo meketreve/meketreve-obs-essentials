@@ -357,6 +357,21 @@ private slots:
 				      emotes.at(0).toObject().value(key("length")).toInt()),
 			 key("KEKW"));
 
+		/* Twitch emotes go animated on screen; other links stay as they are. */
+		ChatMessage twitch = chat(ChatPlatform::Twitch, ChatEvent::None, 0, QString(), key("hi PogChamp"));
+		twitch.emotes.append(
+			ChatEmote{3, 8, key("https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_abc/static/dark/2.0")});
+		QCOMPARE(ChatOverlay::toJson(twitch)
+				 .value(key("emotes"))
+				 .toArray()
+				 .at(0)
+				 .toObject()
+				 .value(key("url"))
+				 .toString(),
+			 key("https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_abc/default/dark/2.0"));
+		QCOMPARE(emotes.at(0).toObject().value(key("url")).toString(),
+			 key("https://files.kick.com/emotes/1/fullsize"));
+
 		/* The samples cover every platform. */
 		QSet<QString> seen;
 		for (const QJsonValue v : ChatOverlay::samples())
