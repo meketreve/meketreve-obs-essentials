@@ -110,7 +110,7 @@ function render() {
   const create = el("button", { type: "button", class: "btn small primary", text: t("Create"),
     onclick: () => act({ action: "command", name: newName.value, reply: newReply.value }) });
 
-  document.getElementById("form").replaceChildren(
+  document.getElementById("form").replaceChildren(...[
     el("h2", { text: t("Tab") }),
     el("section", { class: "card" }, el("h3", { text: t("Sounds") }),
       row(t("Volume"), el("div", { class: "inline" }, volume, volumeOut)),
@@ -118,7 +118,7 @@ function render() {
       soundRows),
     prices.length ? el("section", { class: "card" }, el("h3", { text: t("Waits") }), el("p", { class: "hint", text: t("WaitsNote") }), waitRows) : null,
     el("section", { class: "card" }, el("h3", { text: t("Commands") }), el("p", { class: "hint", text: t("CommandsNote") }),
-      commandRows, el("div", { class: "list-row" }, newName, el("div", { class: "inline grow" }, newReply, create))));
+      commandRows, el("div", { class: "list-row" }, newName, el("div", { class: "inline grow" }, newReply, create)))].filter(Boolean));
 }
 
 async function init() {
