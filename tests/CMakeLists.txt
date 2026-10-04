@@ -137,6 +137,8 @@ add_executable(
   test-alerts.cpp
   ${_alerts}/alert-logic.cpp
   ${_alerts}/alert-logic.hpp
+  ${_alerts}/chat-overlay.cpp
+  ${_alerts}/chat-overlay.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
 )

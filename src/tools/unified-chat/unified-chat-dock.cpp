@@ -513,6 +513,7 @@ void UnifiedChatDock::appendMessage(const ChatMessage &incoming)
 		appendEventLine(msg, description);
 		return;
 	}
+	emit shown(msg);
 
 	if (!m_hasMessages) {
 		m_view->clear();
@@ -695,19 +696,26 @@ void UnifiedChatDock::onAuthorClicked(const QUrl &url)
 
 	QMenu menu(this);
 	menu.addSection(msg.author);
-	menu.addAction(T("UnifiedChat.Timeout60"), this,
-		       [this, msg, channel]() { m_accounts->timeoutUser(msg.platform, channel, msg.userId, 60); });
-	menu.addAction(T("UnifiedChat.Timeout600"), this,
-		       [this, msg, channel]() { m_accounts->timeoutUser(msg.platform, channel, msg.userId, 600); });
+	menu.addAction(T("UnifiedChat.Timeout60"), this, [this, msg, channel]() {
+		m_accounts->timeoutUser(msg.platform, channel, msg.userId, 60);
+		emit removed(msg.platform, QString(), msg.userId);
+	});
+	menu.addAction(T("UnifiedChat.Timeout600"), this, [this, msg, channel]() {
+		m_accounts->timeoutUser(msg.platform, channel, msg.userId, 600);
+		emit removed(msg.platform, QString(), msg.userId);
+	});
 	menu.addAction(T("UnifiedChat.Ban"), this, [this, msg, channel]() {
 		if (QMessageBox::question(this, T("UnifiedChat.Ban"), T("UnifiedChat.BanConfirm").arg(msg.author)) ==
-		    QMessageBox::Yes)
+		    QMessageBox::Yes) {
 			m_accounts->banUser(msg.platform, channel, msg.userId);
+			emit removed(msg.platform, QString(), msg.userId);
+		}
 	});
 	menu.addAction(T("UnifiedChat.Unban"), this,
 		       [this, msg, channel]() { m_accounts->unbanUser(msg.platform, channel, msg.userId); });
 	QAction *del = menu.addAction(T("UnifiedChat.DeleteMessage"), this, [this, msg, channel]() {
 		m_accounts->deleteMessage(msg.platform, channel, msg.id);
+		emit removed(msg.platform, msg.id, QString());
 	});
 	del->setEnabled(!msg.id.isEmpty());
 	menu.exec(QCursor::pos());

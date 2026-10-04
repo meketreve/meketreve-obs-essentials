@@ -147,13 +147,29 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 .keybox { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
 .keybox a { color: var(--accent-2); }
 
+/* Chat on screen editor: no type list, a portrait preview. */
+.layout.two { grid-template-columns: minmax(340px, 1fr) minmax(280px, 420px); }
+.chat-frame {
+  position: relative; width: 100%; aspect-ratio: 2 / 3; overflow: hidden;
+  border-radius: var(--radius); border: 1px solid var(--line);
+  background: repeating-conic-gradient(#2a2d38 0% 25%, #23252e 0% 50%) 0 0 / 24px 24px;
+}
+.chat-frame #pbox { position: absolute; left: 0; top: 0; width: 480px; height: 720px; transform-origin: 0 0; }
+.row .inline .cr-icon { width: 20px; height: 20px; }
+
 @media (max-width: 1180px) {
   .layout { grid-template-columns: 200px 1fr; }
   .preview { grid-column: 2; grid-row: 1; position: static; }
   .form { grid-column: 2; }
   .types { grid-row: 1 / span 2; }
 }
+@media (max-width: 1180px) {
+  .layout.two { grid-template-columns: 1fr minmax(260px, 360px); }
+  .layout.two .preview { grid-column: 2; }
+  .layout.two .form { grid-column: 1; grid-row: 1; }
+}
 @media (max-width: 720px) {
+  .layout.two .form, .layout.two .preview { grid-column: 1; grid-row: auto; }
   .layout { grid-template-columns: 1fr; padding: 12px 16px; }
   .types { position: static; flex-direction: row; overflow-x: auto; grid-row: auto; }
   .nav-item { width: auto; white-space: nowrap; }

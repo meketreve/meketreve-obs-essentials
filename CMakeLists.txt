@@ -61,6 +61,8 @@ target_sources(
     src/plugin-main.c
     src/tools/alerts/alert-logic.cpp
     src/tools/alerts/alert-logic.hpp
+    src/tools/alerts/chat-overlay.cpp
+    src/tools/alerts/chat-overlay.hpp
     src/tools/alerts/alerts-dock.cpp
     src/tools/alerts/alerts-dock.hpp
     src/tools/alerts/alerts.h

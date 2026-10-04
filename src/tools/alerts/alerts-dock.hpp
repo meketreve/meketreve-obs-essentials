@@ -39,21 +39,28 @@ public:
 
 	QString overlayUrl() const;
 	QString editorUrl() const;
+	QString chatOverlayUrl() const;
+	QString chatEditorUrl() const;
 	QJsonObject shareableConfig() const;
 	void importConfig(const QJsonObject &config);
+	QJsonObject chatConfig() const { return m_chatConfig; }
+	void importChatConfig(const QJsonObject &config);
 
 private:
 	void loadSettings();
 	void saveSettings();
 	void loadConfig();
 	void saveConfig();
+	void saveChatConfig();
+	void onShown(const ChatMessage &msg);
+	void onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId);
 	void applyEnabled();
 	void refreshStatus();
 	void onChat(const ChatMessage &msg);
 	void fire(const Alerts::Event &event);
 	void broadcastConfig();
 	QJsonObject overlayConfig() const;
-	void addBrowserSource();
+	void addBrowserSource(const QString &name, const QString &url, int width, int height, bool audio);
 	void openSettings();
 	bool route(const OverlayServer::Request &request, OverlayServer::Reply &reply);
 	void apiMediaList(OverlayServer::Reply &reply) const;
@@ -67,6 +74,7 @@ private:
 	QString m_dir;
 	QString m_mediaDir;
 	QJsonObject m_config;
+	QJsonObject m_chatConfig;
 	QString m_token;
 	quint16 m_port = 8902;
 	bool m_enabled = true;

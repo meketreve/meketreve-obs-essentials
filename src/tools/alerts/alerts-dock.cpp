@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "alerts-dock.hpp"
 #include "alerts.h"
+#include "chat-overlay.hpp"
 
 #include "../config/config-share.hpp"
 #include "../texuguito/tts-client.hpp"
@@ -128,8 +129,10 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		return m_tts.value(id);
 	};
 	routes.snapshot = [this]() {
+		/* Alert pages read "config", chat pages "chat". */
 		return QJsonObject{{QStringLiteral("type"), QStringLiteral("config")},
-				   {QStringLiteral("config"), overlayConfig()}};
+				   {QStringLiteral("config"), overlayConfig()},
+				   {QStringLiteral("chat"), m_chatConfig}};
 	};
 	routes.handler = [this](const OverlayServer::Request &request, OverlayServer::Reply &reply) {
 		return route(request, reply);
@@ -138,6 +141,8 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	m_server = new OverlayServer(routes, this);
 	connect(m_server, &OverlayServer::clientsChanged, this, &AlertsDock::refreshStatus);
 	connect(m_chat, &UnifiedChatDock::incoming, this, &AlertsDock::onChat);
+	connect(m_chat, &UnifiedChatDock::shown, this, &AlertsDock::onShown);
+	connect(m_chat, &UnifiedChatDock::removed, this, &AlertsDock::onRemoved);
 
 	auto *layout = new QVBoxLayout(this);
 	layout->setContentsMargins(6, 6, 6, 6);
@@ -162,7 +167,12 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		QDesktopServices::openUrl(QUrl(editorUrl()));
 	});
 	auto *add = new QPushButton(T("Alerts.AddSource"), this);
-	connect(add, &QPushButton::clicked, this, &AlertsDock::addBrowserSource);
+	connect(add, &QPushButton::clicked, this, [this]() {
+		obs_video_info ovi{};
+		obs_get_video_info(&ovi);
+		addBrowserSource(T("Alerts.SourceName"), overlayUrl(), static_cast<int>(ovi.base_width),
+				 static_cast<int>(ovi.base_height), true);
+	});
 	row1->addWidget(m_toggle);
 	row1->addWidget(customize);
 	row1->addWidget(add);
@@ -196,6 +206,34 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	help->setWordWrap(true);
 	help->setStyleSheet(QStringLiteral("color: gray"));
 	layout->addWidget(help);
+
+	/* Chat on screen shares the server, the token and the editor look. */
+	auto *chatTitle = new QLabel(QStringLiteral("<b>%1</b>").arg(T("ChatOverlay.Title").toHtmlEscaped()), this);
+	layout->addSpacing(6);
+	layout->addWidget(chatTitle);
+	auto *row3 = new QHBoxLayout();
+	auto *chatCustomize = new QPushButton(T("Alerts.Customize"), this);
+	connect(chatCustomize, &QPushButton::clicked, this, [this]() {
+		if (!m_server->isListening()) {
+			refreshStatus();
+			return;
+		}
+		QDesktopServices::openUrl(QUrl(chatEditorUrl()));
+	});
+	auto *chatAdd = new QPushButton(T("Alerts.AddSource"), this);
+	connect(chatAdd, &QPushButton::clicked, this,
+		[this]() { addBrowserSource(T("ChatOverlay.SourceName"), chatOverlayUrl(), 480, 720, false); });
+	auto *chatCopy = new QPushButton(T("Alerts.CopyUrl"), this);
+	connect(chatCopy, &QPushButton::clicked, this,
+		[this]() { QApplication::clipboard()->setText(chatOverlayUrl()); });
+	row3->addWidget(chatCustomize);
+	row3->addWidget(chatAdd);
+	row3->addWidget(chatCopy);
+	layout->addLayout(row3);
+	auto *chatHelp = new QLabel(T("ChatOverlay.Help"), this);
+	chatHelp->setWordWrap(true);
+	chatHelp->setStyleSheet(QStringLiteral("color: gray"));
+	layout->addWidget(chatHelp);
 	layout->addStretch();
 
 	applyEnabled();
@@ -215,6 +253,16 @@ QString AlertsDock::editorUrl() const
 {
 	/* The token goes after "#": browsers never send that part anywhere. */
 	return QStringLiteral("http://localhost:%1/editor#t=%2").arg(m_port).arg(m_token);
+}
+
+QString AlertsDock::chatOverlayUrl() const
+{
+	return QStringLiteral("http://localhost:%1/chat").arg(m_port);
+}
+
+QString AlertsDock::chatEditorUrl() const
+{
+	return QStringLiteral("http://localhost:%1/chat-editor#t=%2").arg(m_port).arg(m_token);
 }
 
 void AlertsDock::loadSettings()
@@ -255,6 +303,46 @@ void AlertsDock::loadConfig()
 	if (file.open(QIODevice::ReadOnly))
 		stored = QJsonDocument::fromJson(file.readAll()).object();
 	m_config = stored.isEmpty() ? Alerts::defaults(T) : Alerts::normalize(stored, T);
+
+	QFile chatFile(QDir(m_dir).filePath(QStringLiteral("chat-overlay.json")));
+	QJsonObject chatStored;
+	if (chatFile.open(QIODevice::ReadOnly))
+		chatStored = QJsonDocument::fromJson(chatFile.readAll()).object();
+	m_chatConfig = ChatOverlay::normalize(chatStored);
+}
+
+void AlertsDock::saveChatConfig()
+{
+	QSaveFile file(QDir(m_dir).filePath(QStringLiteral("chat-overlay.json")));
+	if (!file.open(QIODevice::WriteOnly) ||
+	    file.write(QJsonDocument(m_chatConfig).toJson(QJsonDocument::Indented)) < 0 || !file.commit())
+		obs_log(LOG_WARNING, "[alerts] could not save chat-overlay.json");
+}
+
+void AlertsDock::importChatConfig(const QJsonObject &config)
+{
+	m_chatConfig = ChatOverlay::normalize(config);
+	saveChatConfig();
+	m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-config")},
+					{QStringLiteral("config"), m_chatConfig}});
+}
+
+void AlertsDock::onShown(const ChatMessage &msg)
+{
+	if (!m_enabled || !ChatOverlay::passes(m_chatConfig, msg))
+		return;
+	m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat")},
+					{QStringLiteral("message"), ChatOverlay::toJson(msg)}});
+}
+
+void AlertsDock::onRemoved(ChatPlatform platform, const QString &messageId, const QString &userId)
+{
+	if (!m_enabled)
+		return;
+	m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-remove")},
+					{QStringLiteral("platform"), ChatOverlay::platformKey(platform)},
+					{QStringLiteral("id"), messageId},
+					{QStringLiteral("user"), userId}});
 }
 
 void AlertsDock::saveConfig()
@@ -369,6 +457,14 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		reply.file = QDir(webDir()).filePath(QStringLiteral("editor.html"));
 		return true;
 	}
+	if (get && path == QLatin1String("/chat")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("chat.html"));
+		return true;
+	}
+	if (get && path == QLatin1String("/chat-editor")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("chat-editor.html"));
+		return true;
+	}
 	if (get && path.startsWith(QLatin1String("/media/"))) {
 		reply.file = OverlayServer::resolvePath(m_mediaDir, path.mid(7));
 		if (reply.file.isEmpty())
@@ -413,6 +509,28 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		}
 		fire(Alerts::sample(type, T));
 		jsonReply(reply, 200, QJsonObject{{QStringLiteral("overlays"), m_server->clientCount()}});
+	} else if (get && path == QLatin1String("/api/chat-config")) {
+		jsonReply(reply, 200, m_chatConfig);
+	} else if (post && path == QLatin1String("/api/chat-config")) {
+		const QJsonDocument doc = QJsonDocument::fromJson(request.body);
+		if (!doc.isObject()) {
+			errorReply(reply, 400, QStringLiteral("bad json"));
+			return true;
+		}
+		importChatConfig(doc.object());
+		jsonReply(reply, 200, m_chatConfig);
+	} else if (get && path == QLatin1String("/api/chat-sample")) {
+		jsonReply(reply, 200, QJsonObject{{QStringLiteral("messages"), ChatOverlay::samples()}});
+	} else if (post && path == QLatin1String("/api/chat-test")) {
+		/* One made-up line, past the filters: the page still picks platforms. */
+		const QJsonArray samples = ChatOverlay::samples();
+		QJsonObject message =
+			samples.at(QRandomGenerator::global()->bounded(static_cast<int>(samples.size()))).toObject();
+		message.insert(QStringLiteral("id"),
+			       QStringLiteral("test-%1").arg(QDateTime::currentMSecsSinceEpoch()));
+		m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat")},
+						{QStringLiteral("message"), message}});
+		jsonReply(reply, 200, QJsonObject{{QStringLiteral("overlays"), m_server->clientCount()}});
 	} else if (get && path == QLatin1String("/api/sample")) {
 		/* The editor's preview uses the same made-up events. */
 		QJsonObject samples;
@@ -430,7 +548,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 			while (!file.atEnd()) {
 				const QByteArray line = file.readLine();
 				const qsizetype eq = line.indexOf('=');
-				if (eq > 0 && line.startsWith("Alerts.")) {
+				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}
@@ -490,25 +608,22 @@ void AlertsDock::apiMediaUpload(const QString &name, const QByteArray &data, Ove
 		  QJsonObject{{QStringLiteral("name"), target}, {QStringLiteral("kind"), Alerts::mediaKind(target)}});
 }
 
-void AlertsDock::addBrowserSource()
+void AlertsDock::addBrowserSource(const QString &title, const QString &url, int width, int height, bool audio)
 {
-	obs_video_info ovi{};
-	obs_get_video_info(&ovi);
-	const QByteArray name = T("Alerts.SourceName").toUtf8();
-
+	const QByteArray name = title.toUtf8();
 	obs_source_t *source = obs_get_source_by_name(name.constData());
 	if (!source) {
 		obs_data_t *settings = obs_data_create();
-		obs_data_set_string(settings, "url", overlayUrl().toUtf8().constData());
-		obs_data_set_int(settings, "width", ovi.base_width);
-		obs_data_set_int(settings, "height", ovi.base_height);
+		obs_data_set_string(settings, "url", url.toUtf8().constData());
+		obs_data_set_int(settings, "width", width);
+		obs_data_set_int(settings, "height", height);
 		/* Alert sounds show up in the OBS mixer like any other source. */
-		obs_data_set_bool(settings, "reroute_audio", true);
+		obs_data_set_bool(settings, "reroute_audio", audio);
 		source = obs_source_create("browser_source", name.constData(), settings, nullptr);
 		obs_data_release(settings);
 	}
 	if (!source) {
-		QMessageBox::information(this, T("Alerts.Title"), T("Alerts.NoBrowser").arg(overlayUrl()));
+		QMessageBox::information(this, T("Alerts.Title"), T("Alerts.NoBrowser").arg(url));
 		return;
 	}
 	obs_source_t *sceneSource = obs_frontend_get_current_scene();
@@ -583,6 +698,24 @@ void alerts_register(void)
 			 for (const QString &type : Alerts::types())
 				 on += types.value(type).toObject().value(QStringLiteral("enabled")).toBool() ? 1 : 0;
 			 return T("Alerts.Describe").arg(on).arg(Alerts::types().size());
+		 }});
+	configShareAddSection(
+		{QStringLiteral("chatOverlay"), "Config.Section.ChatOverlay",
+		 []() { return g_dock ? QJsonValue(g_dock->chatConfig()) : QJsonValue(); },
+		 [](const QJsonValue &v) {
+			 if (g_dock && v.isObject())
+				 g_dock->importChatConfig(v.toObject());
+		 },
+		 [](const QJsonValue &v) {
+			 const QJsonObject on = v.toObject().value(QStringLiteral("platforms")).toObject();
+			 QStringList names;
+			 for (const QString &p : ChatOverlay::platforms()) {
+				 if (on.value(p).toBool(true))
+					 names.append(p == QLatin1String("twitch")    ? QStringLiteral("Twitch")
+						      : p == QLatin1String("youtube") ? QStringLiteral("YouTube")
+										      : QStringLiteral("Kick"));
+			 }
+			 return T("ChatOverlay.Describe").arg(names.join(QStringLiteral(", ")));
 		 }});
 }
 

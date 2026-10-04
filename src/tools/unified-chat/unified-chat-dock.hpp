@@ -87,6 +87,11 @@ signals:
 	void activity(const ChatMessage &msg, const QString &description);
 	/* Every message and event from every platform, before any filtering. */
 	void incoming(const ChatMessage &msg);
+	/* A chat line as the dock shows it (BTTV/7TV emotes added). */
+	void shown(const ChatMessage &msg);
+	/* The streamer deleted a message (messageId) or timed out or banned a
+	 * user (userId) from the dock. */
+	void removed(ChatPlatform platform, const QString &messageId, const QString &userId);
 	/* The channels changed (Settings, import or setTarget). */
 	void targetsChanged();
 

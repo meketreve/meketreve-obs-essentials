@@ -16,9 +16,11 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "alert-logic.hpp"
+#include "chat-overlay.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
+#include <QSet>
 #include <QTcpSocket>
 #include <QTest>
 
@@ -284,6 +286,82 @@ private slots:
 		QVERIFY(got.startsWith("HTTP/1.1 405"));
 		got = send("GET /api/echo HTTP/1.1\r\nHost: x\r\n\r\n");
 		QVERIFY(got.endsWith("GET::"));
+	}
+
+	void chatOverlayConfig()
+	{
+		const QJsonObject d = ChatOverlay::defaults();
+		const QJsonObject platforms = d.value(key("platforms")).toObject();
+		QVERIFY(platforms.value(key("twitch")).toBool() && platforms.value(key("youtube")).toBool() &&
+			platforms.value(key("kick")).toBool());
+		QVERIFY(d.value(key("hideCommands")).toBool());
+		QCOMPARE(d.value(key("newest")).toString(), key("bottom"));
+
+		/* Platforms turned off stay off; junk is cleaned. */
+		const QJsonObject n = ChatOverlay::normalize(
+			QJsonObject{{key("platforms"), QJsonObject{{key("youtube"), false}, {key("kick"), false}}},
+				    {key("fontSize"), 500},
+				    {key("textColor"), key("red")},
+				    {key("newest"), key("sideways")},
+				    {key("hideUsers"), key("")}});
+		QCOMPARE(n.value(key("platforms")).toObject().value(key("twitch")).toBool(), true);
+		QCOMPARE(n.value(key("platforms")).toObject().value(key("youtube")).toBool(), false);
+		QCOMPARE(n.value(key("fontSize")).toDouble(), 72.0);
+		QCOMPARE(n.value(key("textColor")).toString(), key("#FFFFFF"));
+		QCOMPARE(n.value(key("newest")).toString(), key("bottom"));
+		QCOMPARE(n.value(key("hideUsers")).toString(), QString());
+	}
+
+	void chatOverlayFilter()
+	{
+		const QJsonObject config = ChatOverlay::defaults();
+		ChatMessage msg = chat(ChatPlatform::Twitch, ChatEvent::None, 0, QString(), key("oi chat"));
+		QVERIFY(ChatOverlay::passes(config, msg));
+
+		ChatMessage command = msg;
+		command.text = key("  !pontos");
+		QVERIFY(!ChatOverlay::passes(config, command));
+		QJsonObject showCommands = config;
+		showCommands.insert(key("hideCommands"), false);
+		QVERIFY(ChatOverlay::passes(showCommands, command));
+
+		/* Bots by name, the YouTube @ and case do not matter. */
+		ChatMessage bot = msg;
+		bot.author = key("@NightBot");
+		QVERIFY(!ChatOverlay::passes(config, bot));
+
+		/* Events are for the alerts, empty lines for nobody. */
+		QVERIFY(!ChatOverlay::passes(config,
+					     chat(ChatPlatform::Twitch, ChatEvent::Sub, 1, QString(), key("oi"))));
+		QVERIFY(!ChatOverlay::passes(config, chat(ChatPlatform::Kick, ChatEvent::None)));
+	}
+
+	void chatOverlayJson()
+	{
+		ChatMessage msg =
+			chat(ChatPlatform::Kick, ChatEvent::None, 0, QString(), QString::fromUtf8("😀 oi KEKW"));
+		msg.id = key("m1");
+		msg.userId = key("u1");
+		msg.isMod = true;
+		/* UTF-16 positions, the same as JavaScript's: the emoji takes two. */
+		msg.emotes.append(ChatEmote{6, 4, key("https://files.kick.com/emotes/1/fullsize")});
+		msg.emotes.append(ChatEmote{8, 9, key("https://bad")});
+		const QJsonObject j = ChatOverlay::toJson(msg);
+		QCOMPARE(j.value(key("platform")).toString(), key("kick"));
+		QCOMPARE(j.value(key("id")).toString(), key("m1"));
+		QCOMPARE(j.value(key("user")).toString(), key("u1"));
+		QVERIFY(j.value(key("mod")).toBool());
+		const QJsonArray emotes = j.value(key("emotes")).toArray();
+		QCOMPARE(emotes.size(), 1);
+		QCOMPARE(msg.text.mid(emotes.at(0).toObject().value(key("start")).toInt(),
+				      emotes.at(0).toObject().value(key("length")).toInt()),
+			 key("KEKW"));
+
+		/* The samples cover every platform. */
+		QSet<QString> seen;
+		for (const QJsonValue v : ChatOverlay::samples())
+			seen.insert(v.toObject().value(key("platform")).toString());
+		QCOMPARE(seen.size(), 3);
 	}
 };
 
