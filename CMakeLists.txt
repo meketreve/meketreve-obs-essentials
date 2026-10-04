@@ -73,6 +73,8 @@ target_sources(
     src/tools/alerts/event-history.hpp
     src/tools/alerts/goals.cpp
     src/tools/alerts/goals.hpp
+    src/tools/alerts/poll.cpp
+    src/tools/alerts/poll.hpp
     src/tools/alerts/alerts-dock.cpp
     src/tools/alerts/alerts-dock.hpp
     src/tools/alerts/alerts-widgets.cpp

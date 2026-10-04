@@ -281,6 +281,12 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 		[this]() { return goalsOverlayUrl(); });
 	section("Goals.Title", "Goals.Help", goalsRow);
 
+	auto *pollRow = new QHBoxLayout();
+	sourceButtons(
+		pollRow, [this]() { addBrowserSource(T("Poll.SourceName"), pollOverlayUrl(), 600, 400, false); },
+		[this]() { return pollOverlayUrl(); });
+	section("Poll.Title", "Poll.Help", pollRow);
+
 	/* Overlays with their own server (the chat parade, now playing). */
 	m_extraSections = new QVBoxLayout();
 	m_extraSections->setContentsMargins(0, 0, 0, 0);
@@ -337,6 +343,11 @@ QString AlertsDock::eventsOverlayUrl() const
 QString AlertsDock::goalsOverlayUrl() const
 {
 	return QStringLiteral("http://localhost:%1/metas").arg(m_port);
+}
+
+QString AlertsDock::pollOverlayUrl() const
+{
+	return QStringLiteral("http://localhost:%1/enquete").arg(m_port);
 }
 
 void AlertsDock::loadSettings()
@@ -584,7 +595,10 @@ void AlertsDock::refreshStatus()
 
 void AlertsDock::onChat(const ChatMessage &msg)
 {
-	if (!m_enabled || msg.event == ChatEvent::None)
+	if (!m_enabled)
+		return;
+	widgetsChat(msg);
+	if (msg.event == ChatEvent::None)
 		return;
 	const Alerts::Event event = Alerts::fromChat(msg);
 	const qint64 now = QDateTime::currentMSecsSinceEpoch();
@@ -808,7 +822,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
 					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
-					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals."))) {
+					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals.") ||
+					       line.startsWith("Poll."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}

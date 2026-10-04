@@ -5,7 +5,7 @@
 
 const TABS = [["alertas", "/editor", "Alerts.Title"], ["chat", "/chat-editor", "ChatOverlay.Title"],
   ["eventos", "/eventos-editor", "EventsOverlay.Title"], ["desfile", "/desfile-editor", "Texuguito.Parade.Title"],
-  ["metas", "/metas-editor", "Goals.Title"], ["bot", "/bot-editor", "Texuguito.BotPanel.Tab"],
+  ["metas", "/metas-editor", "Goals.Title"], ["enquete", "/enquete-editor", "Poll.Title"], ["bot", "/bot-editor", "Texuguito.BotPanel.Tab"],
   ["tocando", "/tocando-editor", "NowPlaying.Title"]];
 const hash = new URLSearchParams(location.hash.slice(1));
 const token = hash.get("t") || "";

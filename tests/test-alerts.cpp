@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "chat-overlay.hpp"
 #include "event-history.hpp"
 #include "goals.hpp"
+#include "poll.hpp"
 #include "overlay-server.hpp"
 
 #include <QJsonArray>
@@ -532,6 +533,70 @@ private slots:
 		QCOMPARE(current(config, 0), 0.0);
 		QCOMPARE(current(config, 1), 100.0);
 		QVERIFY(!Goals::resetForLive(config));
+	}
+
+	void poll()
+	{
+		QCOMPARE(Poll::voteFromChat(key("!voto 2")), 2);
+		QCOMPARE(Poll::voteFromChat(key("  !VOTE 3 please")), 3);
+		QCOMPARE(Poll::voteFromChat(key("!voto 12")), 0);
+		QCOMPARE(Poll::voteFromChat(key("!votos 1")), 0);
+		QCOMPARE(Poll::voteFromChat(key("eu !voto 1")), 0);
+
+		Poll::Session p;
+		QVERIFY(!p.exists());
+		QVERIFY(p.toJson(0).isEmpty());
+		QCOMPARE(p.start(key(""), {key("a"), key("b")}, 60, 0), key("question"));
+		QCOMPARE(p.start(key("Q?"), {key("a"), key(" ")}, 60, 0), key("options"));
+		QCOMPARE(p.start(key("Q?"), {key("a"), key("b")}, 99999, 0), key("duration"));
+		QVERIFY(p.start(key("Qual jogo?"), {key("Celeste"), key("Hades"), key("Tetris")}, 60, 1000).isEmpty());
+		QVERIFY(p.isOpen());
+
+		/* One vote per person per platform; changing it moves the vote. */
+		QVERIFY(p.vote(key("twitch:1"), 1, 2000));
+		QVERIFY(p.vote(key("kick:1"), 2, 2000));
+		QVERIFY(!p.vote(key("twitch:1"), 1, 2000));
+		QVERIFY(p.vote(key("twitch:1"), 2, 2000));
+		QVERIFY(!p.vote(key("youtube:x"), 4, 2000));
+		QVERIFY(!p.vote(key("youtube:x"), 0, 2000));
+		QCOMPARE(p.counts(), (QList<int>{0, 2, 0}));
+		QCOMPARE(p.winner(), 2);
+		const QJsonObject open = p.toJson(31000);
+		QCOMPARE(open.value(key("total")).toInt(), 2);
+		QCOMPARE(open.value(key("remainingMs")).toDouble(), 30000.0);
+
+		/* Saved and loaded as it was. */
+		Poll::Session copy;
+		copy.load(p.save());
+		QCOMPARE(copy.counts(), p.counts());
+		QVERIFY(copy.isOpen());
+
+		/* Time up: closed, and late votes do not count. */
+		QVERIFY(!p.expire(60999));
+		QVERIFY(p.expire(61000));
+		QVERIFY(!p.isOpen());
+		QVERIFY(!p.vote(key("youtube:y"), 1, 62000));
+		QCOMPARE(p.toJson(62000).value(key("closedAt")).toDouble(), 61000.0);
+		QVERIFY(!p.stop(63000));
+
+		/* No time limit: open until closed by hand. Ties go to the first. */
+		QVERIFY(p.start(key("Sim ou não?"), {key("Sim"), key("Não")}, 0, 0).isEmpty());
+		QCOMPARE(p.winner(), 0);
+		QVERIFY(!p.expire(99999999));
+		QVERIFY(p.vote(key("a"), 2, 1));
+		QVERIFY(p.vote(key("b"), 1, 1));
+		QCOMPARE(p.winner(), 1);
+		QVERIFY(p.stop(5));
+		QVERIFY(!p.isOpen());
+
+		/* Broken files load as no poll. */
+		Poll::Session broken;
+		broken.load(QJsonObject{{key("options"), QJsonArray{key("one")}}});
+		QVERIFY(!broken.exists());
+
+		const QJsonObject config = Poll::normalizeConfig(QJsonObject{{key("resultSeconds"), -3}});
+		QCOMPARE(config.value(key("resultSeconds")).toDouble(), 0.0);
+		QCOMPARE(config.value(key("announce")).toBool(), false);
 	}
 
 	void chatOverlayJson()

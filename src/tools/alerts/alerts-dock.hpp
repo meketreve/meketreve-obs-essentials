@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "alert-logic.hpp"
 #include "event-history.hpp"
 #include "goals.hpp"
+#include "poll.hpp"
 #include "../texuguito/overlay-server.hpp"
 
 #include <obs-frontend-api.h>
@@ -54,6 +55,7 @@ void overlaysAddSection(OverlaySection section);
 
 class QLabel;
 class QPushButton;
+class QTimer;
 class QVBoxLayout;
 class UnifiedChatDock;
 
@@ -68,6 +70,7 @@ public:
 	QString chatOverlayUrl() const;
 	QString eventsOverlayUrl() const;
 	QString goalsOverlayUrl() const;
+	QString pollOverlayUrl() const;
 	/* The web panel, open on one tab: alertas, chat, eventos, tocando. */
 	QString panelUrl(const QString &tab) const;
 	QJsonObject shareableConfig() const;
@@ -112,6 +115,8 @@ private:
 	 * check). */
 	void loadWidgets();
 	void widgetsEvent(const Alerts::Event &event);
+	/* Every chat line: "!voto N" while a poll is open. */
+	void widgetsChat(const ChatMessage &msg);
 	void widgetsLiveStarted();
 	void widgetsSnapshot(QJsonObject &snapshot) const;
 	bool widgetsPage(const QString &path, OverlayServer::Reply &reply) const;
@@ -119,6 +124,16 @@ private:
 	void saveGoals();
 	void broadcastGoals();
 	QJsonObject goalsMessage() const;
+	void savePoll();
+	void broadcastPoll();
+	QJsonObject pollMessage() const;
+	/* While a poll is open: closes it when the time is up and sends the
+	 * votes that came in, at most four times a second. */
+	void pollTick();
+	/* Closed by hand or by the time: saved, sent and the result announced. */
+	void pollClosed();
+	/* To every chat with a login, when "announce" is on. */
+	void announce(const QString &text);
 	void apiMediaList(OverlayServer::Reply &reply) const;
 	void apiMediaUpload(const QString &name, const QByteArray &data, OverlayServer::Reply &reply);
 
@@ -135,6 +150,10 @@ private:
 	QJsonObject m_eventsConfig;
 	EventsOverlay::History m_history;
 	QJsonObject m_goals;
+	QJsonObject m_pollConfig;
+	Poll::Session m_poll;
+	QTimer *m_pollTimer = nullptr;
+	bool m_pollDirty = false;
 	QString m_token;
 	quint16 m_port = 8902;
 	bool m_enabled = true;

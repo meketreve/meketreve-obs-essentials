@@ -145,6 +145,8 @@ add_executable(
   ${_alerts}/event-history.hpp
   ${_alerts}/goals.cpp
   ${_alerts}/goals.hpp
+  ${_alerts}/poll.cpp
+  ${_alerts}/poll.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
 )

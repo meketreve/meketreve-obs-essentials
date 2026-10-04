@@ -16,18 +16,23 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
-/* The overlays the events fill (goals), apart from alerts-dock.cpp: they
- * share its server, token and events. */
+/* The overlays the events and the chat fill (goals, poll), apart from
+ * alerts-dock.cpp: they share its server, token and events. */
 
 #include "alerts-dock.hpp"
+
+#include "../unified-chat/unified-chat-dock.hpp"
 
 #include <obs-module.h>
 #include <plugin-support.h>
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QSaveFile>
+#include <QTimer>
 
 namespace {
 
@@ -75,11 +80,26 @@ bool writeJson(const QString &path, const QJsonObject &object)
 	       file.write(QJsonDocument(object).toJson(QJsonDocument::Indented)) >= 0 && file.commit();
 }
 
+qint64 now()
+{
+	return QDateTime::currentMSecsSinceEpoch();
+}
+
 } // namespace
 
 void AlertsDock::loadWidgets()
 {
 	m_goals = Goals::normalize(readJson(QDir(m_dir).filePath(QStringLiteral("goals.json"))), T);
+
+	const QJsonObject poll = readJson(QDir(m_dir).filePath(QStringLiteral("poll.json")));
+	m_pollConfig = Poll::normalizeConfig(poll.value(QStringLiteral("config")).toObject());
+	m_poll.load(poll.value(QStringLiteral("poll")).toObject());
+	m_pollTimer = new QTimer(this);
+	m_pollTimer->setInterval(250);
+	connect(m_pollTimer, &QTimer::timeout, this, &AlertsDock::pollTick);
+	/* Open when OBS closed: it goes on, or closes now if its time is up. */
+	if (m_poll.isOpen())
+		m_pollTimer->start();
 }
 
 void AlertsDock::saveGoals()
@@ -108,6 +128,77 @@ void AlertsDock::widgetsEvent(const Alerts::Event &event)
 	}
 }
 
+void AlertsDock::widgetsChat(const ChatMessage &msg)
+{
+	if (msg.event != ChatEvent::None || !m_poll.isOpen())
+		return;
+	const int option = Poll::voteFromChat(msg.text);
+	if (option == 0)
+		return;
+	const QString user = msg.userId.isEmpty() ? msg.author.toLower() : msg.userId;
+	if (m_poll.vote(Alerts::platformKey(msg.platform) + QLatin1Char(':') + user, option, now()))
+		m_pollDirty = true;
+}
+
+void AlertsDock::savePoll()
+{
+	const QJsonObject stored{{QStringLiteral("config"), m_pollConfig}, {QStringLiteral("poll"), m_poll.save()}};
+	if (!writeJson(QDir(m_dir).filePath(QStringLiteral("poll.json")), stored))
+		obs_log(LOG_WARNING, "[alerts] could not save poll.json");
+}
+
+QJsonObject AlertsDock::pollMessage() const
+{
+	return QJsonObject{{QStringLiteral("type"), QStringLiteral("poll")},
+			   {QStringLiteral("config"), m_pollConfig},
+			   {QStringLiteral("poll"), m_poll.toJson(now())},
+			   /* The overlay gets its few strings here, in the OBS language. */
+			   {QStringLiteral("texts"),
+			    QJsonObject{{QStringLiteral("vote"), T("Poll.Overlay.Vote")},
+					{QStringLiteral("result"), T("Poll.Overlay.Result")},
+					{QStringLiteral("noVotes"), T("Poll.Overlay.NoVotes")}}},
+			   {QStringLiteral("lang"), language()}};
+}
+
+void AlertsDock::broadcastPoll()
+{
+	m_server->broadcast(pollMessage());
+}
+
+void AlertsDock::pollTick()
+{
+	if (m_poll.expire(now())) {
+		pollClosed();
+	} else if (m_pollDirty) {
+		m_pollDirty = false;
+		savePoll();
+		broadcastPoll();
+	}
+}
+
+void AlertsDock::pollClosed()
+{
+	m_pollTimer->stop();
+	m_pollDirty = false;
+	savePoll();
+	broadcastPoll();
+	const int winner = m_poll.winner();
+	if (winner > 0)
+		announce(T("Poll.Announce.Result")
+				 .arg(m_poll.question(), m_poll.options().at(winner - 1))
+				 .arg(m_poll.counts().at(winner - 1)));
+	else
+		announce(T("Poll.Announce.NoVotes").arg(m_poll.question()));
+}
+
+void AlertsDock::announce(const QString &text)
+{
+	if (!m_pollConfig.value(QStringLiteral("announce")).toBool())
+		return;
+	for (const ChatPlatform platform : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick})
+		m_chat->sendAs(platform, text);
+}
+
 void AlertsDock::widgetsLiveStarted()
 {
 	if (Goals::resetForLive(m_goals)) {
@@ -119,6 +210,7 @@ void AlertsDock::widgetsLiveStarted()
 void AlertsDock::widgetsSnapshot(QJsonObject &snapshot) const
 {
 	snapshot.insert(QStringLiteral("goals"), goalsMessage());
+	snapshot.insert(QStringLiteral("poll"), pollMessage());
 }
 
 bool AlertsDock::widgetsPage(const QString &path, OverlayServer::Reply &reply) const
@@ -127,6 +219,10 @@ bool AlertsDock::widgetsPage(const QString &path, OverlayServer::Reply &reply) c
 		reply.file = webFile("goals.html");
 	else if (path == QLatin1String("/metas-editor"))
 		reply.file = webFile("goals-editor.html");
+	else if (path == QLatin1String("/enquete"))
+		reply.file = webFile("poll.html");
+	else if (path == QLatin1String("/enquete-editor"))
+		reply.file = webFile("poll-editor.html");
 	else
 		return false;
 	return true;
@@ -138,7 +234,9 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 	const bool get = request.method == "GET";
 	const bool post = request.method == "POST";
 	const QJsonDocument doc = post ? QJsonDocument::fromJson(request.body) : QJsonDocument();
-	if (post && !doc.isObject() && path.startsWith(QLatin1String("/api/goals"))) {
+	/* An empty body is {}: stop and clear need nothing. */
+	if (post && !request.body.trimmed().isEmpty() && !doc.isObject() &&
+	    (path.startsWith(QLatin1String("/api/goals")) || path.startsWith(QLatin1String("/api/poll")))) {
 		errorReply(reply, 400, QStringLiteral("bad json"));
 		return true;
 	}
@@ -161,6 +259,45 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 		saveGoals();
 		broadcastGoals();
 		jsonReply(reply, 200, m_goals);
+	} else if (get && path == QLatin1String("/api/poll")) {
+		jsonReply(reply, 200, pollMessage());
+	} else if (post && path == QLatin1String("/api/poll-config")) {
+		m_pollConfig = Poll::normalizeConfig(body);
+		savePoll();
+		broadcastPoll();
+		jsonReply(reply, 200, pollMessage());
+	} else if (post && path == QLatin1String("/api/poll-start")) {
+		/* {question, options: [...], seconds}; a poll still open is replaced. */
+		QStringList options;
+		for (const QJsonValue v : body.value(QStringLiteral("options")).toArray())
+			options.append(v.toString());
+		const QString error = m_poll.start(body.value(QStringLiteral("question")).toString(), options,
+						   body.value(QStringLiteral("seconds")).toInt(), now());
+		if (!error.isEmpty()) {
+			errorReply(reply, 400, error);
+			return true;
+		}
+		m_pollDirty = false;
+		m_pollTimer->start();
+		savePoll();
+		broadcastPoll();
+		QStringList numbered;
+		for (int i = 0; i < m_poll.options().size(); i++)
+			numbered.append(QStringLiteral("%1) %2").arg(i + 1).arg(m_poll.options().at(i)));
+		announce(T("Poll.Announce.Start").arg(m_poll.question(), numbered.join(QStringLiteral(" · "))));
+		jsonReply(reply, 200, pollMessage());
+	} else if (post && path == QLatin1String("/api/poll-stop")) {
+		/* Closing by hand goes the same way as the time running out. */
+		if (m_poll.stop(now()))
+			pollClosed();
+		jsonReply(reply, 200, pollMessage());
+	} else if (post && path == QLatin1String("/api/poll-clear")) {
+		/* Off the screen; a poll still open is closed first. */
+		m_pollTimer->stop();
+		m_poll = Poll::Session();
+		savePoll();
+		broadcastPoll();
+		jsonReply(reply, 200, pollMessage());
 	} else {
 		return false;
 	}
