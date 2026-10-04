@@ -45,6 +45,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
@@ -284,6 +285,87 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 	m_server->broadcast(
 		QJsonObject{{QStringLiteral("type"), QStringLiteral("look")}, {QStringLiteral("look"), lookJson()}});
 	return panelState();
+}
+
+QJsonObject TexuguitoDock::botPanelState() const
+{
+	QJsonArray sounds;
+	QJsonObject cooldowns;
+	for (const auto &[name, clip] : m_engine->clips()) {
+		sounds.append(QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("price"), clip.cost}});
+		cooldowns.insert(QString::number(clip.cost), m_engine->clipCooldownSeconds(clip.cost));
+	}
+	QJsonArray commands;
+	CustomCommandStore &store = m_engine->customCommands();
+	QStringList names = store.names();
+	names.sort();
+	for (const QString &name : names)
+		commands.append(
+			QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("reply"), store.get(name)}});
+	return QJsonObject{{QStringLiteral("volume"), qRound(m_volume * 100.0)},
+			   {QStringLiteral("sounds"), sounds},
+			   {QStringLiteral("cooldowns"), cooldowns},
+			   {QStringLiteral("commands"), commands},
+			   {QStringLiteral("listeners"), m_server->clientCount()}};
+}
+
+QJsonObject TexuguitoDock::applyBotPanel(const QJsonObject &panel)
+{
+	const QString action = panel.value(QStringLiteral("action")).toString();
+	const QString name = panel.value(QStringLiteral("name")).toString().trimmed().toLower();
+	const auto clip = m_engine->clips().find(name);
+	const bool known = clip != m_engine->clips().end();
+	/* "/audios/<price>/<file>" -> the file on disk. */
+	const QString file =
+		known ? QDir(m_engine->audioDir()).filePath(QUrl::fromPercentEncoding(clip->second.url.mid(8).toUtf8()))
+		      : QString();
+	QString error;
+	if (action == QLatin1String("settings")) {
+		m_volume = std::clamp(panel.value(QStringLiteral("volume")).toDouble(m_volume * 100.0), 0.0, 100.0) /
+			   100.0;
+		m_engine->setVolume(m_volume);
+		const QJsonObject waits = panel.value(QStringLiteral("cooldowns")).toObject();
+		for (auto it = waits.constBegin(); it != waits.constEnd(); ++it) {
+			bool ok = false;
+			const int cost = it.key().toInt(&ok);
+			if (ok && cost >= 0)
+				m_cooldowns.insert(cost, std::clamp(it.value().toInt(), 0, 3600));
+		}
+		m_engine->setClipCooldowns(m_cooldowns);
+		saveSettings();
+	} else if (action == QLatin1String("price") && known) {
+		/* The folder is the price: moving the file changes it. */
+		const int price = panel.value(QStringLiteral("price")).toInt(-1);
+		const QDir target(QDir(m_engine->audioDir()).filePath(QString::number(price)));
+		if (price < 0 || price > BotEngine::kMaxClipCost || !QDir().mkpath(target.path()) ||
+		    !QFile::rename(file, target.filePath(QFileInfo(file).fileName())))
+			error = T("Texuguito.BotPanel.MoveFailed");
+		m_engine->reloadClips();
+	} else if (action == QLatin1String("remove") && known) {
+		/* Out of the price folders, not deleted: the bot only reads numbered
+		 * folders, and the file can still be put back by hand. */
+		const QDir removed(QDir(m_engine->audioDir()).filePath(QStringLiteral("removidos")));
+		if (!QDir().mkpath(removed.path()) ||
+		    !QFile::rename(file, removed.filePath(QFileInfo(file).fileName())))
+			error = T("Texuguito.BotPanel.MoveFailed");
+		m_engine->reloadClips();
+	} else if (action == QLatin1String("test") && known) {
+		if (m_server->clientCount() <= 0)
+			error = T("Texuguito.BotPanel.NoParade");
+		else
+			m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio")},
+							{QStringLiteral("url"), clip->second.url},
+							{QStringLiteral("volume"), m_volume}});
+	} else if (action == QLatin1String("command")) {
+		error = m_engine->setCustomCommand(panel.value(QStringLiteral("name")).toString(),
+						   panel.value(QStringLiteral("reply")).toString());
+	} else if (action == QLatin1String("deleteCommand")) {
+		m_engine->customCommands().remove(name);
+	}
+	QJsonObject state = botPanelState();
+	if (!error.isEmpty())
+		state.insert(QStringLiteral("error"), error);
+	return state;
 }
 
 void TexuguitoDock::loadSettings()
@@ -761,6 +843,10 @@ void texuguito_register(void)
 				    if (self)
 					    self->addBrowserSource();
 			    }});
+	overlaysAddPanelTab(QStringLiteral("bot"), {[self]() { return self ? self->botPanelState() : QJsonObject(); },
+						    [self](const QJsonObject &panel) {
+							    return self ? self->applyBotPanel(panel) : QJsonObject();
+						    }});
 	overlaysAddPanelTab(QStringLiteral("desfile"), {[self]() { return self ? self->panelState() : QJsonObject(); },
 							[self](const QJsonObject &panel) {
 								return self ? self->applyPanel(panel) : QJsonObject();

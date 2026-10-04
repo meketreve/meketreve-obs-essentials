@@ -636,6 +636,10 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		reply.file = QDir(webDir()).filePath(QStringLiteral("panel.html"));
 		return true;
 	}
+	if (get && path == QLatin1String("/bot-editor")) {
+		reply.file = QDir(webDir()).filePath(QStringLiteral("bot-editor.html"));
+		return true;
+	}
 	if (get && path == QLatin1String("/desfile-editor")) {
 		reply.file = QDir(webDir()).filePath(QStringLiteral("parade-editor.html"));
 		return true;
@@ -782,7 +786,8 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 				const qsizetype eq = line.indexOf('=');
 				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
 					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
-					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade."))) {
+					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
+					       line.startsWith("Texuguito.BotPanel."))) {
 					const QByteArray key = line.left(eq).trimmed();
 					strings.insert(QString::fromUtf8(key), T(key.constData()));
 				}

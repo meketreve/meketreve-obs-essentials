@@ -544,6 +544,31 @@ QString BotEngine::handleCustomCommand(const BotMessage &msg, const QString &nam
 	return response;
 }
 
+QString BotEngine::setCustomCommand(const QString &rawName, const QString &response)
+{
+	QString name = rawName.trimmed();
+	while (name.startsWith(QLatin1Char('!')))
+		name.remove(0, 1);
+	name = name.toLower();
+	static const QRegularExpression valid(QStringLiteral("^[\\w-]+$"),
+					      QRegularExpression::UseUnicodePropertiesOption);
+	if (name.isEmpty())
+		return t("Texuguito.Bot.CommandNameMissing");
+	if (name.size() > kCustomNameMax)
+		return t("Texuguito.Bot.CommandNameTooLong").arg(kCustomNameMax);
+	if (!valid.match(name).hasMatch())
+		return t("Texuguito.Bot.CommandNameInvalid");
+	if (reservedNames().contains(name))
+		return t("Texuguito.Bot.CommandReserved").arg(name);
+	const QString reply = response.trimmed();
+	if (reply.isEmpty())
+		return t("Texuguito.BotPanel.EmptyReply");
+	if (reply.size() > kCustomResponseMax)
+		return t("Texuguito.Bot.ReplyTooLong").arg(kCustomResponseMax);
+	m_custom.set(name, reply);
+	return QString();
+}
+
 QString BotEngine::handleComando(const BotMessage &msg, const QStringList &args)
 {
 	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;

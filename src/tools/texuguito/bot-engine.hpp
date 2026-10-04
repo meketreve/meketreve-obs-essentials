@@ -141,6 +141,9 @@ public:
 	PointsStore &points() { return m_points; }
 	ViewerStore &viewers() { return m_viewers; }
 	CustomCommandStore &customCommands() { return m_custom; }
+	/* Creates or changes a chat-made command from the web panel, with the
+	 * same rules as "!comando add": empty when done, else the error. */
+	QString setCustomCommand(const QString &name, const QString &response);
 	void setRaffleChooser(Raffle::Chooser chooser) { m_raffle = Raffle(std::move(chooser)); }
 	/* For tests: move the clip cooldown clocks back. */
 	void resetClipCooldown() { m_lastClip.clear(); }

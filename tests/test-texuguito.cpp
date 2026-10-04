@@ -692,6 +692,20 @@ private slots:
 		QVERIFY(avatar.value(QStringLiteral("dance_remaining")).toDouble() > 0);
 	}
 
+	void customCommandsFromPanel()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setText(locale("pt-BR.ini"));
+		QVERIFY(bot.setCustomCommand(QStringLiteral("!Discord"), QStringLiteral("  discord.gg/x  ")).isEmpty());
+		QCOMPARE(bot.customCommands().get(QStringLiteral("discord")), QStringLiteral("discord.gg/x"));
+		/* Built-in names, bad names and empty replies are refused. */
+		QVERIFY(!bot.setCustomCommand(QStringLiteral("pontos"), QStringLiteral("x")).isEmpty());
+		QVERIFY(!bot.setCustomCommand(QStringLiteral("a b"), QStringLiteral("x")).isEmpty());
+		QVERIFY(!bot.setCustomCommand(QStringLiteral("vazio"), QStringLiteral("   ")).isEmpty());
+		QVERIFY(!bot.customCommands().contains(QStringLiteral("vazio")));
+	}
+
 	void raffle()
 	{
 		QTemporaryDir dir;

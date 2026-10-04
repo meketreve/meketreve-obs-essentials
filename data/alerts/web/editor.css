@@ -38,6 +38,14 @@ button, input, select { font: inherit; color: inherit; }
 .tabs-bar button.active { background: var(--panel-2); border-color: var(--line); color: var(--text); }
 .np-frame { width: 100%; aspect-ratio: 16 / 7; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);
   background: repeating-conic-gradient(#2a2d38 0% 25%, #23252e 0% 50%) 0 0 / 24px 24px; }
+/* One-column pages (chat bot) and lists of editable rows. */
+.single { max-width: 900px; margin: 0 auto; padding: 18px; }
+.list-row { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.list-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inline.grow > input[type=text] { flex: 1; min-width: 120px; }
+input.num { width: 90px; }
+.muted { color: var(--muted); font-size: 13px; }
+@media (max-width: 720px) { .list-row { grid-template-columns: 1fr; } }
 .parade-frame { width: 100%; aspect-ratio: 16 / 5; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);
   background: repeating-conic-gradient(#2a2d38 0% 25%, #23252e 0% 50%) 0 0 / 24px 24px; }
 .parade-frame iframe { width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }

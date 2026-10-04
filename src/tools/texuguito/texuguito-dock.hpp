@@ -42,6 +42,11 @@ public:
 	 * what the panel saved and answers the new state. */
 	QJsonObject panelState() const;
 	QJsonObject applyPanel(const QJsonObject &panel);
+	/* The web panel's Chat bot tab: sounds with their price, the wait per
+	 * price, the volume and the chat-made commands. applyBotPanel runs one
+	 * "action" and answers the new state (and "error" when it failed). */
+	QJsonObject botPanelState() const;
+	QJsonObject applyBotPanel(const QJsonObject &panel);
 	QString statusText() const;
 	/* Copies an old texuguito-seu-bot-amigo folder in; returns a summary. */
 	QString importFrom(const QString &dir);
