@@ -23,6 +23,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QJsonObject>
 #include <QString>
 
+#include <functional>
+
 /* Two languages with two readers: the plugin language is for whoever runs
  * OBS (docks, dialogs, web panel); the stream language is for viewers
  * (overlays, announcements, TTS). Languages are short codes: "pt" or "en",
@@ -64,6 +66,14 @@ private:
 	QHash<QString, QString> m_en;
 };
 
+/* A text function for one language: key -> translated template. */
+using Text = std::function<QString(const char *key)>;
+
+/* Builds a text for the stream language with <build>; bilingual ("both")
+ * builds it in pt and in en and joins them ("pt / en") when they differ. */
+QString compose(const QString &stream, const Catalog &catalog, const std::function<QString(const Text &)> &build,
+		const QString &separator = QStringLiteral(" / "));
+
 /* Runtime (inside OBS): read once, on the first call, from language.json
  * and the module's locale files. Changes only apply after restarting OBS. */
 QString plugin();
@@ -73,6 +83,11 @@ QString stream();
 QString streamSingle();
 QString text(const QString &lang, const char *key);
 const Catalog &catalog();
+Text textFor(const QString &lang);
+/* compose() with the configured stream language. */
+QString forStream(const std::function<QString(const Text &)> &build, const QString &separator = QStringLiteral(" / "));
+/* One template in the stream language (bilingual = "pt / en"). */
+QString streamText(const char *key);
 /* Saved settings, read again from disk (what the next start will use). */
 Settings saved();
 bool save(const Settings &settings);

@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "theme.hpp"
 
 #include "../unified-chat/unified-chat-dock.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-module.h>
 #include <plugin-support.h>
@@ -53,8 +54,7 @@ QString webFile(const char *name)
 
 QString language()
 {
-	const char *locale = obs_get_locale();
-	return locale && QByteArray(locale).startsWith("pt") ? QStringLiteral("pt") : QStringLiteral("en");
+	return I18n::streamSingle();
 }
 
 void jsonReply(OverlayServer::Reply &reply, int status, const QJsonObject &body)
@@ -124,8 +124,8 @@ QJsonObject AlertsDock::subathonMessage(qint64 added) const
 			   {QStringLiteral("timer"), m_subathon.toJson(now())},
 			   {QStringLiteral("added"), static_cast<double>(added)},
 			   {QStringLiteral("texts"),
-			    QJsonObject{{QStringLiteral("ended"), T("Subathon.Overlay.Ended")},
-					{QStringLiteral("paused"), T("Subathon.Overlay.Paused")}}}};
+			    QJsonObject{{QStringLiteral("ended"), I18n::streamText("Subathon.Overlay.Ended")},
+					{QStringLiteral("paused"), I18n::streamText("Subathon.Overlay.Paused")}}}};
 }
 
 void AlertsDock::broadcastSubathon(qint64 added)
@@ -188,11 +188,11 @@ QJsonObject AlertsDock::pollMessage() const
 	return QJsonObject{{QStringLiteral("type"), QStringLiteral("poll")},
 			   {QStringLiteral("config"), m_pollConfig},
 			   {QStringLiteral("poll"), m_poll.toJson(now())},
-			   /* The overlay gets its few strings here, in the OBS language. */
+			   /* The overlay gets its few strings here, in the stream language. */
 			   {QStringLiteral("texts"),
-			    QJsonObject{{QStringLiteral("vote"), T("Poll.Overlay.Vote")},
-					{QStringLiteral("result"), T("Poll.Overlay.Result")},
-					{QStringLiteral("noVotes"), T("Poll.Overlay.NoVotes")}}},
+			    QJsonObject{{QStringLiteral("vote"), I18n::streamText("Poll.Overlay.Vote")},
+					{QStringLiteral("result"), I18n::streamText("Poll.Overlay.Result")},
+					{QStringLiteral("noVotes"), I18n::streamText("Poll.Overlay.NoVotes")}}},
 			   {QStringLiteral("lang"), language()}};
 }
 
@@ -220,11 +220,11 @@ void AlertsDock::pollClosed()
 	broadcastPoll();
 	const int winner = m_poll.winner();
 	if (winner > 0)
-		announce(T("Poll.Announce.Result")
+		announce(I18n::streamText("Poll.Announce.Result")
 				 .arg(m_poll.question(), m_poll.options().at(winner - 1))
 				 .arg(m_poll.counts().at(winner - 1)));
 	else
-		announce(T("Poll.Announce.NoVotes").arg(m_poll.question()));
+		announce(I18n::streamText("Poll.Announce.NoVotes").arg(m_poll.question()));
 }
 
 void AlertsDock::announce(const QString &text)
@@ -328,7 +328,8 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 		QStringList numbered;
 		for (int i = 0; i < m_poll.options().size(); i++)
 			numbered.append(QStringLiteral("%1) %2").arg(i + 1).arg(m_poll.options().at(i)));
-		announce(T("Poll.Announce.Start").arg(m_poll.question(), numbered.join(QStringLiteral(" · "))));
+		announce(I18n::streamText("Poll.Announce.Start")
+				 .arg(m_poll.question(), numbered.join(QStringLiteral(" · "))));
 		jsonReply(reply, 200, pollMessage());
 	} else if (post && path == QLatin1String("/api/poll-stop")) {
 		/* Closing by hand goes the same way as the time running out. */

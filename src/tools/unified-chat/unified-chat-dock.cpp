@@ -432,36 +432,39 @@ void UnifiedChatDock::showPlaceholder()
 				.arg(T(anyConfigured ? "UnifiedChat.Waiting" : "UnifiedChat.Empty").toHtmlEscaped()));
 }
 
-QString UnifiedChatDock::describeEvent(const ChatMessage &msg)
+QString UnifiedChatDock::describeEvent(const ChatMessage &msg, const std::function<QString(const char *)> &text)
 {
-	const QString who = msg.author.isEmpty() ? T("Activity.Someone") : msg.author;
+	const auto tx = [&text](const char *key) {
+		return text ? text(key) : T(key);
+	};
+	const QString who = msg.author.isEmpty() ? tx("Activity.Someone") : msg.author;
 	QString line;
 	switch (msg.event) {
 	case ChatEvent::None:
 		return QString();
 	case ChatEvent::Sub:
-		line = msg.amount > 1 ? T("Activity.Resub").arg(who).arg(msg.amount) : T("Activity.Sub").arg(who);
+		line = msg.amount > 1 ? tx("Activity.Resub").arg(who).arg(msg.amount) : tx("Activity.Sub").arg(who);
 		break;
 	case ChatEvent::GiftSub:
 		line = msg.amount <= 1 && !msg.detail.isEmpty() && !msg.detail.startsWith(QLatin1String("Tier")) &&
 				       msg.detail != QLatin1String("Prime")
-			       ? T("Activity.GiftSubOne").arg(who, msg.detail)
-			       : T("Activity.GiftSubMany").arg(who).arg(std::max(1, msg.amount));
+			       ? tx("Activity.GiftSubOne").arg(who, msg.detail)
+			       : tx("Activity.GiftSubMany").arg(who).arg(std::max(1, msg.amount));
 		return line;
 	case ChatEvent::Raid:
-		line = msg.amount > 0 ? T("Activity.Raid").arg(who).arg(msg.amount) : T("Activity.Host").arg(who);
+		line = msg.amount > 0 ? tx("Activity.Raid").arg(who).arg(msg.amount) : tx("Activity.Host").arg(who);
 		return line;
 	case ChatEvent::Bits:
-		return T("Activity.Bits").arg(who).arg(msg.amount);
+		return tx("Activity.Bits").arg(who).arg(msg.amount);
 	case ChatEvent::Follow:
-		return T("Activity.Follow").arg(who);
+		return tx("Activity.Follow").arg(who);
 	case ChatEvent::Donation:
-		return T("Activity.Donation").arg(who, msg.detail);
+		return tx("Activity.Donation").arg(who, msg.detail);
 	case ChatEvent::Membership:
-		line = T("Activity.Membership").arg(who);
+		line = tx("Activity.Membership").arg(who);
 		break;
 	case ChatEvent::Gift:
-		return T("Activity.Gift").arg(who).arg(std::max(1, msg.amount)).arg(msg.detail);
+		return tx("Activity.Gift").arg(who).arg(std::max(1, msg.amount)).arg(msg.detail);
 	}
 	if (!msg.detail.isEmpty())
 		line += QStringLiteral(" · ") + msg.detail;

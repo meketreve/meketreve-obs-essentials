@@ -109,4 +109,19 @@ QString Catalog::both(const QString &key, const QString &separator) const
 	return pt == en ? pt : pt + separator + en;
 }
 
+QString compose(const QString &stream, const Catalog &catalog, const std::function<QString(const Text &)> &build,
+		const QString &separator)
+{
+	const auto textIn = [&catalog](const QString &lang) -> Text {
+		return [&catalog, lang](const char *key) {
+			return catalog.text(lang, QString::fromUtf8(key));
+		};
+	};
+	if (stream != QLatin1String("both"))
+		return build(textIn(stream == QLatin1String("pt") ? QStringLiteral("pt") : QStringLiteral("en")));
+	const QString pt = build(textIn(QStringLiteral("pt")));
+	const QString en = build(textIn(QStringLiteral("en")));
+	return pt == en ? pt : pt + separator + en;
+}
+
 } // namespace I18n

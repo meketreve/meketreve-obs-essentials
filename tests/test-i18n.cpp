@@ -100,6 +100,26 @@ private slots:
 		QCOMPARE(c.both(QStringLiteral("Ok")), QStringLiteral("OK"));
 	}
 
+	void composeForTheStream()
+	{
+		Catalog c;
+		c.set(QStringLiteral("en"), {{QStringLiteral("Follow"), QStringLiteral("%1 followed")},
+					     {QStringLiteral("Pts"), QStringLiteral("%1 pts")}});
+		c.set(QStringLiteral("pt"), {{QStringLiteral("Follow"), QStringLiteral("%1 seguiu")},
+					     {QStringLiteral("Pts"), QStringLiteral("%1 pts")}});
+		const auto follow = [](const Text &t) {
+			return t("Follow").arg(QStringLiteral("ana"));
+		};
+		QCOMPARE(compose(QStringLiteral("pt"), c, follow), QStringLiteral("ana seguiu"));
+		QCOMPARE(compose(QStringLiteral("en"), c, follow), QStringLiteral("ana followed"));
+		QCOMPARE(compose(QStringLiteral("both"), c, follow), QStringLiteral("ana seguiu / ana followed"));
+		QCOMPARE(compose(QStringLiteral("both"), c, [](const Text &t) { return t("Pts").arg(5); }),
+			 QStringLiteral("5 pts"));
+		/* A joined template still takes .arg() in both halves. */
+		QCOMPARE(c.both(QStringLiteral("Follow")).arg(QStringLiteral("bo")),
+			 QStringLiteral("bo seguiu / bo followed"));
+	}
+
 	void localeFilesHaveTheSameKeys()
 	{
 		const auto en = readLocale("en-US.ini");

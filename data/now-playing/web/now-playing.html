@@ -78,6 +78,9 @@ const TEXT = {
   pt: { now: "Tocando agora", playing: "tocando", paused: "pausado", nothing: "Nada tocando", pc: "Som do PC", noInfo: "sem informação da música", untitled: "Sem título" },
   en: { now: "Now playing", playing: "playing", paused: "paused", nothing: "Nothing playing", pc: "Computer audio", noInfo: "no song information", untitled: "Untitled" },
 };
+// Bilingual stream: "Tocando agora / Now playing".
+TEXT.both = Object.fromEntries(Object.keys(TEXT.pt).map((k) =>
+  [k, TEXT.pt[k] === TEXT.en[k] ? TEXT.pt[k] : `${TEXT.pt[k]} / ${TEXT.en[k]}`]));
 let L = TEXT.en;
 
 /* ---------- Bars: dB per band from the plugin -> smoothing, auto gain ---------- */
@@ -183,7 +186,7 @@ function connect() {
       for (let i = 0; i < BARS; i++) bandsDb[i] = +msg.bands[i] || -120;
       rmsDb = +msg.rms || -120; bandsAt = performance.now();
     } else if (msg.type === "media") {
-      if (msg.lang) L = String(msg.lang).startsWith("pt") ? TEXT.pt : TEXT.en;
+      if (msg.lang) L = msg.lang === "both" ? TEXT.both : String(msg.lang).startsWith("pt") ? TEXT.pt : TEXT.en;
       applyLook(msg.look);
       renderMedia(msg.media || null);
     }

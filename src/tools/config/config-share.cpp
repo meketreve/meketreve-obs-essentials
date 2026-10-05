@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "config-share.h"
 #include "config-share.hpp"
 #include "config-codec.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -64,7 +65,7 @@ QString localized(const QJsonValue &v)
 	if (v.isString())
 		return v.toString();
 	const QJsonObject o = v.toObject();
-	const QString locale = QString::fromUtf8(obs_get_locale());
+	const QString locale = I18n::localeOf(I18n::plugin());
 	if (o.contains(locale))
 		return o.value(locale).toString();
 	return o.value(QStringLiteral("en-US")).toString();

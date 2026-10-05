@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include <functional>
+
 #include "chat-connector.hpp"
 
 #include <QHash>
@@ -76,7 +78,8 @@ public:
 	void onRemoval(const ChatRemoval &removal);
 
 	/* Translated one-line summary of an event ("x gifted 5 subs"). */
-	static QString describeEvent(const ChatMessage &msg);
+	/* <text> picks the language (the plugin one when empty). */
+	static QString describeEvent(const ChatMessage &msg, const std::function<QString(const char *)> &text = {});
 
 	/* Sends from the logged-in account; false when that platform has no
 	 * login or no channel set. */

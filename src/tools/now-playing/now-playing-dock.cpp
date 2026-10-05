@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "now-playing-dock.hpp"
 #include "now-playing.h"
 #include "../alerts/alerts-dock.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -339,7 +340,7 @@ QJsonObject NowPlayingDock::mediaMessage() const
 	}
 	return QJsonObject{{QStringLiteral("type"), QStringLiteral("media")},
 			   {QStringLiteral("media"), media.isEmpty() ? QJsonValue() : QJsonValue(media)},
-			   {QStringLiteral("lang"), QString::fromLatin1(obs_get_locale())},
+			   {QStringLiteral("lang"), I18n::stream()},
 			   {QStringLiteral("look"), QJsonObject{{QStringLiteral("color"), m_color},
 								{QStringLiteral("card"), m_card},
 								{QStringLiteral("bars"), m_bars},

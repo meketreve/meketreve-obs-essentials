@@ -100,6 +100,23 @@ const Catalog &catalog()
 	return g_state.catalog;
 }
 
+Text textFor(const QString &lang)
+{
+	return [lang](const char *key) {
+		return text(lang, key);
+	};
+}
+
+QString forStream(const std::function<QString(const Text &)> &build, const QString &separator)
+{
+	return compose(stream(), catalog(), build, separator);
+}
+
+QString streamText(const char *key)
+{
+	return forStream([key](const Text &t) { return t(key); });
+}
+
 Settings saved()
 {
 	QFile file(configFile());

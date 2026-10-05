@@ -88,10 +88,17 @@ QString webDir()
 	return path;
 }
 
+/* Overlays, numbers and TTS follow the stream language (the plugin one
+ * when the stream is bilingual). */
 QString language()
 {
-	const char *locale = obs_get_locale();
-	return locale && QByteArray(locale).startsWith("pt") ? QStringLiteral("pt") : QStringLiteral("en");
+	return I18n::streamSingle();
+}
+
+/* Event text for viewers, in the stream language. */
+QString describeForStream(const ChatMessage &msg)
+{
+	return I18n::forStream([&msg](const I18n::Text &t) { return UnifiedChatDock::describeEvent(msg, t); });
 }
 
 QByteArray json(const QJsonValue &value)
@@ -474,7 +481,7 @@ void AlertsDock::onShown(const ChatMessage &msg)
 					{QStringLiteral("message"), ChatOverlay::toJson(msg)}});
 }
 
-void AlertsDock::onActivity(const ChatMessage &msg, const QString &description)
+void AlertsDock::onActivity(const ChatMessage &msg, const QString & /* the dock one, in the plugin language */)
 {
 	if (!m_enabled)
 		return;
@@ -482,9 +489,9 @@ void AlertsDock::onActivity(const ChatMessage &msg, const QString &description)
 	if (event.type.isEmpty() || m_chatDedup.swallow(event, QDateTime::currentMSecsSinceEpoch()) ||
 	    !ChatOverlay::passesEvent(m_chatConfig, event))
 		return;
-	m_server->broadcast(
-		QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-event")},
-			    {QStringLiteral("event"), ChatOverlay::eventToJson(event, description, msg.id)}});
+	m_server->broadcast(QJsonObject{{QStringLiteral("type"), QStringLiteral("chat-event")},
+					{QStringLiteral("event"),
+					 ChatOverlay::eventToJson(event, describeForStream(msg), msg.id)}});
 }
 
 namespace {
@@ -517,7 +524,7 @@ QJsonObject AlertsDock::eventsSamples() const
 	for (const ChatMessage &m : sampleEventMessages()) {
 		const Alerts::Event event = Alerts::fromChat(m);
 		if (!event.type.isEmpty())
-			sample.add(EventsOverlay::entryFrom(event, UnifiedChatDock::describeEvent(m),
+			sample.add(EventsOverlay::entryFrom(event, describeForStream(m),
 							    QStringLiteral("sample-") + event.type, 0));
 	}
 	return QJsonObject{{QStringLiteral("recent"), sample.recent(EventsOverlay::History::kKeep)},
@@ -530,7 +537,7 @@ QJsonArray AlertsDock::chatEventSamples() const
 	for (const ChatMessage &m : sampleEventMessages()) {
 		const Alerts::Event event = Alerts::fromChat(m);
 		if (!event.type.isEmpty())
-			out.append(ChatOverlay::eventToJson(event, UnifiedChatDock::describeEvent(m),
+			out.append(ChatOverlay::eventToJson(event, describeForStream(m),
 							    QStringLiteral("sample-") + event.type));
 	}
 	return out;
@@ -618,7 +625,7 @@ void AlertsDock::onChat(const ChatMessage &msg)
 	/* One gift dedup for alerts and history, so both see the same events. */
 	if (event.type.isEmpty() || m_dedup.swallow(event, now))
 		return;
-	m_history.add(EventsOverlay::entryFrom(event, UnifiedChatDock::describeEvent(msg), msg.id, now));
+	m_history.add(EventsOverlay::entryFrom(event, describeForStream(msg), msg.id, now));
 	saveHistory();
 	broadcastHistory();
 	widgetsEvent(event);
