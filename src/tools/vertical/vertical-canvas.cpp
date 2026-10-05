@@ -800,11 +800,6 @@ extern "C" void vertical_canvas_unload(void)
 	obs_frontend_remove_event_callback(frontend_event, nullptr);
 }
 
-CanvasScenesDock *CanvasDock::GetScenesDock()
-{
-	return scenesDock;
-}
-
 void CanvasDock::AddScene(QString duplicate, bool ask_name)
 {
 	std::string name = duplicate.isEmpty() ? obs_module_text("VerticalScene") : duplicate.toUtf8().constData();
@@ -939,25 +934,6 @@ void CanvasDock::SetLinkedScene(obs_source_t *scene_, const QString &linkedScene
 	obs_data_array_release(c);
 }
 
-bool CanvasDock::HasScene(QString sceneName) const
-{
-	if (scenesCombo) {
-		for (int i = 0; i < scenesCombo->count(); i++) {
-			if (sceneName == scenesCombo->itemText(i)) {
-				return true;
-			}
-		}
-	}
-	if (scenesDock) {
-		for (int i = 0; i < scenesDock->sceneList->count(); i++) {
-			if (sceneName == scenesDock->sceneList->item(i)->text()) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 void CanvasDock::CheckReplayBuffer(bool start)
 {
 	if (replayAlwaysOn) {
@@ -1025,7 +1001,6 @@ void CanvasDock::CreateScenesRow()
 
 CanvasDock::CanvasDock(obs_data_t *settings, QWidget *parent)
 	: QFrame(parent),
-	  action(nullptr),
 	  mainLayout(new QVBoxLayout(this)),
 	  preview(new OBSQTDisplay(this)),
 	  eventFilter(BuildEventFilter())
@@ -1762,11 +1737,6 @@ CanvasDock::~CanvasDock()
 	obs_source_release(oldTransition);
 
 	transitions.clear();
-}
-
-void CanvasDock::setAction(QAction *a)
-{
-	action = a;
 }
 
 static bool SceneItemHasVideo(obs_sceneitem_t *item)
@@ -2845,61 +2815,6 @@ OBSEventFilter *CanvasDock::BuildEventFilter()
 			return false;
 		}
 	});
-}
-
-bool CanvasDock::GetSourceRelativeXY(int mouseX, int mouseY, int &relX, int &relY)
-{
-	float pixelRatio = (float)devicePixelRatioF();
-
-	int mouseXscaled = (int)roundf((float)mouseX * pixelRatio);
-	int mouseYscaled = (int)roundf((float)mouseY * pixelRatio);
-
-	QSize size = preview->size() * preview->devicePixelRatioF();
-
-	obs_source_t *s = obs_weak_source_get_source(source);
-	uint32_t sourceCX = s ? obs_source_get_width(s) : 1;
-	if (sourceCX <= 0) {
-		sourceCX = 1;
-	}
-	uint32_t sourceCY = s ? obs_source_get_height(s) : 1;
-	if (sourceCY <= 0) {
-		sourceCY = 1;
-	}
-
-	obs_source_release(s);
-
-	int x, y;
-	float scale;
-
-	GetScaleAndCenterPos(sourceCX, sourceCY, size.width(), size.height(), x, y, scale);
-
-	auto newCX = scale * float(sourceCX);
-	auto newCY = scale * float(sourceCY);
-
-	auto extraCx = /*(zoom - 1.0f) **/ newCX;
-	auto extraCy = /*(zoom - 1.0f) **/ newCY;
-
-	//scale *= zoom;
-	float scrollX = 0.5f;
-	float scrollY = 0.5f;
-
-	if (x > 0) {
-		relX = int(((float)mouseXscaled - (float)x + extraCx * scrollX) / scale);
-		relY = int(((float)mouseYscaled + extraCy * scrollY) / scale);
-	} else {
-		relX = int(((float)mouseXscaled + extraCx * scrollX) / scale);
-		relY = int(((float)mouseYscaled - (float)y + extraCy * scrollY) / scale);
-	}
-
-	// Confirm mouse is inside the source
-	if (relX < 0 || relX > int(sourceCX)) {
-		return false;
-	}
-	if (relY < 0 || relY > int(sourceCY)) {
-		return false;
-	}
-
-	return true;
 }
 
 bool CanvasDock::HandleMousePressEvent(QMouseEvent *event)
@@ -7628,9 +7543,6 @@ void CanvasDock::FinishLoading()
 	if (!first_time) {
 		return;
 	}
-	if (action && !action->isChecked()) {
-		action->trigger();
-	}
 	auto canvasDock = (QDockWidget *)this->parentWidget();
 	auto main = ((QMainWindow *)canvasDock->parentWidget());
 
@@ -8426,38 +8338,6 @@ void CanvasDock::Nudge(int dist, MoveDir dir)
 	}
 
 	obs_scene_enum_items(scene, nudge_callback, &offset);
-}
-
-void RemoveWidget(QWidget *widget);
-
-void RemoveLayoutItem(QLayoutItem *item)
-{
-	if (!item) {
-		return;
-	}
-	RemoveWidget(item->widget());
-	if (item->layout()) {
-		while (QLayoutItem *item2 = item->layout()->takeAt(0)) {
-			RemoveLayoutItem(item2);
-		}
-	}
-	delete item;
-}
-
-void RemoveWidget(QWidget *widget)
-{
-	if (!widget) {
-		return;
-	}
-	if (widget->layout()) {
-		auto l = widget->layout();
-		QLayoutItem *item;
-		while (l->count() > 0 && (item = l->takeAt(0))) {
-			RemoveLayoutItem(item);
-		}
-		delete l;
-	}
-	delete widget;
 }
 
 void CanvasDock::ProfileChanged()

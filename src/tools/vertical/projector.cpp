@@ -237,14 +237,6 @@ int OBSProjector::GetMonitor()
 	return savedMonitor;
 }
 
-void OBSProjector::RenameProjector(QString oldName, QString newName)
-{
-	if (oldName == newName)
-		return;
-
-	UpdateProjectorTitle(newName);
-}
-
 void OBSProjector::OpenFullScreenProjector()
 {
 	if (!isFullScreen())
@@ -290,7 +282,7 @@ void OBSProjector::ResizeToContent()
 
 void OBSProjector::AlwaysOnTopToggled(bool onTop)
 {
-	SetIsAlwaysOnTop(onTop, true);
+	SetIsAlwaysOnTop(onTop);
 }
 
 void OBSProjector::closeEvent(QCloseEvent *event)
@@ -299,20 +291,9 @@ void OBSProjector::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 
-bool OBSProjector::IsAlwaysOnTop() const
-{
-	return isAlwaysOnTop;
-}
-
-bool OBSProjector::IsAlwaysOnTopOverridden() const
-{
-	return isAlwaysOnTopOverridden;
-}
-
-void OBSProjector::SetIsAlwaysOnTop(bool onTop, bool isOverridden)
+void OBSProjector::SetIsAlwaysOnTop(bool onTop)
 {
 	isAlwaysOnTop = onTop;
-	isAlwaysOnTopOverridden = isOverridden;
 
 	SetAlwaysOnTop(this, onTop);
 }
@@ -325,19 +306,6 @@ void OBSProjector::ScreenRemoved(QScreen *screen_)
 	if (screen == screen_)
 		EscapeTriggered();
 }
-
-#ifdef _WIN32
-bool IsAlwaysOnTop(QWidget *window)
-{
-	DWORD exStyle = GetWindowLong((HWND)window->winId(), GWL_EXSTYLE);
-	return (exStyle & WS_EX_TOPMOST) != 0;
-}
-#else
-bool IsAlwaysOnTop(QWidget *window)
-{
-	return (window->windowFlags() & Qt::WindowStaysOnTopHint) != 0;
-}
-#endif
 
 #ifdef _WIN32
 void SetAlwaysOnTop(QWidget *window, bool enable)

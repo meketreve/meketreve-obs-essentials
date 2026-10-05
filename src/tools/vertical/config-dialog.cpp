@@ -1493,26 +1493,6 @@ std::vector<obs_key_combination_t> OBSBasicSettings::GetCombosForHotkey(obs_hotk
 	return t.combos;
 }
 
-std::vector<obs_hotkey_t *> OBSBasicSettings::GetHotkeyById(obs_hotkey_id hotkey)
-{
-	struct find_hotkey {
-		std::vector<obs_hotkey_t *> hotkeys;
-		obs_hotkey_id hotkey_id;
-	};
-	find_hotkey t = {};
-	t.hotkey_id = hotkey;
-	obs_enum_hotkeys(
-		[](void *param, obs_hotkey_id id, obs_hotkey_t *key) {
-			auto hp = (struct find_hotkey *)param;
-			if (hp->hotkey_id == id) {
-				hp->hotkeys.push_back(key);
-			}
-			return true;
-		},
-		&t);
-	return t.hotkeys;
-}
-
 obs_hotkey_t *OBSBasicSettings::GetHotkeyByName(QString name)
 {
 	struct find_hotkey {

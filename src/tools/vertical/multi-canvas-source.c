@@ -42,22 +42,6 @@ void multi_canvas_destroy(void *data)
 	bfree(data);
 }
 
-bool view_get_width(void *data, struct obs_video_info *ovi)
-{
-	uint32_t *width = data;
-	if (ovi->base_width > *width)
-		*width = ovi->base_width;
-	return true;
-}
-
-bool view_get_height(void *data, struct obs_video_info *ovi)
-{
-	uint32_t *height = data;
-	if (ovi->base_height > *height)
-		*height = ovi->base_height;
-	return true;
-}
-
 static void multi_canvas_video_render(void *data, gs_effect_t *effect)
 {
 	struct multi_canvas_info *mc = data;

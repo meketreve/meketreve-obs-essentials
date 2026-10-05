@@ -7,7 +7,6 @@
 #include "qt-display.hpp"
 #include "vertical-canvas.hpp"
 
-bool IsAlwaysOnTop(QWidget *window);
 void SetAlwaysOnTop(QWidget *window, bool enable);
 
 class OBSProjector : public OBSQTDisplay {
@@ -22,7 +21,6 @@ private:
 	void closeEvent(QCloseEvent *event) override;
 
 	bool isAlwaysOnTop;
-	bool isAlwaysOnTopOverridden = false;
 	int savedMonitor = -1;
 
 	bool ready = false;
@@ -47,10 +45,7 @@ public:
 	~OBSProjector();
 
 	int GetMonitor();
-	void RenameProjector(QString oldName, QString newName);
 	void SetHideCursor();
 
-	bool IsAlwaysOnTop() const;
-	bool IsAlwaysOnTopOverridden() const;
-	void SetIsAlwaysOnTop(bool isAlwaysOnTop, bool isOverridden);
+	void SetIsAlwaysOnTop(bool isAlwaysOnTop);
 };

@@ -40,7 +40,6 @@ public:
 	bool isOpen() const { return m_state == State::Open; }
 
 	void sendText(const QByteArray &utf8);
-	void sendBinary(const QByteArray &data);
 
 signals:
 	void opened();

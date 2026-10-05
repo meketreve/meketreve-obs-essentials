@@ -92,7 +92,6 @@ private:
 
 	std::vector<obs_hotkey_t *> GetHotKeysFromOutput(obs_output_t *obs_output);
 	std::vector<obs_key_combination_t> GetCombosForHotkey(obs_hotkey_id hotkey);
-	std::vector<obs_hotkey_t *> GetHotkeyById(obs_hotkey_id hotkey);
 	obs_hotkey_t *GetHotkeyByName(QString name);
 
 	void SetEncoderBitrate(obs_encoder_t *obs_encoder, bool record);

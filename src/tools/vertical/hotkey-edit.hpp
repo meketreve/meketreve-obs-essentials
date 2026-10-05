@@ -55,7 +55,6 @@ public:
 	void enterEvent(QEvent *event) override;
 #endif
 	void leaveEvent(QEvent *event) override;
-	void setToolTip(const QString &toolTip);
 };
 
 class OBSHotkeyEdit : public QLineEdit {
@@ -80,7 +79,6 @@ public:
 	obs_key_combination_t key;
 	bool changed = false;
 
-	void UpdateDuplicationState();
 	bool hasDuplicate = false;
 	QVariant inputMethodQuery(Qt::InputMethodQuery) const override;
 
@@ -136,19 +134,11 @@ public:
 	std::string name;
 
 	bool changed = false;
-	bool Changed() const;
 
 	QPointer<OBSHotkeyLabel> label;
 	std::vector<QPointer<OBSHotkeyEdit>> edits;
 
 	QString toolTip;
-	void setToolTip(const QString &toolTip_)
-	{
-		toolTip = toolTip_;
-		for (auto &edit : edits)
-			edit->setToolTip(toolTip_);
-	}
-
 	void Apply();
 	void GetCombinations(std::vector<obs_key_combination_t> &) const;
 	void Save();

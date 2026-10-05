@@ -87,12 +87,6 @@ void ChatConnector::setViewers(int viewers)
 	emit viewersChanged(viewers);
 }
 
-void ChatConnector::emitMessage(const QString &author, const QString &color, const QString &text,
-				const QString &highlight)
-{
-	emit messageReceived(ChatMessage{m_platform, author, color, text, highlight});
-}
-
 void ChatConnector::emitEvent(ChatEvent event, const QString &author, int amount, const QString &detail,
 			      const QString &text)
 {

@@ -1067,23 +1067,8 @@ SourceTree::SourceTree(CanvasDock *canvas_dock, QWidget *parent_) : QListView(pa
 	UpdateNoSourcesMessage();
 	//const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	//connect(App(), &OBSApp::StyleChanged, this, &SourceTree::UpdateNoSourcesMessage);
-	//connect(App(), &OBSApp::StyleChanged, this, &SourceTree::UpdateIcons);
 
 	setItemDelegate(new SourceTreeDelegate(this));
-}
-
-void SourceTree::UpdateIcons()
-{
-	SourceTreeModel *stm = GetStm();
-	stm->SceneChanged();
-}
-
-void SourceTree::SetIconsVisible(bool visible)
-{
-	SourceTreeModel *stm = GetStm();
-
-	iconsVisible = visible;
-	stm->SceneChanged();
 }
 
 void SourceTree::ResetWidgets()
@@ -1502,73 +1487,6 @@ bool SourceTree::Edit(int row)
 	itemWidget->EnterEditMode();
 	edit(index);
 	return true;
-}
-
-bool SourceTree::MultipleBaseSelected() const
-{
-	SourceTreeModel *stm = GetStm();
-	QModelIndexList selectedIndices = selectedIndexes();
-
-	obs_scene_t *scene = canvasDock->scene;
-
-	if (selectedIndices.size() < 1) {
-		return false;
-	}
-
-	for (auto &idx : selectedIndices) {
-		obs_sceneitem_t *item = stm->items[idx.row()];
-		if (obs_sceneitem_is_group(item)) {
-			return false;
-		}
-
-		obs_scene *itemScene = obs_sceneitem_get_scene(item);
-		if (itemScene != scene) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool SourceTree::GroupsSelected() const
-{
-	SourceTreeModel *stm = GetStm();
-	QModelIndexList selectedIndices = selectedIndexes();
-
-	if (selectedIndices.size() < 1) {
-		return false;
-	}
-
-	for (auto &idx : selectedIndices) {
-		obs_sceneitem_t *item = stm->items[idx.row()];
-		if (!obs_sceneitem_is_group(item)) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool SourceTree::GroupedItemsSelected() const
-{
-	SourceTreeModel *stm = GetStm();
-	QModelIndexList selectedIndices = selectedIndexes();
-	obs_scene_t *scene = canvasDock->scene;
-
-	if (!selectedIndices.size()) {
-		return false;
-	}
-
-	for (auto &idx : selectedIndices) {
-		obs_sceneitem_t *item = stm->items[idx.row()];
-		obs_scene *itemScene = obs_sceneitem_get_scene(item);
-
-		if (itemScene != scene) {
-			return true;
-		}
-	}
-
-	return false;
 }
 
 void SourceTree::Remove(OBSSceneItem item, OBSScene scene)

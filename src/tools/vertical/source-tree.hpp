@@ -194,13 +194,6 @@ public:
 
 	void SelectItem(obs_sceneitem_t *sceneitem, bool select);
 
-	bool MultipleBaseSelected() const;
-	bool GroupsSelected() const;
-	bool GroupedItemsSelected() const;
-
-	void UpdateIcons();
-	void SetIconsVisible(bool visible);
-
 public slots:
 	inline void ReorderItems() { GetStm()->ReorderItems(); }
 	inline void RefreshItems() { GetStm()->SceneChanged(); }

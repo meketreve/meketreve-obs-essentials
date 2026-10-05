@@ -98,8 +98,6 @@ protected:
 
 	void setViewers(int viewers);
 	void setState(ConnectorState state, const QString &detail = QString());
-	void emitMessage(const QString &author, const QString &color, const QString &text,
-			 const QString &highlight = QString());
 	void emitEvent(ChatEvent event, const QString &author, int amount = 0, const QString &detail = QString(),
 		       const QString &text = QString());
 	void emitFull(ChatMessage msg);

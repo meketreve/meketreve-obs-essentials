@@ -93,7 +93,6 @@ class CanvasDock : public QFrame {
 	friend class OBSProjector;
 
 private:
-	QPointer<QAction> action;
 	QVBoxLayout *mainLayout;
 	OBSQTDisplay *preview;
 	bool preview_disabled = false;
@@ -286,7 +285,6 @@ private:
 	void DrawSpacingLine(vec3 &start, vec3 &end, vec3 &viewport, float pixelRatio);
 	void SetLabelText(int sourceIndex, int px);
 	void RenderSpacingHelper(int sourceIndex, vec3 &start, vec3 &end, vec3 &viewport, float pixelRatio);
-	bool GetSourceRelativeXY(int mouseX, int mouseY, int &relX, int &relY);
 
 	void RotateItem(const vec2 &pos);
 	void CropItem(const vec2 &pos);
@@ -322,7 +320,6 @@ private:
 	void AddScene(QString duplicate = "", bool ask_name = true);
 	void RemoveScene(const QString &sceneName);
 	void SetLinkedScene(obs_source_t *scene, const QString &linkedScene);
-	bool HasScene(QString scene) const;
 	void CheckReplayBuffer(bool start = false);
 	void SendVendorEvent(const char *e);
 	void DeleteProjector(OBSProjector *projector);
@@ -446,8 +443,6 @@ public:
 	void LoadScenes();
 	void LogScenes();
 	void FinishLoading();
-	void setAction(QAction *action);
-	CanvasScenesDock *GetScenesDock();
 	inline uint32_t GetCanvasWidth() const { return canvas_width; }
 	inline uint32_t GetCanvasHeight() const { return canvas_height; }
 	inline video_t *GetVideo() const { return obs_canvas_get_video(canvas); }

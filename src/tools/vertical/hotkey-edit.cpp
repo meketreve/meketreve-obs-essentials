@@ -206,14 +206,6 @@ void OBSHotkeyEdit::ClearKey()
 	RenderKey();
 }
 
-void OBSHotkeyEdit::UpdateDuplicationState()
-{
-	if (dupeIcon && dupeIcon->isVisible() != hasDuplicate) {
-		dupeIcon->setVisible(hasDuplicate);
-		update();
-	}
-}
-
 void OBSHotkeyEdit::InitSignalHandler()
 {
 	layoutChanged = {obs_get_signal_handler(), "hotkey_layout_change",
@@ -246,11 +238,6 @@ void OBSHotkeyWidget::SetKeyCombinations(const std::vector<obs_key_combination_t
 
 	for (auto combo : combos)
 		AddEdit(combo);
-}
-
-bool OBSHotkeyWidget::Changed() const
-{
-	return changed || std::any_of(begin(edits), end(edits), [](OBSHotkeyEdit *edit) { return edit->changed; });
 }
 
 void OBSHotkeyWidget::Apply()
@@ -495,11 +482,4 @@ void OBSHotkeyLabel::leaveEvent(QEvent *event)
 
 	event->accept();
 	highlightPair(false);
-}
-
-void OBSHotkeyLabel::setToolTip(const QString &toolTip)
-{
-	QLabel::setToolTip(toolTip);
-	if (widget)
-		widget->setToolTip(toolTip);
 }

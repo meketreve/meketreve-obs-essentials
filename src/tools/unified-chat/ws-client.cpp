@@ -86,12 +86,6 @@ void WsClient::sendText(const QByteArray &utf8)
 		sendFrame(kOpText, utf8);
 }
 
-void WsClient::sendBinary(const QByteArray &data)
-{
-	if (m_state == State::Open)
-		sendFrame(kOpBinary, data);
-}
-
 void WsClient::onEncrypted()
 {
 	if (m_state != State::Connecting)
