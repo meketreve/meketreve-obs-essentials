@@ -21,6 +21,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QByteArray>
 #include <QHash>
 #include <QJsonObject>
+#include <QJsonValue>
+#include <QList>
 #include <QString>
 
 #include <functional>
@@ -74,6 +76,11 @@ using Text = std::function<QString(const char *key)>;
 QString compose(const QString &stream, const Catalog &catalog, const std::function<QString(const Text &)> &build,
 		const QString &separator = QStringLiteral(" / "));
 
+/* Default texts saved in another language: a string in <current> equal to
+ * the same spot in any of <candidates> (the defaults built in each
+ * language) takes that spot's value in <target>. Edited texts stay. */
+QJsonValue swapDefaults(const QJsonValue &current, const QList<QJsonValue> &candidates, const QJsonValue &target);
+
 /* Runtime (inside OBS): read once, on the first call, from language.json
  * and the module's locale files. Changes only apply after restarting OBS. */
 QString plugin();
@@ -88,6 +95,9 @@ Text textFor(const QString &lang);
 QString forStream(const std::function<QString(const Text &)> &build, const QString &separator = QStringLiteral(" / "));
 /* One template in the stream language (bilingual = "pt / en"). */
 QString streamText(const char *key);
+/* <defaults> built in pt, en and bilingual; <config>'s default texts
+ * move to the stream language. */
+QJsonObject toStreamDefaults(const QJsonObject &config, const std::function<QJsonObject(const Text &)> &defaults);
 /* Saved settings, read again from disk (what the next start will use). */
 Settings saved();
 bool save(const Settings &settings);

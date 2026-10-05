@@ -124,11 +124,13 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	m_engine = new BotEngine(m_dataDir, m_audioDir, this);
 	m_engine->setVolume(m_volume);
 	m_engine->setClipCooldowns(m_cooldowns);
-	m_engine->setText([](const char *key) { return T(key); });
-	m_engine->setReplyText([](const char *key) { return I18n::streamText(key); });
-	m_engine->setReplyEnglish(I18n::streamSingle() == QLatin1String("en"));
+	/* Both tables first: setText reads the sounds, and the group of new
+	 * sounds gets renamed from the other language. */
 	m_engine->setCommandTexts(I18n::catalog().table(QStringLiteral("en")),
 				  I18n::catalog().table(QStringLiteral("pt")));
+	m_engine->setReplyText([](const char *key) { return I18n::streamText(key); });
+	m_engine->setReplyEnglish(I18n::streamSingle() == QLatin1String("en"));
+	m_engine->setText([](const char *key) { return T(key); });
 	m_engine->setTts(
 		[this](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
 			GoogleTts::synthesize(&m_net, text, std::move(done), this, lang);

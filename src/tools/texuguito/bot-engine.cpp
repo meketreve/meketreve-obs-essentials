@@ -189,6 +189,11 @@ int BotEngine::reloadClips()
 		return m_cooldowns.value(price, defaultCooldownSeconds(price));
 	};
 	defaults.looseGroupName = t("Texuguito.Groups.LooseName");
+	for (const QHash<QString, QString> *texts : {&m_cmdEn, &m_cmdPt}) {
+		const QString name = texts->value(QStringLiteral("Texuguito.Groups.LooseName"));
+		if (!name.isEmpty() && name != defaults.looseGroupName)
+			defaults.otherLooseNames.append(name);
+	}
 	m_library.sync(m_audioDir, defaults);
 	for (const SoundGroup &g : m_library.groups()) {
 		for (const QString &name : g.sounds)

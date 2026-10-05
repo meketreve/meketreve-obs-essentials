@@ -117,6 +117,19 @@ QString streamText(const char *key)
 	return forStream([key](const Text &t) { return t(key); });
 }
 
+QJsonObject toStreamDefaults(const QJsonObject &config, const std::function<QJsonObject(const Text &)> &defaults)
+{
+	const Catalog &c = catalog();
+	const Text both = [&c](const char *key) {
+		return c.both(QString::fromUtf8(key));
+	};
+	const QString s = stream();
+	const Text target = s == QLatin1String("both") ? both : textFor(s);
+	const QList<QJsonValue> candidates{defaults(textFor(QStringLiteral("pt"))),
+					   defaults(textFor(QStringLiteral("en"))), defaults(both)};
+	return swapDefaults(config, candidates, defaults(target)).toObject();
+}
+
 Settings saved()
 {
 	QFile file(configFile());

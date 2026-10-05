@@ -95,6 +95,12 @@ QString language()
 	return I18n::streamSingle();
 }
 
+/* Texts viewers see (alert texts, labels, test events): the stream language. */
+QString ST(const char *key)
+{
+	return I18n::streamText(key);
+}
+
 /* Event text for viewers, in the stream language. */
 QString describeForStream(const ChatMessage &msg)
 {
@@ -250,7 +256,7 @@ AlertsDock::AlertsDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(parent)
 	auto *menu = new QMenu(test);
 	for (const QString &type : Alerts::types()) {
 		const QByteArray key = "Alerts.Type." + type.toLatin1();
-		menu->addAction(T(key.constData()), this, [this, type]() { fire(Alerts::sample(type, T)); });
+		menu->addAction(T(key.constData()), this, [this, type]() { fire(Alerts::sample(type, ST)); });
 	}
 	test->setMenu(menu);
 	auto *skip = new QToolButton(this);
@@ -407,7 +413,8 @@ void AlertsDock::loadConfig()
 	QJsonObject stored;
 	if (file.open(QIODevice::ReadOnly))
 		stored = QJsonDocument::fromJson(file.readAll()).object();
-	m_config = stored.isEmpty() ? Alerts::defaults(T) : Alerts::normalize(stored, T);
+	m_config = stored.isEmpty() ? Alerts::defaults(ST) : Alerts::normalize(stored, ST);
+	m_config = I18n::toStreamDefaults(m_config, [](const I18n::Text &t) { return Alerts::defaults(t); });
 
 	QFile chatFile(QDir(m_dir).filePath(QStringLiteral("chat-overlay.json")));
 	QJsonObject chatStored;
@@ -419,7 +426,9 @@ void AlertsDock::loadConfig()
 	QJsonObject eventsStored;
 	if (eventsFile.open(QIODevice::ReadOnly))
 		eventsStored = QJsonDocument::fromJson(eventsFile.readAll()).object();
-	m_eventsConfig = EventsOverlay::normalize(eventsStored, T);
+	m_eventsConfig = EventsOverlay::normalize(eventsStored, ST);
+	m_eventsConfig =
+		I18n::toStreamDefaults(m_eventsConfig, [](const I18n::Text &t) { return EventsOverlay::defaults(t); });
 
 	QFile historyFile(QDir(m_dir).filePath(QStringLiteral("event-history.json")));
 	if (historyFile.open(QIODevice::ReadOnly))
@@ -449,7 +458,7 @@ void AlertsDock::broadcastHistory()
 
 void AlertsDock::importEventsConfig(const QJsonObject &config)
 {
-	m_eventsConfig = EventsOverlay::normalize(config, T);
+	m_eventsConfig = EventsOverlay::normalize(config, ST);
 	QSaveFile file(QDir(m_dir).filePath(QStringLiteral("events-overlay.json")));
 	if (!file.open(QIODevice::WriteOnly) ||
 	    file.write(QJsonDocument(m_eventsConfig).toJson(QJsonDocument::Indented)) < 0 || !file.commit())
@@ -585,7 +594,7 @@ void AlertsDock::importConfig(const QJsonObject &config)
 	/* Keys for GIF search stay the ones typed on this computer. */
 	QJsonObject merged = config;
 	merged.insert(QStringLiteral("integrations"), m_config.value(QStringLiteral("integrations")));
-	m_config = Alerts::normalize(merged, T);
+	m_config = Alerts::normalize(merged, ST);
 	saveConfig();
 	broadcastConfig();
 }
@@ -743,7 +752,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 			errorReply(reply, 400, QStringLiteral("bad json"));
 			return true;
 		}
-		m_config = Alerts::normalize(doc.object(), T);
+		m_config = Alerts::normalize(doc.object(), ST);
 		saveConfig();
 		broadcastConfig();
 		jsonReply(reply, 200, m_config);
@@ -753,7 +762,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 			errorReply(reply, 400, QStringLiteral("unknown type"));
 			return true;
 		}
-		fire(Alerts::sample(type, T));
+		fire(Alerts::sample(type, ST));
 		jsonReply(reply, 200, QJsonObject{{QStringLiteral("overlays"), m_server->clientCount()}});
 	} else if (get && path == QLatin1String("/api/chat-config")) {
 		jsonReply(reply, 200, m_chatConfig);
@@ -826,7 +835,7 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 		/* The editor's preview uses the same made-up events. */
 		QJsonObject samples;
 		for (const QString &type : Alerts::types())
-			samples.insert(type, Alerts::toJson(Alerts::sample(type, T)));
+			samples.insert(type, Alerts::toJson(Alerts::sample(type, ST)));
 		jsonReply(reply, 200, samples);
 	} else if (get && path == QLatin1String("/api/i18n")) {
 		/* Every web string, in the language the panel asked for or the

@@ -52,6 +52,7 @@ public:
 		std::function<QString(int price)> priceGroupName; /* "50 pts" */
 		std::function<int(int price)> priceCooldown;      /* the old wait of that price */
 		QString looseGroupName;                           /* files dropped by hand */
+		QStringList otherLooseNames;                      /* its default name in the other languages */
 	};
 
 	explicit SoundLibrary(const QString &jsonPath);

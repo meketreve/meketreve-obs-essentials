@@ -124,8 +124,17 @@ void SoundLibrary::sync(const QString &audioDir, const Defaults &defaults)
 		}
 	}
 
-	/* A sound whose file is gone (or listed twice) leaves its group. */
 	bool changed = false;
+	/* The group of new sounds still with its default name follows the
+	 * plugin language. */
+	for (SoundGroup &g : m_groups) {
+		if (!defaults.looseGroupName.isEmpty() && defaults.otherLooseNames.contains(g.name)) {
+			g.name = defaults.looseGroupName;
+			changed = true;
+		}
+	}
+
+	/* A sound whose file is gone (or listed twice) leaves its group. */
 	QSet<QString> placed;
 	for (SoundGroup &g : m_groups) {
 		const qsizetype before = g.sounds.size();

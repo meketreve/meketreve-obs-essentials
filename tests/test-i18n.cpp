@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "i18n.hpp"
 
 #include <QFile>
+#include <QJsonArray>
 #include <QSet>
 #include <QTest>
 
@@ -118,6 +119,57 @@ private slots:
 		/* A joined template still takes .arg() in both halves. */
 		QCOMPARE(c.both(QStringLiteral("Follow")).arg(QStringLiteral("bo")),
 			 QStringLiteral("bo seguiu / bo followed"));
+	}
+
+	void swapOnlyUntouchedDefaults()
+	{
+		const auto defaults = [](const QString &follow, const QString &goal) {
+			return QJsonObject{
+				{QStringLiteral("types"),
+				 QJsonObject{{QStringLiteral("follow"),
+					      QJsonObject{{QStringLiteral("text"), follow},
+							  {QStringLiteral("image"), QStringLiteral("star.svg")}}},
+					     {QStringLiteral("sub"), QJsonObject{{QStringLiteral("text"), follow}}}}},
+				{QStringLiteral("goals"), QJsonArray{QJsonObject{{QStringLiteral("title"), goal}}}}};
+		};
+		const QJsonObject pt = defaults(QStringLiteral("{name} seguiu!"), QStringLiteral("Meta de follows"));
+		const QJsonObject en = defaults(QStringLiteral("{name} followed!"), QStringLiteral("Follower goal"));
+
+		QJsonObject saved = pt;
+		QJsonObject types = saved.value(QStringLiteral("types")).toObject();
+		QJsonObject sub = types.value(QStringLiteral("sub")).toObject();
+		sub.insert(QStringLiteral("text"), QStringLiteral("valeu {name}"));
+		types.insert(QStringLiteral("sub"), sub);
+		saved.insert(QStringLiteral("types"), types);
+		QJsonArray goals = saved.value(QStringLiteral("goals")).toArray();
+		goals.append(QJsonObject{{QStringLiteral("title"), QStringLiteral("Meta de follows")}});
+		saved.insert(QStringLiteral("goals"), goals);
+		saved.insert(QStringLiteral("extra"), QStringLiteral("Meta de follows"));
+
+		const QJsonObject out = swapDefaults(saved, {pt, en}, en).toObject();
+		const QJsonObject outTypes = out.value(QStringLiteral("types")).toObject();
+		QCOMPARE(outTypes.value(QStringLiteral("follow")).toObject().value(QStringLiteral("text")).toString(),
+			 QStringLiteral("{name} followed!"));
+		QCOMPARE(outTypes.value(QStringLiteral("follow")).toObject().value(QStringLiteral("image")).toString(),
+			 QStringLiteral("star.svg"));
+		QCOMPARE(outTypes.value(QStringLiteral("sub")).toObject().value(QStringLiteral("text")).toString(),
+			 QStringLiteral("valeu {name}"));
+		const QJsonArray outGoals = out.value(QStringLiteral("goals")).toArray();
+		QCOMPARE(outGoals.at(0).toObject().value(QStringLiteral("title")).toString(),
+			 QStringLiteral("Follower goal"));
+		/* Only the spots the defaults have: a second goal or an extra field stays. */
+		QCOMPARE(outGoals.at(1).toObject().value(QStringLiteral("title")).toString(),
+			 QStringLiteral("Meta de follows"));
+		QCOMPARE(out.value(QStringLiteral("extra")).toString(), QStringLiteral("Meta de follows"));
+		/* Back to Portuguese. */
+		const QJsonObject back = swapDefaults(out, {pt, en}, pt).toObject();
+		QCOMPARE(back.value(QStringLiteral("types"))
+				 .toObject()
+				 .value(QStringLiteral("follow"))
+				 .toObject()
+				 .value(QStringLiteral("text"))
+				 .toString(),
+			 QStringLiteral("{name} seguiu!"));
 	}
 
 	void localeFilesHaveTheSameKeys()

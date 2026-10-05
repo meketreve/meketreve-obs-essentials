@@ -333,6 +333,22 @@ private slots:
 		QCOMPARE(library.file(QStringLiteral("bip")), QStringLiteral("50/bip.mp3"));
 		QVERIFY(QFile::exists(audio + QStringLiteral("/50/bip.mp3")));
 
+		/* The group of new sounds follows the plugin language while it
+		 * keeps its default name. */
+		SoundLibrary::Defaults english = defaults;
+		english.looseGroupName = QStringLiteral("New");
+		english.otherLooseNames = QStringList{QStringLiteral("Novos")};
+		SoundLibrary inEnglish(json);
+		inEnglish.sync(audio, english);
+		QCOMPARE(inEnglish.groupOf(QStringLiteral("solto"))->name, QStringLiteral("New"));
+		QCOMPARE(inEnglish.groupOf(QStringLiteral("bip"))->name, QStringLiteral("50 pts"));
+		SoundLibrary::Defaults portuguese = defaults;
+		portuguese.otherLooseNames = QStringList{QStringLiteral("New")};
+		SoundLibrary inPortuguese(json);
+		inPortuguese.sync(audio, portuguese);
+		QCOMPARE(inPortuguese.groupOf(QStringLiteral("solto"))->name, QStringLiteral("Novos"));
+		QCOMPARE(inPortuguese.groups().size(), 2);
+
 		/* Two groups may cost the same; dragging moves a sound over. */
 		SoundGroup memes;
 		memes.name = QStringLiteral("Memes");

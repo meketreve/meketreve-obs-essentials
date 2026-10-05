@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "i18n.hpp"
 
+#include <QJsonArray>
 #include <QStringList>
 
 namespace I18n {
@@ -122,6 +123,43 @@ QString compose(const QString &stream, const Catalog &catalog, const std::functi
 	const QString pt = build(textIn(QStringLiteral("pt")));
 	const QString en = build(textIn(QStringLiteral("en")));
 	return pt == en ? pt : pt + separator + en;
+}
+
+QJsonValue swapDefaults(const QJsonValue &current, const QList<QJsonValue> &candidates, const QJsonValue &target)
+{
+	if (current.isString() && target.isString()) {
+		if (current == target)
+			return current;
+		for (const QJsonValue &c : candidates)
+			if (c.isString() && c == current)
+				return target;
+		return current;
+	}
+	if (current.isObject() && target.isObject()) {
+		QJsonObject out = current.toObject();
+		const QJsonObject t = target.toObject();
+		for (auto it = out.begin(); it != out.end(); ++it) {
+			if (!t.contains(it.key()))
+				continue;
+			QList<QJsonValue> inner;
+			for (const QJsonValue &c : candidates)
+				inner.append(c.toObject().value(it.key()));
+			it.value() = swapDefaults(it.value(), inner, t.value(it.key()));
+		}
+		return out;
+	}
+	if (current.isArray() && target.isArray()) {
+		QJsonArray out = current.toArray();
+		const QJsonArray t = target.toArray();
+		for (qsizetype i = 0; i < out.size() && i < t.size(); i++) {
+			QList<QJsonValue> inner;
+			for (const QJsonValue &c : candidates)
+				inner.append(c.toArray().at(i));
+			out[i] = swapDefaults(out.at(i), inner, t.at(i));
+		}
+		return out;
+	}
+	return current;
 }
 
 } // namespace I18n

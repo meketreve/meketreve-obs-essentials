@@ -57,6 +57,12 @@ QString language()
 	return I18n::streamSingle();
 }
 
+/* Goal titles and other texts viewers see: the stream language. */
+QString ST(const char *key)
+{
+	return I18n::streamText(key);
+}
+
 void jsonReply(OverlayServer::Reply &reply, int status, const QJsonObject &body)
 {
 	reply.status = status;
@@ -91,7 +97,9 @@ qint64 now()
 
 void AlertsDock::loadWidgets()
 {
-	m_goals = Goals::normalize(readJson(QDir(m_dir).filePath(QStringLiteral("goals.json"))), T);
+	m_goals = Goals::normalize(readJson(QDir(m_dir).filePath(QStringLiteral("goals.json"))), ST);
+	m_goals =
+		I18n::toStreamDefaults(m_goals, [](const I18n::Text &t) { return Goals::normalize(QJsonObject(), t); });
 
 	const QJsonObject poll = readJson(QDir(m_dir).filePath(QStringLiteral("poll.json")));
 	m_pollConfig = Poll::normalizeConfig(poll.value(QStringLiteral("config")).toObject());
@@ -288,7 +296,7 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 	if (get && path == QLatin1String("/api/goals")) {
 		jsonReply(reply, 200, m_goals);
 	} else if (post && path == QLatin1String("/api/goals")) {
-		m_goals = Goals::normalize(body, T, m_goals);
+		m_goals = Goals::normalize(body, ST, m_goals);
 		saveGoals();
 		broadcastGoals();
 		jsonReply(reply, 200, m_goals);
@@ -382,7 +390,7 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 			return on.value(QLatin1String(target)).toBool();
 		};
 		if (picked("alertas")) {
-			m_config = Alerts::normalize(Theme::applyToAlerts(m_config, theme), T);
+			m_config = Alerts::normalize(Theme::applyToAlerts(m_config, theme), ST);
 			saveConfig();
 			broadcastConfig();
 		}
@@ -391,7 +399,7 @@ bool AlertsDock::widgetsApi(const OverlayServer::Request &request, OverlayServer
 		if (picked("eventos"))
 			importEventsConfig(Theme::applyTo(m_eventsConfig, theme));
 		if (picked("metas")) {
-			m_goals = Goals::normalize(Theme::applyTo(m_goals, theme), T, m_goals);
+			m_goals = Goals::normalize(Theme::applyTo(m_goals, theme), ST, m_goals);
 			saveGoals();
 			broadcastGoals();
 		}
