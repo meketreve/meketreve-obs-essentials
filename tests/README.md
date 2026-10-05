@@ -12,7 +12,7 @@ cmake --build build_dev -j"$(nproc)"
 | Tool | What it does |
 | --- | --- |
 | `chat-probe <twitch\|youtube\|kick> <channel> [seconds]` | Runs one chat connector and prints states and messages. Exit 0 if a message arrived. |
-| `dock-harness <widget> <out.png> [seconds] [--locale pt-BR] [--config dir]` | Shows a plugin widget outside OBS and saves a screenshot. Use `QT_QPA_PLATFORM=offscreen`. |
-| `test-*` | QtTest unit tests for the pure logic (parsers, config codec). |
+| `dock-harness <widget> <out.png> [seconds] [--locale pt-BR] [--config dir]` | Shows a plugin widget outside OBS and saves a screenshot (`language` = the language dialog; `language.json` in `--config` sets the plugin/stream languages). Use `QT_QPA_PLATFORM=offscreen`. |
+| `test-*` | QtTest unit tests for the pure logic (parsers, config codec, languages — `test-i18n` also checks that `en-US.ini` and `pt-BR.ini` have the same keys). |
 
 Channels that are usually live: Twitch `xqc`, Kick `westcol`, YouTube `@LofiGirl` (24/7).

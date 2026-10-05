@@ -77,9 +77,11 @@ panel (**Chat parade → Add to scene**, or the URL
   the link to the [command list](https://meketreve.github.io/meketreve-obs-essentials/commands.html)
   (`!comandos` opens it in Portuguese, `!commands` in English). Every command
   also has an English alias (`!color`, `!play`…).
-- **Language:** the bot answers in the language OBS is set to (Portuguese or
-  English; any other language gets English). The voice goes by the command:
-  `!falar` speaks Portuguese, `!speak` English and `!tts` the language of OBS.
+- **Language:** a reply follows the command's language (`!ajuda` answers in
+  Portuguese, `!help` in English); neutral commands (`!ping`, `!pts`, `!tts`…)
+  answer in the stream language (see [Language](#language)). The voice goes
+  by the command: `!falar` speaks Portuguese, `!speak` English and `!tts` the
+  stream language.
 
 It reads every platform set up in Unified Chat. Replies go back to the
 platform the command came from when you are logged in there (Twitch, YouTube
@@ -407,8 +409,21 @@ Check by hand or turn the startup check off in **Tools → Meketreve: Check for 
 
 ## Language
 
-The UI ships with **English (en-US)** and **Portuguese (pt-BR)** strings, and
-follows the language configured in OBS. Other languages fall back to English.
+Everything ships in **English** and **Portuguese**, with two settings in
+**Tools → Meketreve: Language** (they apply after restarting OBS):
+
+- **Plugin language** — for whoever runs OBS: docks, dialogs, filters and the
+  web panel. *Automatic* follows OBS (any language other than Portuguese
+  gets English). The web panel also has its own pt/en picker, kept in that
+  browser.
+- **Stream language** — for viewers: overlays (alert, event, goal, poll,
+  subathon and Now Playing texts), poll announcements in chat, alert TTS and
+  the bot's neutral replies. *Follow the plugin* by default; *Bilingual* shows
+  "Português / English" on screen (TTS then uses the plugin language).
+
+Default texts you never edited (alert texts, event labels, goal titles)
+switch to the new stream language on the next start; edited ones stay as
+they are.
 
 ## Build / Release (CI)
 

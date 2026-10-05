@@ -37,7 +37,7 @@
          "desc": {"pt": "Lê a sua mensagem em voz alta por 200 pontos. <code>!falar</code> fala em português e <code>!speak</code> em inglês.",
                   "en": "Reads your message out loud for 200 points. <code>!speak</code> talks in English and <code>!falar</code> in Portuguese."}},
         {"pt": "!tts <mensagem>", "en": "!tts <message>", "who": "all",
-         "desc": {"pt": "Igual ao <code>!falar</code>, com a voz no idioma do OBS do streamer.", "en": "Same as <code>!speak</code>, with the voice in the language of the streamer's OBS."}},
+         "desc": {"pt": "Igual ao <code>!falar</code>, com a voz no idioma da live escolhido pelo streamer.", "en": "Same as <code>!speak</code>, with the voice in the stream language the streamer picked."}},
         {"pt": "!parar", "en": "!stop", "who": "all",
          "desc": {"pt": "Para o som que está tocando.", "en": "Stops the sound that is playing."}},
         {"pt": "!darpontos <usuário> <quantidade>", "en": "!givepoints <user> <amount>", "also": ["!dar", "!give", "!addpontos", "!addpoints"], "who": "mod",
