@@ -63,8 +63,11 @@ add_executable(
   ${CMAKE_SOURCE_DIR}/src/tools/outputs/output-store.cpp
   ${CMAKE_SOURCE_DIR}/src/tools/outputs/outputs-dock.cpp
   ${CMAKE_SOURCE_DIR}/src/tools/outputs/outputs-dock.hpp
+  ${CMAKE_SOURCE_DIR}/src/i18n/i18n.cpp
+  ${CMAKE_SOURCE_DIR}/src/i18n/i18n-obs.cpp
+  ${CMAKE_SOURCE_DIR}/src/i18n/language-dialog.cpp
 )
-target_include_directories(dock-harness PRIVATE ${CMAKE_SOURCE_DIR}/src/tools/outputs)
+target_include_directories(dock-harness PRIVATE ${CMAKE_SOURCE_DIR}/src/tools/outputs ${CMAKE_SOURCE_DIR}/src/i18n)
 target_link_libraries(
   dock-harness
   PRIVATE chat-core Qt6::Widgets OBS::libobs OBS::obs-frontend-api plugin-support

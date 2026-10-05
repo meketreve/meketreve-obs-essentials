@@ -77,4 +77,7 @@ const Catalog &catalog();
 Settings saved();
 bool save(const Settings &settings);
 
+/* The Tools menu dialog (modal). */
+void openDialog();
+
 } // namespace I18n

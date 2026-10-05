@@ -69,6 +69,7 @@ target_sources(
     src/i18n/i18n.h
     src/i18n/i18n.hpp
     src/i18n/i18n-obs.cpp
+    src/i18n/language-dialog.cpp
     src/tools/alerts/alert-logic.cpp
     src/tools/alerts/alert-logic.hpp
     src/tools/alerts/chat-overlay.cpp

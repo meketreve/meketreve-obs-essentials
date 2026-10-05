@@ -28,6 +28,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "viewers-dialog.hpp"
 #include "config-share.hpp"
 #include "outputs-dock.hpp"
+#include "i18n.h"
+#include "i18n.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -102,12 +104,13 @@ int main(int argc, char **argv)
 	if (args.size() < 3) {
 		std::fprintf(
 			stderr,
-			"usage: dock-harness <chat|chat-settings|activity|viewers|viewers-bans|stream-info|outputs|export|import> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
+			"usage: dock-harness <chat|chat-settings|activity|viewers|viewers-bans|stream-info|outputs|export|import|language> <out.png> [seconds] [--locale xx-XX] [--config dir]\n");
 		return 2;
 	}
 
 	QDir().mkpath(configDir);
 	g_configDir = configDir.toUtf8();
+	meketreve_i18n_start(locale.toUtf8().constData());
 	g_lookup =
 		text_lookup_create(QStringLiteral(HARNESS_DATA_DIR "/locale/%1.ini").arg(locale).toUtf8().constData());
 	if (!g_lookup)
@@ -140,6 +143,19 @@ int main(int argc, char **argv)
 		else
 			configShareOpenImport();
 		delete chat;
+		text_lookup_destroy(g_lookup);
+		return 0;
+	}
+
+	if (args[1] == QLatin1String("language")) {
+		QTimer::singleShot(seconds * 1000, &app, [&out]() {
+			QWidget *w = QApplication::activeModalWidget();
+			const bool ok = w && w->grab().save(out);
+			std::printf("%s %s\n", ok ? "saved" : "FAILED to save", qPrintable(out));
+			if (w)
+				w->close();
+		});
+		I18n::openDialog();
 		text_lookup_destroy(g_lookup);
 		return 0;
 	}

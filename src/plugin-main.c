@@ -96,6 +96,7 @@ bool obs_module_load(void)
 	if (canvas_tools)
 		tabs_register();
 	config_share_register();
+	language_register();
 	updater_register();
 
 	obs_log(LOG_INFO, "Meketreve OBS Essentials loaded (version %s)", PLUGIN_VERSION);

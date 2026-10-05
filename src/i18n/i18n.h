@@ -27,6 +27,9 @@ extern "C" {
  * locale it was given. */
 const char *meketreve_i18n_start(const char *obs_locale);
 
+/* Tools -> "Meketreve: Language": plugin and stream languages. */
+void language_register(void);
+
 #ifdef __cplusplus
 }
 #endif
