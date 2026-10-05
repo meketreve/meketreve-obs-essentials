@@ -30,9 +30,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/alerts/alerts.h"
 #include "tools/now-playing/now-playing.h"
 #include "tools/updater/updater.h"
+#include "i18n/i18n.h"
+
+#include <util/text-lookup.h>
 
 OBS_DECLARE_MODULE()
-OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
+
+/* Like OBS_MODULE_USE_DEFAULT_LOCALE, but the plugin language can differ
+ * from the OBS one (Tools -> "Meketreve: Language"). */
+static lookup_t *module_lookup = NULL;
+
+const char *obs_module_text(const char *val)
+{
+	const char *out = val;
+	text_lookup_getstr(module_lookup, val, &out);
+	return out;
+}
+
+bool obs_module_get_string(const char *val, const char **out)
+{
+	return text_lookup_getstr(module_lookup, val, out);
+}
+
+void obs_module_set_locale(const char *locale)
+{
+	if (module_lookup)
+		text_lookup_destroy(module_lookup);
+	module_lookup = obs_module_load_locale(obs_current_module(), "en-US", meketreve_i18n_start(locale));
+}
+
+void obs_module_free_locale(void)
+{
+	text_lookup_destroy(module_lookup);
+	module_lookup = NULL;
+}
 
 /* Tabs and the vertical canvas use the canvas API that OBS 32 introduced
  * at runtime; everything else works on older versions. */

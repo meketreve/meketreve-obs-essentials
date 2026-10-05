@@ -65,6 +65,10 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/plugin-main.c
+    src/i18n/i18n.cpp
+    src/i18n/i18n.h
+    src/i18n/i18n.hpp
+    src/i18n/i18n-obs.cpp
     src/tools/alerts/alert-logic.cpp
     src/tools/alerts/alert-logic.hpp
     src/tools/alerts/chat-overlay.cpp

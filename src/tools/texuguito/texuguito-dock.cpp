@@ -25,6 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "../unified-chat/kick-chat.hpp"
 #include "../unified-chat/twitch-chat.hpp"
 #include "../unified-chat/unified-chat-dock.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -91,30 +92,6 @@ QString webDir()
 	return path;
 }
 
-/* Both bot languages (Key="value" lines), so replies follow the command's
- * language instead of the OBS language. */
-QHash<QString, QString> readBotLocale(const char *name)
-{
-	QHash<QString, QString> texts;
-	const QByteArray path = QByteArray("locale/") + name;
-	char *ini = obs_module_file(path.constData());
-	QFile file(QString::fromUtf8(ini ? ini : ""));
-	bfree(ini);
-	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-		return texts;
-	while (!file.atEnd()) {
-		const QString line = QString::fromUtf8(file.readLine()).trimmed();
-		const qsizetype eq = line.indexOf(QLatin1Char('='));
-		if (eq <= 0 || line.startsWith(QLatin1Char('#')))
-			continue;
-		QString value = line.mid(eq + 1);
-		if (value.startsWith(QLatin1Char('"')) && value.endsWith(QLatin1Char('"')))
-			value = value.mid(1, value.size() - 2);
-		texts.insert(line.left(eq), value.replace(QStringLiteral("\\\""), QStringLiteral("\"")));
-	}
-	return texts;
-}
-
 /* Copies <from> into <to>, keeping a .bak of anything it replaces. */
 int copyTree(const QString &from, const QString &to)
 {
@@ -148,7 +125,8 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	m_engine->setVolume(m_volume);
 	m_engine->setClipCooldowns(m_cooldowns);
 	m_engine->setText([](const char *key) { return T(key); });
-	m_engine->setCommandTexts(readBotLocale("en-US.ini"), readBotLocale("pt-BR.ini"));
+	m_engine->setCommandTexts(I18n::catalog().table(QStringLiteral("en")),
+				  I18n::catalog().table(QStringLiteral("pt")));
 	m_engine->setTts(
 		[this](const QString &text, const QString &lang, std::function<void(QByteArray, QString)> done) {
 			GoogleTts::synthesize(&m_net, text, std::move(done), this, lang);
