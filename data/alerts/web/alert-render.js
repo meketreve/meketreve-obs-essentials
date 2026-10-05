@@ -45,8 +45,6 @@ const AlertRender = (() => {
     medal: `<g class="k-bob"><path d="M30 6h14l10 34H40zM70 6H56L46 40h14z" fill="A" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
       <circle cx="50" cy="64" r="28" fill="#ffca28" stroke="#fff" stroke-width="3"/><circle cx="50" cy="64" r="19" fill="none" stroke="#fff" stroke-width="2" opacity=".8"/>
       <path d="M50 50l4.4 9 9.9 1.4-7.2 7 1.7 9.8L50 72.6l-8.8 4.6 1.7-9.8-7.2-7 9.9-1.4z" fill="#fff"/></g>`,
-    share: `<g class="k-bob"><circle cx="50" cy="50" r="42" fill="A" stroke="#fff" stroke-width="3"/>
-      <path d="M58 26l22 22-22 22V56c-16 0-28 4-36 16 2-20 14-32 36-34z" fill="#fff"/></g>`,
     heart: `<g class="k-beat"><path d="M50 88S8 62 8 34c0-14 10-24 22-24 9 0 16 5 20 12 4-7 11-12 20-12 12 0 22 10 22 24 0 28-42 54-42 54z" fill="A" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
       <ellipse cx="30" cy="30" rx="8" ry="5" fill="#fff" opacity=".5" transform="rotate(-30 30 30)"/></g>`,
   };
