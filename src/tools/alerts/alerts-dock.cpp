@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "../config/config-share.hpp"
 #include "../texuguito/tts-client.hpp"
 #include "../unified-chat/unified-chat-dock.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -821,28 +822,36 @@ bool AlertsDock::route(const OverlayServer::Request &request, OverlayServer::Rep
 			samples.insert(type, Alerts::toJson(Alerts::sample(type, T)));
 		jsonReply(reply, 200, samples);
 	} else if (get && path == QLatin1String("/api/i18n")) {
-		/* Every Alerts.* string, in the language OBS is in (en-US has
-		 * all the keys). */
+		/* Every web string, in the language the panel asked for or the
+		 * plugin language (en-US has all the keys). */
+		static const char *const prefixes[] = {"Alerts.",
+						       "ChatOverlay.",
+						       "EventsOverlay.",
+						       "NowPlaying.",
+						       "Overlays.",
+						       "Texuguito.Parade.",
+						       "Texuguito.BotPanel.",
+						       "Goals.",
+						       "Poll.",
+						       "Subathon.",
+						       "Theme."};
+		QString lang = query.queryItemValue(QStringLiteral("lang"));
+		if (lang != QLatin1String("pt") && lang != QLatin1String("en"))
+			lang = I18n::plugin();
+		const I18n::Catalog &catalog = I18n::catalog();
 		QJsonObject strings;
-		char *ini = obs_module_file("locale/en-US.ini");
-		QFile file(QString::fromUtf8(ini ? ini : ""));
-		bfree(ini);
-		if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			while (!file.atEnd()) {
-				const QByteArray line = file.readLine();
-				const qsizetype eq = line.indexOf('=');
-				if (eq > 0 && (line.startsWith("Alerts.") || line.startsWith("ChatOverlay.") ||
-					       line.startsWith("EventsOverlay.") || line.startsWith("NowPlaying.") ||
-					       line.startsWith("Overlays.") || line.startsWith("Texuguito.Parade.") ||
-					       line.startsWith("Texuguito.BotPanel.") || line.startsWith("Goals.") ||
-					       line.startsWith("Poll.") || line.startsWith("Subathon.") ||
-					       line.startsWith("Theme."))) {
-					const QByteArray key = line.left(eq).trimmed();
-					strings.insert(QString::fromUtf8(key), T(key.constData()));
+		for (auto it = catalog.table(QStringLiteral("en")).constBegin();
+		     it != catalog.table(QStringLiteral("en")).constEnd(); ++it) {
+			for (const char *prefix : prefixes) {
+				if (it.key().startsWith(QLatin1String(prefix))) {
+					strings.insert(it.key(), catalog.text(lang, it.key()));
+					break;
 				}
 			}
 		}
-		strings.insert(QStringLiteral("lang"), language());
+		strings.insert(QStringLiteral("plugin"), I18n::plugin());
+		strings.insert(QStringLiteral("stream"), I18n::stream());
+		strings.insert(QStringLiteral("lang"), lang);
 		jsonReply(reply, 200, strings);
 	} else if (get && path == QLatin1String("/api/media")) {
 		apiMediaList(reply);

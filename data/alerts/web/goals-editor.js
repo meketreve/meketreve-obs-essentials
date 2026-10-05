@@ -246,7 +246,7 @@ function listen() {
 
 async function init() {
   try {
-    S = await api("/api/i18n");
+    S = await api("/api/i18n" + location.search);
   } catch (e) {
     S = {};
   }
