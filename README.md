@@ -93,8 +93,7 @@ elsewhere a viewer stays in the parade for 10 minutes after their last
 message. The streamer's own avatar (the Twitch and Kick channels set in
 Unified Chat, or whoever chats with the broadcaster badge) never leaves. The
 web panel's **Chat parade** tab sets the avatar size, walking speed and the
-names above the heads. Coming from the Python bot? **Import old bot** copies its `data/`
-and `audios/` folders. Clips and TTS play through the Browser Source, so they
+names above the heads. Clips and TTS play through the Browser Source, so they
 show up in the OBS mixer.
 
 ### Overlays

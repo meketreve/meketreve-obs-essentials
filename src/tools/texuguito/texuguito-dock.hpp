@@ -49,9 +49,6 @@ public:
 	 * it is going. */
 	QJsonObject botPanelState() const;
 	QJsonObject applyBotPanel(const QJsonObject &panel);
-	QString statusText() const;
-	/* Copies an old texuguito-seu-bot-amigo folder in; returns a summary. */
-	QString importFrom(const QString &dir);
 	BotEngine *engine() const { return m_engine; }
 
 private:
@@ -64,7 +61,6 @@ private:
 	void updateStreamerChannels();
 	void refreshStatus();
 	QJsonObject lookJson() const;
-	void importOldBot();
 	void addAudio();
 	void openSettings();
 

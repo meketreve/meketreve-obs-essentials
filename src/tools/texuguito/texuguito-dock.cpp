@@ -92,25 +92,6 @@ QString webDir()
 	return path;
 }
 
-/* Copies <from> into <to>, keeping a .bak of anything it replaces. */
-int copyTree(const QString &from, const QString &to)
-{
-	int copied = 0;
-	QDirIterator it(from, QDir::Files, QDirIterator::Subdirectories);
-	while (it.hasNext()) {
-		const QString src = it.next();
-		const QString dst = QDir(to).filePath(QDir(from).relativeFilePath(src));
-		QDir().mkpath(QFileInfo(dst).absolutePath());
-		if (QFile::exists(dst)) {
-			QFile::remove(dst + QStringLiteral(".bak"));
-			QFile::rename(dst, dst + QStringLiteral(".bak"));
-		}
-		if (QFile::copy(src, dst))
-			copied++;
-	}
-	return copied;
-}
-
 QPointer<TexuguitoDock> g_dock;
 
 } // namespace
@@ -201,8 +182,6 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	});
 	auto *addAudio = new QPushButton(T("Texuguito.AddAudio"), this);
 	connect(addAudio, &QPushButton::clicked, this, &TexuguitoDock::addAudio);
-	auto *import = new QPushButton(T("Texuguito.Import"), this);
-	connect(import, &QPushButton::clicked, this, &TexuguitoDock::importOldBot);
 	auto *settings = new QToolButton(this);
 	settings->setText(T("UnifiedChat.Settings"));
 	connect(settings, &QToolButton::clicked, this, &TexuguitoDock::openSettings);
@@ -210,7 +189,6 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	row2->addWidget(addAudio);
 	layout->addLayout(row2);
 	auto *row3 = new QHBoxLayout();
-	row3->addWidget(import);
 	row3->addWidget(settings);
 	layout->addLayout(row3);
 
@@ -229,11 +207,6 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 TexuguitoDock::~TexuguitoDock()
 {
 	m_server->close();
-}
-
-QString TexuguitoDock::statusText() const
-{
-	return m_status->text() + QStringLiteral(" | ") + m_replies->text();
 }
 
 QString TexuguitoDock::overlayUrl() const
@@ -702,65 +675,6 @@ void TexuguitoDock::addBrowserSource()
 	obs_source_release(source);
 }
 
-void TexuguitoDock::importOldBot()
-{
-	const QString dir = QFileDialog::getExistingDirectory(this, T("Texuguito.ImportTitle"));
-	if (dir.isEmpty())
-		return;
-	QMessageBox::information(this, T("Texuguito.ImportTitle"), importFrom(dir));
-}
-
-QString TexuguitoDock::importFrom(const QString &dir)
-{
-	const QDir root(dir);
-	int files = 0;
-	for (const char *name : {"viewers.json", "points.json", "custom_commands.json"}) {
-		const QString src = root.filePath(QStringLiteral("data/") + QLatin1String(name));
-		if (!QFile::exists(src))
-			continue;
-		const QString dst = QDir(m_dataDir).filePath(QLatin1String(name));
-		if (QFile::exists(dst)) {
-			QFile::remove(dst + QStringLiteral(".bak"));
-			QFile::rename(dst, dst + QStringLiteral(".bak"));
-		}
-		if (QFile::copy(src, dst))
-			files++;
-	}
-	/* The old bot knew its Twitch channel from .env; only that line is read,
-	 * never its app or tokens (Twitch logs in with the plugin's own app). */
-	QString channel;
-	QFile env(root.filePath(QStringLiteral(".env")));
-	if (env.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		while (!env.atEnd()) {
-			const QString line = QString::fromUtf8(env.readLine()).trimmed();
-			const qsizetype eq = line.indexOf(QLatin1Char('='));
-			if (eq <= 0)
-				continue;
-			if (line.left(eq).trimmed() != QLatin1String("CHANNEL"))
-				continue;
-			channel = line.mid(eq + 1).trimmed();
-			channel.remove(QLatin1Char('"'));
-			channel.remove(QLatin1Char('\''));
-		}
-	}
-	const bool setChannel = !channel.isEmpty() && m_chat->target(ChatPlatform::Twitch).trimmed().isEmpty();
-	if (setChannel)
-		m_chat->setTarget(ChatPlatform::Twitch, channel);
-
-	const int audios = root.exists(QStringLiteral("audios"))
-				   ? copyTree(root.filePath(QStringLiteral("audios")), m_engine->audioDir())
-				   : 0;
-	m_engine->reloadData();
-	refreshStatus();
-	obs_log(LOG_INFO, "[texuguito] imported %d data file(s) and %d audio file(s) from %s", files, audios,
-		dir.toUtf8().constData());
-	QString result = files + audios > 0 ? T("Texuguito.Imported").arg(files).arg(audios)
-					    : T("Texuguito.ImportNothing");
-	if (setChannel)
-		result += QStringLiteral("\n\n") + T("Texuguito.ImportedChannel").arg(channel);
-	return result;
-}
-
 void TexuguitoDock::openSettings()
 {
 	QDialog dialog(this);
@@ -859,18 +773,4 @@ void texuguito_register(void)
 							[self](const QJsonObject &panel) {
 								return self ? self->applyPanel(panel) : QJsonObject();
 							}});
-
-	/* Developer smoke test, inert unless the variable is set: imports the
-	 * old bot folder it names, then logs what the dock shows. */
-	const QString selftest = qEnvironmentVariable("MEKETREVE_SELFTEST_TEXUGUITO_IMPORT");
-	if (!selftest.isEmpty()) {
-		QTimer::singleShot(3000, dock, [dock, selftest]() {
-			obs_log(LOG_INFO, "[selftest] texuguito status before: %s",
-				dock->statusText().toUtf8().constData());
-			obs_log(LOG_INFO, "[selftest] texuguito import: %s",
-				dock->importFrom(selftest).toUtf8().constData());
-			obs_log(LOG_INFO, "[selftest] texuguito status after: %s",
-				dock->statusText().toUtf8().constData());
-		});
-	}
 }

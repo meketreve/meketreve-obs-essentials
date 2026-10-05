@@ -303,15 +303,6 @@ QString BotEngine::soundFetchError(const SoundFetch::Result &result, const QStri
 	return tr("Texuguito.Bot.AddAudioDownloadFailed");
 }
 
-void BotEngine::reloadData()
-{
-	m_viewers.load();
-	m_points.load();
-	m_custom.load();
-	reloadClips();
-	refreshPresence();
-}
-
 QString BotEngine::displayName(const QString &key)
 {
 	const Viewer &v = m_viewers.getOrCreate(key);
