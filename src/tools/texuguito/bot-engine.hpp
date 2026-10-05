@@ -72,7 +72,7 @@ public:
 	/* Both languages for chat replies: the answer follows the language of
 	 * the command that was typed (!help answers in English, !ajuda in
 	 * Portuguese), not the language OBS is in. Neutral aliases (ping,
-	 * status, pts, p, tts, cmd, audio) fall back to TextFunction. */
+	 * status, pts, p, tts, cmd, audio) fall back to setReplyText. */
 
 	static constexpr int kTtsCost = 200;
 	static constexpr int kMaxClipCost = 100000;
@@ -115,6 +115,12 @@ public:
 	/* Also reads the sounds: groups made from old price folders get their
 	 * name in this language (and the waits of setClipCooldowns, so set
 	 * those first). */
+	/* Neutral chat replies (no language in the command): the stream
+	 * language. Without it they use TextFunction. */
+	void setReplyText(TextFunction text) { m_reply = std::move(text); }
+	/* The single language of neutral commands that need one (!tts voice,
+	 * !chapeu list); a bilingual stream gives the plugin language. */
+	void setReplyEnglish(bool english) { m_replyEnglish = english; }
 	void setText(TextFunction text)
 	{
 		m_text = std::move(text);
@@ -197,7 +203,7 @@ private:
 	void say(ChatPlatform platform, const QString &text);
 	QString t(const char *key) const { return m_text ? m_text(key) : QString::fromLatin1(key); }
 	QString tCmd(const QString &invoked, const char *key) const;
-	bool english() const { return t("Texuguito.Bot.Language") == QLatin1String("en"); }
+	bool english() const { return m_replyEnglish.value_or(t("Texuguito.Bot.Language") == QLatin1String("en")); }
 	/* One avatar per name: the same name on two platforms (ana and
 	 * kick:ana) is drawn once, by whoever showed up first; the other takes
 	 * over when that one leaves. Call after any change to key's status. */
@@ -240,6 +246,8 @@ private:
 	TtsFunction m_tts;
 	SoundFetchFunction m_soundFetch;
 	TextFunction m_text;
+	TextFunction m_reply;
+	std::optional<bool> m_replyEnglish;
 	QHash<QString, QString> m_cmdEn;
 	QHash<QString, QString> m_cmdPt;
 	QHash<QString, QByteArray> m_ttsClips;

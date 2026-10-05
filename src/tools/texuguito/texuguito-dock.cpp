@@ -125,6 +125,8 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 	m_engine->setVolume(m_volume);
 	m_engine->setClipCooldowns(m_cooldowns);
 	m_engine->setText([](const char *key) { return T(key); });
+	m_engine->setReplyText([](const char *key) { return I18n::streamText(key); });
+	m_engine->setReplyEnglish(I18n::streamSingle() == QLatin1String("en"));
 	m_engine->setCommandTexts(I18n::catalog().table(QStringLiteral("en")),
 				  I18n::catalog().table(QStringLiteral("pt")));
 	m_engine->setTts(

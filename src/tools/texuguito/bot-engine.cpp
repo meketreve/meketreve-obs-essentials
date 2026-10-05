@@ -43,7 +43,7 @@ const QStringList kList{QStringLiteral("list"), QStringLiteral("lista"), QString
 
 /* Per site/commands.json: the canonical command in each language. Neutral
  * aliases (ping, status, pts, p, tts, cmd, audio) are in neither set and
- * fall back to the OBS language. */
+ * fall back to the stream language. */
 const QSet<QString> kEnglishInvocations{
 	QStringLiteral("color"),     QStringLiteral("resetcolor"), QStringLiteral("hat"),
 	QStringLiteral("accessory"), QStringLiteral("nick"),       QStringLiteral("nickname"),
@@ -132,7 +132,7 @@ QString BotEngine::tCmd(const QString &invoked, const char *key) const
 		if (!found.isEmpty())
 			return found;
 	}
-	return t(key);
+	return m_reply ? m_reply(key) : t(key);
 }
 
 BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *parent)
@@ -703,8 +703,7 @@ void BotEngine::playTts(const BotMessage &msg, const QString &key, const QString
 		return;
 	}
 	/* The command picks the voice: !falar speaks Portuguese, !speak English,
-	 * !tts the language OBS is in. The spoken intro goes with the voice, not
-	 * with OBS. */
+	 * !tts the stream language. The spoken intro goes with the voice. */
 	const bool englishVoice = invoked == QLatin1String("speak") || (invoked != QLatin1String("falar") && english());
 	const QString lang = englishVoice ? QStringLiteral("en") : QStringLiteral("pt");
 	const QString text =
