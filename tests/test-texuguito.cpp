@@ -78,6 +78,25 @@ BotEngine::TextFunction locale(const char *name)
 	};
 }
 
+/* A group as sound-groups.json keeps it. */
+QJsonObject group(const char *id, int price, int cooldown, const QStringList &sounds)
+{
+	return QJsonObject{{QStringLiteral("id"), QLatin1String(id)},
+			   {QStringLiteral("name"), QStringLiteral("%1 pts").arg(price)},
+			   {QStringLiteral("price"), price},
+			   {QStringLiteral("cooldown"), cooldown},
+			   {QStringLiteral("enabled"), true},
+			   {QStringLiteral("sounds"), QJsonArray::fromStringList(sounds)}};
+}
+
+void writeFile(const QString &path, const QByteArray &data);
+
+void writeSoundGroups(const QString &dataDir, const QJsonArray &groups)
+{
+	writeFile(dataDir + QStringLiteral("/sound-groups.json"),
+		  QJsonDocument(QJsonObject{{QStringLiteral("groups"), groups}}).toJson());
+}
+
 void writeFile(const QString &path, const QByteArray &data)
 {
 	QFile f(path);
@@ -212,9 +231,9 @@ private slots:
 		QTemporaryDir dir;
 		const QString audio = dir.filePath(QStringLiteral("audios"));
 		QDir().mkpath(audio + QStringLiteral("/10"));
-		QDir().mkpath(audio + QStringLiteral("/grátis"));
 		writeFile(audio + QStringLiteral("/10/Buzina Alta.mp3"), "x");
-		writeFile(audio + QStringLiteral("/grátis/ignorado.mp3"), "x");
+		writeFile(audio + QStringLiteral("/10/leia-me.txt"), "x");
+		writeSoundGroups(dir.path(), {group("g1", 10, 10, {QStringLiteral("buzina alta")})});
 		BotEngine bot(dir.path(), audio);
 		bot.setText(locale("pt-BR.ini"));
 		QCOMPARE(bot.clips().size(), size_t(1));
@@ -253,19 +272,18 @@ private slots:
 	{
 		QTemporaryDir dir;
 		const QString audio = dir.filePath(QStringLiteral("audios"));
-		QDir().mkpath(audio + QStringLiteral("/20"));
 		QDir().mkpath(audio + QStringLiteral("/200"));
-		writeFile(audio + QStringLiteral("/20/pato.mp3"), "x");
-		writeFile(audio + QStringLiteral("/20/sino.mp3"), "x");
+		writeFile(audio + QStringLiteral("/pato.mp3"), "x");
+		writeFile(audio + QStringLiteral("/sino.mp3"), "x");
 		writeFile(audio + QStringLiteral("/200/trovao.mp3"), "x");
+		writeSoundGroups(dir.path(), {group("g1", 20, 10, {QStringLiteral("pato"), QStringLiteral("sino")}),
+					      group("g2", 200, 6, {QStringLiteral("trovao")})});
 		BotEngine bot(dir.path(), audio);
-		/* The old waits are set before the text, as the dock does. */
-		bot.setClipCooldowns({{200, 6}});
 		bot.setText(locale("pt-BR.ini"));
 		bot.setOverlayListeners(1);
 		bot.points().add(QStringLiteral("ana"), 1000);
 
-		/* Each old price folder became a group with its wait. */
+		/* Each group has its own price and wait. */
 		SoundLibrary &library = bot.soundLibrary();
 		QCOMPARE(library.groups().size(), 2);
 		const SoundGroup cheap = *library.groupOf(QStringLiteral("pato"));
@@ -315,15 +333,13 @@ private slots:
 		writeFile(audio + QStringLiteral("/solto.ogg"), "x");
 		writeFile(audio + QStringLiteral("/leia-me.txt"), "x");
 		const QString json = dir.filePath(QStringLiteral("sound-groups.json"));
+		writeSoundGroups(dir.path(), {group("g1", 50, 30, {QStringLiteral("bip")})});
 		SoundLibrary::Defaults defaults;
-		defaults.priceGroupName = [](int price) {
-			return QStringLiteral("%1 pts").arg(price);
-		};
 		defaults.looseGroupName = QStringLiteral("Novos");
 
 		SoundLibrary library(json);
 		library.sync(audio, defaults);
-		/* The old folder became a group; a file dropped in by hand waits,
+		/* A sound in a subfolder is found; a file dropped in by hand waits,
 		 * turned off. Files stay where they were. */
 		QCOMPARE(library.groups().size(), 2);
 		QCOMPARE(library.groupOf(QStringLiteral("bip"))->price, 50);

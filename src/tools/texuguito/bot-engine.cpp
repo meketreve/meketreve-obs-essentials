@@ -182,12 +182,6 @@ int BotEngine::reloadClips()
 	if (!QDir(m_audioDir).exists())
 		QDir().mkpath(m_audioDir);
 	SoundLibrary::Defaults defaults;
-	defaults.priceGroupName = [this](int price) {
-		return t("Texuguito.Groups.PriceName").arg(price);
-	};
-	defaults.priceCooldown = [this](int price) {
-		return m_cooldowns.value(price, defaultCooldownSeconds(price));
-	};
 	defaults.looseGroupName = t("Texuguito.Groups.LooseName");
 	for (const QHash<QString, QString> *texts : {&m_cmdEn, &m_cmdPt}) {
 		const QString name = texts->value(QStringLiteral("Texuguito.Groups.LooseName"));
@@ -570,17 +564,6 @@ QSet<QString> BotEngine::reservedNames() const
 			names.insert(a);
 	}
 	return names;
-}
-
-int BotEngine::defaultCooldownSeconds(int cost)
-{
-	if (cost <= 20)
-		return 10;
-	if (cost <= 100)
-		return 30;
-	if (cost <= 200)
-		return 60;
-	return 120;
 }
 
 QString BotEngine::handleCustomCommand(const BotMessage &msg, const QString &name, const QStringList &args)

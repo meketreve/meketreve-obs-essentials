@@ -34,8 +34,7 @@ struct DockPlacement {
 };
 
 /* A tab is a named QMainWindow::saveState() snapshot. "live" and "build" are
- * fixed tabs with a built-in default layout; everything else is user-made
- * (older versions also saved the layout from before the plugin as "mine"). */
+ * fixed tabs with a built-in default layout; everything else is user-made. */
 struct TabLayout {
 	QString id;
 	QString name; /* empty for fixed tabs: the UI shows the translated name */

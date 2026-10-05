@@ -35,10 +35,9 @@ private slots:
 		QVERIFY(!cfg.tabs[0].isRemovable());
 		QVERIFY(cfg.tabs[0].state.isEmpty());
 
-		/* A "My layout" saved by older versions can be removed now. */
-		TabLayout old;
-		old.id = QStringLiteral("mine");
-		QVERIFY(old.isRemovable());
+		TabLayout custom;
+		custom.id = QStringLiteral("custom-1");
+		QVERIFY(custom.isRemovable());
 	}
 
 	void roundTrip()

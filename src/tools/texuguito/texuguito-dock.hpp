@@ -87,7 +87,6 @@ private:
 	double m_speed = 1.0;
 	bool m_names = true;
 	int m_nameSize = 10;
-	QHash<int, int> m_cooldowns; /* price -> seconds */
 	bool m_enabled = true;
 	bool m_chattersDenied = false;
 	/* What the bot said lately: the same text coming back through the

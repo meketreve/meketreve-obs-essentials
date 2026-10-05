@@ -726,16 +726,9 @@ void TabsController::setEnabled(bool enabled)
 		return;
 
 	if (!enabled) {
-		/* Go back to the layout from before the plugin (the "My layout" tab
-		 * older versions saved, if it is still there), then hide the bar. */
+		/* Keep the current layout and hide the bar. */
 		if (m_loaded) {
 			captureCurrent();
-			const qsizetype mine = m_cfg.indexOf(QStringLiteral("mine"));
-			if (mine >= 0) {
-				m_cfg.current = m_cfg.tabs[mine].id;
-				rebuildTabBar();
-				applyTab(static_cast<int>(mine));
-			}
 			saveProfile();
 		}
 		m_enabled = false;
@@ -809,8 +802,8 @@ void TabsController::importTabs(const QJsonValue &value)
 			mine.previewShown = t.previewShown;
 			continue;
 		}
-		/* Everything else, the sender's "My layout" included, is added as a
-		 * new tab so nothing of the user's own is overwritten. */
+		/* Everything else is added as a new tab, so nothing of the user's
+		 * own is overwritten. */
 		QString name = t.name.isEmpty() ? t.id : t.name;
 		const auto taken = [this](const QString &n) {
 			return std::any_of(m_cfg.tabs.begin(), m_cfg.tabs.end(),
@@ -856,7 +849,7 @@ void TabsController::runSelfTest(int step)
 		return;
 	}
 	if (step == m_tabBar->count()) {
-		/* A fresh profile must start with its own "My layout". */
+		/* A fresh profile starts with its own Live and Build. */
 		m_tabBar->setCurrentIndex(0);
 		char *before = obs_frontend_get_current_profile();
 		const std::string original = before ? before : "";

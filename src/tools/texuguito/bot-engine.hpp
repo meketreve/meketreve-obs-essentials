@@ -112,15 +112,14 @@ public:
 	SoundLibrary &soundLibrary() { return m_library; }
 	/* What a fetch error means, in the bot's language. */
 	QString soundFetchError(const SoundFetch::Result &result, const QString &invoked = QString()) const;
-	/* Also reads the sounds: groups made from old price folders get their
-	 * name in this language (and the waits of setClipCooldowns, so set
-	 * those first). */
 	/* Neutral chat replies (no language in the command): the stream
 	 * language. Without it they use TextFunction. */
 	void setReplyText(TextFunction text) { m_reply = std::move(text); }
 	/* The single language of neutral commands that need one (!tts voice,
 	 * !chapeu list); a bilingual stream gives the plugin language. */
 	void setReplyEnglish(bool english) { m_replyEnglish = english; }
+	/* Also reads the sounds: the group of new sounds is named in this
+	 * language (set the command texts first, for its other names). */
 	void setText(TextFunction text)
 	{
 		m_text = std::move(text);
@@ -136,11 +135,6 @@ public:
 	static std::optional<bool> commandEnglish(const QString &invoked);
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
-	/* The waits of the old layout, one per price folder: a price folder
-	 * that becomes a group takes its wait from here (else
-	 * defaultCooldownSeconds()). After that each group has its own. */
-	void setClipCooldowns(const QHash<int, int> &seconds) { m_cooldowns = seconds; }
-	static int defaultCooldownSeconds(int cost);
 	void setAudioDir(const QString &dir);
 	QString audioDir() const { return m_audioDir; }
 	int reloadClips();
@@ -239,7 +233,6 @@ private:
 		qint64 at = -1;
 	};
 	StreamerCommand m_lastStreamerCommand;
-	QHash<int, int> m_cooldowns;
 	QElapsedTimer m_clock;
 	double m_volume = 1.0;
 	int m_listeners = 0;

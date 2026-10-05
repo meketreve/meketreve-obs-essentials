@@ -123,7 +123,6 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 
 	m_engine = new BotEngine(m_dataDir, m_audioDir, this);
 	m_engine->setVolume(m_volume);
-	m_engine->setClipCooldowns(m_cooldowns);
 	/* Both tables first: setText reads the sounds, and the group of new
 	 * sounds gets renamed from the other language. */
 	m_engine->setCommandTexts(I18n::catalog().table(QStringLiteral("en")),
@@ -426,14 +425,6 @@ void TexuguitoDock::loadSettings()
 	const QString audio = QString::fromUtf8(obs_data_get_string(data, "audioDir"));
 	if (!audio.isEmpty())
 		m_audioDir = audio;
-	obs_data_t *cooldowns = obs_data_get_obj(data, "cooldowns");
-	for (obs_data_item_t *item = obs_data_first(cooldowns); item; obs_data_item_next(&item)) {
-		bool ok = false;
-		const int cost = QString::fromUtf8(obs_data_item_get_name(item)).toInt(&ok);
-		if (ok)
-			m_cooldowns.insert(cost, static_cast<int>(obs_data_item_get_int(item)));
-	}
-	obs_data_release(cooldowns);
 	obs_data_release(data);
 }
 
@@ -448,11 +439,6 @@ void TexuguitoDock::saveSettings()
 	obs_data_set_bool(data, "paradeNames", m_names);
 	obs_data_set_int(data, "paradeNameSize", m_nameSize);
 	obs_data_set_string(data, "audioDir", m_engine->audioDir().toUtf8().constData());
-	obs_data_t *cooldowns = obs_data_create();
-	for (auto it = m_cooldowns.constBegin(); it != m_cooldowns.constEnd(); ++it)
-		obs_data_set_int(cooldowns, QByteArray::number(it.key()).constData(), it.value());
-	obs_data_set_obj(data, "cooldowns", cooldowns);
-	obs_data_release(cooldowns);
 	const QString path = QDir(m_dataDir).filePath(QStringLiteral("settings.json"));
 	obs_data_save_json_safe(data, path.toUtf8().constData(), "tmp", "bak");
 	obs_data_release(data);

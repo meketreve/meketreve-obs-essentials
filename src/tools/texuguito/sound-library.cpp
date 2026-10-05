@@ -79,25 +79,18 @@ QString SoundLibrary::newId() const
 
 void SoundLibrary::sync(const QString &audioDir, const Defaults &defaults)
 {
-	/* The files: loose in the folder, then in the old price folders. A name
+	/* The files: loose in the folder, then one level of subfolders. A name
 	 * found twice keeps the first file. */
 	m_files.clear();
-	QHash<QString, int> legacyPrice;
 	const QDir root(audioDir);
 	for (const QFileInfo &f : root.entryInfoList(QDir::Files, QDir::Name))
 		if (isAudio(f))
 			m_files.insert(f.completeBaseName().toLower(), f.fileName());
 	for (const QString &folder : root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-		bool numeric = false;
-		const int price = folder.toInt(&numeric);
-		if (!numeric || price < 0)
-			continue;
 		for (const QFileInfo &f : QDir(root.filePath(folder)).entryInfoList(QDir::Files, QDir::Name)) {
 			const QString name = f.completeBaseName().toLower();
-			if (!isAudio(f) || m_files.contains(name))
-				continue;
-			m_files.insert(name, folder + QLatin1Char('/') + f.fileName());
-			legacyPrice.insert(name, price);
+			if (isAudio(f) && !m_files.contains(name))
+				m_files.insert(name, folder + QLatin1Char('/') + f.fileName());
 		}
 	}
 
@@ -149,54 +142,25 @@ void SoundLibrary::sync(const QString &audioDir, const Defaults &defaults)
 		changed = changed || g.sounds.size() != before;
 	}
 
-	/* Files in no group yet: the old price folders become groups; a file
-	 * dropped in by hand waits, turned off, in the group of new sounds. */
-	QHash<int, QString> madeForPrice;
+	/* Files in no group yet wait, turned off, in the group of new sounds. */
 	QString loose;
-	/* Cheapest old folder first, so the groups come in price order. */
 	QStringList names = m_files.keys();
-	std::sort(names.begin(), names.end(), [&legacyPrice](const QString &a, const QString &b) {
-		/* Loose files last: they never pick a price group. */
-		const int pa = legacyPrice.value(a, INT_MAX), pb = legacyPrice.value(b, INT_MAX);
-		return pa != pb ? pa < pb : a < b;
-	});
+	std::sort(names.begin(), names.end());
 	for (const QString &name : names) {
 		if (placed.contains(name))
 			continue;
-		QString id;
-		if (legacyPrice.contains(name)) {
-			const int price = legacyPrice.value(name);
-			id = madeForPrice.value(price);
-			for (const SoundGroup &g : m_groups)
-				if (id.isEmpty() && g.price == price && g.id != loose &&
-				    (defaults.looseGroupName.isEmpty() || g.name != defaults.looseGroupName))
-					id = g.id;
-			if (id.isEmpty()) {
-				SoundGroup g;
-				g.id = newId();
-				g.name = defaults.priceGroupName ? defaults.priceGroupName(price)
-								 : QString::number(price);
-				g.price = price;
-				g.cooldown = defaults.priceCooldown ? defaults.priceCooldown(price) : 30;
-				m_groups.append(g);
-				id = madeForPrice[price] = g.id;
-			}
-		} else {
-			for (const SoundGroup &g : m_groups)
-				if (loose.isEmpty() && !defaults.looseGroupName.isEmpty() &&
-				    g.name == defaults.looseGroupName)
-					loose = g.id;
-			if (loose.isEmpty()) {
-				SoundGroup g;
-				g.id = newId();
-				g.name = defaults.looseGroupName.isEmpty() ? g.id : defaults.looseGroupName;
-				g.enabled = false;
-				m_groups.append(g);
+		for (const SoundGroup &g : m_groups)
+			if (loose.isEmpty() && !defaults.looseGroupName.isEmpty() && g.name == defaults.looseGroupName)
 				loose = g.id;
-			}
-			id = loose;
+		if (loose.isEmpty()) {
+			SoundGroup g;
+			g.id = newId();
+			g.name = defaults.looseGroupName.isEmpty() ? g.id : defaults.looseGroupName;
+			g.enabled = false;
+			m_groups.append(g);
+			loose = g.id;
 		}
-		find(id)->sounds.append(name);
+		find(loose)->sounds.append(name);
 		changed = true;
 	}
 	if (changed)

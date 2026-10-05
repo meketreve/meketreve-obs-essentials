@@ -38,10 +38,8 @@ struct SoundGroup {
 };
 
 /* Which sound is in which group, kept in sound-groups.json; the files stay
- * in the audio folder. New sounds go loose in the folder. Sounds of the old
- * layout (<audio dir>/<price>/<file>) stay where they are: the first time
- * they are seen, each price folder becomes a group of that price. No OBS
- * dependency, so it runs in unit tests. */
+ * in the audio folder (loose, or one level of subfolders), new sounds go
+ * loose in it. No OBS dependency, so it runs in unit tests. */
 class SoundLibrary {
 public:
 	static constexpr int kMaxGroups = 50;
@@ -49,19 +47,16 @@ public:
 
 	/* What sync() needs to name and set up the groups it makes. */
 	struct Defaults {
-		std::function<QString(int price)> priceGroupName; /* "50 pts" */
-		std::function<int(int price)> priceCooldown;      /* the old wait of that price */
-		QString looseGroupName;                           /* files dropped by hand */
-		QStringList otherLooseNames;                      /* its default name in the other languages */
+		QString looseGroupName;      /* files dropped by hand */
+		QStringList otherLooseNames; /* its default name in the other languages */
 	};
 
 	explicit SoundLibrary(const QString &jsonPath);
 
 	/* Reads the json and the audio folder: a sound whose file is gone
-	 * leaves its group; a file in no group joins the group made for its old
-	 * price folder, or (loose in the folder) a group of new sounds that
-	 * starts turned off, so nothing plays before it has a price. Saves when
-	 * something changed. */
+	 * leaves its group; a file in no group joins the group of new sounds,
+	 * which starts turned off so nothing plays before it has a price. Saves
+	 * when something changed. */
 	void sync(const QString &audioDir, const Defaults &defaults);
 
 	const QList<SoundGroup> &groups() const { return m_groups; }
