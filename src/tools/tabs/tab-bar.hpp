@@ -37,6 +37,8 @@ class QToolBar;
 /* Owns the tab toolbar and swaps QMainWindow dock layouts per tab. The
  * layouts live in the current profile's folder, so each profile keeps its
  * own set. */
+class QTimer;
+
 class TabsController : public QObject {
 	Q_OBJECT
 
@@ -59,6 +61,9 @@ public slots:
 	void switchToIndex(int index);
 	void switchRelative(int delta);
 
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
 	void loadProfile(bool startup = false);
 	void saveProfile();
@@ -67,6 +72,7 @@ private:
 	void applyTab(int configIndex);
 	void applyDockList(const QString &id, const QList<DockPlacement> &docks);
 	void fillCentralSpace();
+	void settleStartupLayout();
 	void ensurePreviewVisible(TabLayout &tab);
 	void onCurrentChanged(int index);
 	void showContextMenu(const QPoint &pos);
@@ -94,6 +100,10 @@ private:
 	bool m_enabled = true;
 	bool m_loaded = false;
 	bool m_switching = false;
+	/* The layout OBS restored at startup, applied again once the window
+	 * reaches its final size (see loadProfile). */
+	QByteArray m_startupState;
+	QTimer *m_settle = nullptr;
 	std::vector<obs_hotkey_id> m_hotkeys;
 	std::vector<std::string> m_hotkeyNames;
 };

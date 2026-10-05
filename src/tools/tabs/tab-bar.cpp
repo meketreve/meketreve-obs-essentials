@@ -28,6 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QAction>
 #include <QDockWidget>
+#include <QEvent>
 #include <QFile>
 #include <QInputDialog>
 #include <QJsonDocument>
@@ -50,6 +51,8 @@ constexpr const char *kPreviewDockId = "meketreve-main-canvas";
 constexpr const char *kChatDockId = "meketreve-unified-chat";
 /* A short strip under the chat on the Live tab. */
 constexpr int kSideSecondHeight = 270;
+/* How long after startup a window resize brings the restored layout back. */
+constexpr int kSettleWatchMs = 8000;
 constexpr const char *kProfileFile = "meketreve-tabs.json";
 constexpr const char *kGlobalFile = "tabs.json";
 constexpr int kGoToHotkeys = 9;
@@ -269,8 +272,44 @@ void TabsController::loadProfile(bool startup)
 	const bool obsRestored = startup && !obsDockState().isEmpty();
 	if (ci >= 0 && !obsRestored && !m_cfg.tabs[ci].state.isEmpty() && m_cfg.tabs[ci].state != m_main->saveState())
 		applyTab(static_cast<int>(ci));
+	if (obsRestored)
+		settleStartupLayout();
 	obs_log(LOG_INFO, "[tabs] loaded %d tab(s), current \"%s\"", static_cast<int>(m_cfg.tabs.size()),
 		m_cfg.current.toUtf8().constData());
+}
+
+/* OBS restores the docks while the window still has its normal size and
+ * maximizes it afterwards: the extra width or height goes to the empty
+ * center, so a gap the user had closed comes back (and is saved on close).
+ * Apply the same layout again each time the window settles during the
+ * first seconds. */
+void TabsController::settleStartupLayout()
+{
+	m_startupState = obsDockState();
+	if (m_startupState.isEmpty())
+		return;
+	if (!m_settle) {
+		m_settle = new QTimer(this);
+		m_settle->setSingleShot(true);
+		m_settle->setInterval(200);
+		connect(m_settle, &QTimer::timeout, this, [this]() {
+			if (!m_startupState.isEmpty() && !m_main->restoreState(m_startupState))
+				obs_log(LOG_WARNING, "[tabs] could not restore the layout after the window settled");
+		});
+	}
+	m_main->installEventFilter(this);
+	m_settle->start();
+	QTimer::singleShot(kSettleWatchMs, this, [this]() {
+		m_main->removeEventFilter(this);
+		m_startupState.clear();
+	});
+}
+
+bool TabsController::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == m_main && event->type() == QEvent::Resize && !m_startupState.isEmpty() && m_settle)
+		m_settle->start();
+	return QObject::eventFilter(watched, event);
 }
 
 void TabsController::saveProfile()
