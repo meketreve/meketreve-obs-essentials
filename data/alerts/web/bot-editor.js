@@ -233,19 +233,24 @@ function render() {
 
   const add = button(t("NewGroup"), () => act({ action: "group", group: "", name: t("NewGroupName"), price: 50, cooldown: 30, enabled: true }), "primary");
 
+  // The chat-made commands as a table; the last row makes a new one, in
+  // the same columns.
   const commandRows = state.commands.map((c) => {
     const reply = el("input", { type: "text", value: c.reply, spellcheck: "false" });
-    return el("div", { class: "list-row" },
-      el("code", { text: "!" + c.name }),
-      el("div", { class: "inline grow" }, reply,
-        el("button", { type: "button", class: "btn small", text: t("Save"), onclick: () => act({ action: "command", name: c.name, reply: reply.value }) }),
-        el("button", { type: "button", class: "btn small", text: t("Remove"),
-          onclick: () => { if (confirm(t("RemoveCommandConfirm", "!" + c.name))) act({ action: "deleteCommand", name: c.name }); } })));
+    return el("tr", {},
+      el("td", {}, el("code", { text: "!" + c.name })),
+      el("td", {}, reply),
+      el("td", { class: "sound-actions" },
+        button(t("Save"), () => act({ action: "command", name: c.name, reply: reply.value })),
+        button(t("Remove"), () => { if (confirm(t("RemoveCommandConfirm", "!" + c.name))) act({ action: "deleteCommand", name: c.name }); })));
   });
-  const newName = el("input", { type: "text", placeholder: t("NewName"), spellcheck: "false", class: "name" });
+  const newName = el("input", { type: "text", placeholder: t("NewName"), spellcheck: "false" });
   const newReply = el("input", { type: "text", placeholder: t("NewReply"), spellcheck: "false" });
-  const create = el("button", { type: "button", class: "btn small primary", text: t("Create"),
-    onclick: () => act({ action: "command", name: newName.value, reply: newReply.value }) });
+  const create = button(t("Create"), () => act({ action: "command", name: newName.value, reply: newReply.value }), "primary");
+  const commandTable = el("table", { class: "sound-table command-table" },
+    el("thead", {}, el("tr", {}, el("th", { text: t("ColCommand") }), el("th", { text: t("ColReply") }), el("th", { text: t("ColActions") }))),
+    el("tbody", {}, commandRows,
+      el("tr", { class: "new-row" }, el("td", {}, newName), el("td", {}, newReply), el("td", { class: "sound-actions" }, create))));
 
   document.getElementById("form").replaceChildren(
     el("h2", { text: t("Tab") }),
@@ -256,7 +261,7 @@ function render() {
       el("div", { class: "inline" }, add)),
     importCard(),
     el("section", { class: "card" }, el("h3", { text: t("Commands") }), el("p", { class: "hint", text: t("CommandsNote") }),
-      commandRows, el("div", { class: "list-row" }, newName, el("div", { class: "inline grow" }, newReply, create))));
+      el("div", { class: "group-panel" }, commandTable)));
 }
 
 async function init() {
