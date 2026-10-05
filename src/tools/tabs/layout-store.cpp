@@ -82,6 +82,13 @@ QJsonObject TabsConfig::toJson(bool withStates) const
 		if (withStates && !t.state.isEmpty()) {
 			o.insert(QStringLiteral("state"), QString::fromLatin1(t.state.toBase64()));
 			o.insert(QStringLiteral("previewShown"), t.previewShown);
+			if (t.window.isValid() && !t.sizes.isEmpty()) {
+				o.insert(QStringLiteral("window"), QJsonArray{t.window.width(), t.window.height()});
+				QJsonObject sizes;
+				for (auto it = t.sizes.constBegin(); it != t.sizes.constEnd(); ++it)
+					sizes.insert(it.key(), QJsonArray{it.value().width(), it.value().height()});
+				o.insert(QStringLiteral("sizes"), sizes);
+			}
 		}
 		if (!t.docks.isEmpty()) {
 			QJsonArray docks;
@@ -123,6 +130,17 @@ bool TabsConfig::fromJson(const QJsonObject &obj, TabsConfig &out, QString *erro
 			t.name = t.id;
 		t.state = QByteArray::fromBase64(o.value(QStringLiteral("state")).toString().toLatin1());
 		t.previewShown = o.value(QStringLiteral("previewShown")).toBool();
+		const auto size = [](const QJsonValue &v) {
+			const QJsonArray a = v.toArray();
+			return a.size() == 2 ? QSize(a.at(0).toInt(), a.at(1).toInt()) : QSize();
+		};
+		t.window = size(o.value(QStringLiteral("window")));
+		const QJsonObject sizes = o.value(QStringLiteral("sizes")).toObject();
+		for (auto it = sizes.constBegin(); it != sizes.constEnd(); ++it) {
+			const QSize s = size(it.value());
+			if (s.isValid())
+				t.sizes.insert(it.key(), s);
+		}
 		for (const QJsonValue d : o.value(QStringLiteral("docks")).toArray()) {
 			const QString dock = d.toObject().value(QStringLiteral("dock")).toString();
 			const QString area = d.toObject().value(QStringLiteral("area")).toString();

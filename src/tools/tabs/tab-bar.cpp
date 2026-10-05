@@ -42,6 +42,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QToolBar>
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <string>
 
@@ -53,6 +54,8 @@ constexpr const char *kChatDockId = "meketreve-unified-chat";
 constexpr int kSideSecondHeight = 270;
 /* How long after startup a window resize brings the restored layout back. */
 constexpr int kSettleWatchMs = 8000;
+/* How long the dock resizes after our own resizeDocks are not the user's. */
+constexpr int kScaleQuietMs = 400;
 constexpr const char *kProfileFile = "meketreve-tabs.json";
 constexpr const char *kGlobalFile = "tabs.json";
 constexpr int kGoToHotkeys = 9;
@@ -111,6 +114,13 @@ QList<QDockWidget *> topLevelDocks(QMainWindow *main)
 	return main->findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);
 }
 
+/* Docked and really shown: a dock behind another tab of its group counts as
+ * visible but keeps an old size, which would pull the whole group. */
+bool onScreen(QDockWidget *dock)
+{
+	return dock->isVisible() && !dock->isFloating() && !dock->visibleRegion().isEmpty();
+}
+
 void hotkeyCallback(void *data, obs_hotkey_id id, obs_hotkey_t *, bool pressed);
 
 } // namespace
@@ -153,6 +163,19 @@ TabsController::TabsController(QMainWindow *main) : QObject(main), m_main(main)
 	m_toggleAction->setCheckable(true);
 	m_toggleAction->setChecked(m_enabled);
 	connect(m_toggleAction, &QAction::toggled, this, &TabsController::setEnabled);
+
+	m_referenceTimer = new QTimer(this);
+	m_referenceTimer->setSingleShot(true);
+	m_referenceTimer->setInterval(300);
+	connect(m_referenceTimer, &QTimer::timeout, this, [this]() {
+		if (!m_scaling && !m_frozen && m_main->size() == m_layoutWindow)
+			takeReference();
+	});
+	m_scaleTimer = new QTimer(this);
+	m_scaleTimer->setSingleShot(true);
+	m_scaleTimer->setInterval(150);
+	connect(m_scaleTimer, &QTimer::timeout, this, &TabsController::scaleDocks);
+	main->installEventFilter(this);
 
 	registerHotkeys();
 }
@@ -206,7 +229,12 @@ void TabsController::onFrontendEvent(enum obs_frontend_event event)
 		if (m_enabled)
 			loadProfile();
 		break;
+	case OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN:
+		/* Other plugins start removing their docks now. */
+		m_frozen = true;
+		break;
 	case OBS_FRONTEND_EVENT_EXIT:
+		m_frozen = true;
 		if (m_loaded) {
 			/* Not saveState(): by now the vertical port has removed its
 			 * docks and the layout around them has collapsed. Keep what
@@ -260,6 +288,7 @@ void TabsController::loadProfile(bool startup)
 		rebuildTabBar();
 		applyTab(static_cast<int>(m_cfg.indexOf(m_cfg.current)));
 		obs_log(LOG_INFO, "[tabs] first run on this profile, starting on Live");
+		m_proportional = true;
 		return;
 	}
 
@@ -274,6 +303,8 @@ void TabsController::loadProfile(bool startup)
 		applyTab(static_cast<int>(ci));
 	if (obsRestored)
 		settleStartupLayout();
+	else
+		m_proportional = true;
 	obs_log(LOG_INFO, "[tabs] loaded %d tab(s), current \"%s\"", static_cast<int>(m_cfg.tabs.size()),
 		m_cfg.current.toUtf8().constData());
 }
@@ -286,30 +317,118 @@ void TabsController::loadProfile(bool startup)
 void TabsController::settleStartupLayout()
 {
 	m_startupState = obsDockState();
-	if (m_startupState.isEmpty())
+	if (m_startupState.isEmpty()) {
+		m_proportional = true;
 		return;
+	}
 	if (!m_settle) {
 		m_settle = new QTimer(this);
 		m_settle->setSingleShot(true);
 		m_settle->setInterval(200);
 		connect(m_settle, &QTimer::timeout, this, [this]() {
-			if (!m_startupState.isEmpty() && !m_main->restoreState(m_startupState))
+			if (m_startupState.isEmpty())
+				return;
+			if (!m_main->restoreState(m_startupState))
 				obs_log(LOG_WARNING, "[tabs] could not restore the layout after the window settled");
+			const qsizetype ci = m_cfg.indexOf(m_cfg.current);
+			if (ci >= 0)
+				useTabReference(m_cfg.tabs[ci]);
 		});
 	}
-	m_main->installEventFilter(this);
 	m_settle->start();
 	QTimer::singleShot(kSettleWatchMs, this, [this]() {
-		m_main->removeEventFilter(this);
 		m_startupState.clear();
+		m_proportional = true;
 	});
 }
 
 bool TabsController::eventFilter(QObject *watched, QEvent *event)
 {
-	if (watched == m_main && event->type() == QEvent::Resize && !m_startupState.isEmpty() && m_settle)
-		m_settle->start();
+	if (event->type() != QEvent::Resize || m_frozen)
+		return QObject::eventFilter(watched, event);
+	if (watched == m_main) {
+		if (!m_startupState.isEmpty() && m_settle)
+			m_settle->start();
+		else if (m_proportional && m_enabled && m_main->size() != m_layoutWindow && m_scaleTimer)
+			m_scaleTimer->start();
+	} else if (m_proportional && m_enabled && !m_scaling && m_main->size() == m_layoutWindow && m_referenceTimer) {
+		/* A dock changed size with the window as it was: the user moved a
+		 * splitter (or switched tabs), so that is the new reference. */
+		m_referenceTimer->start();
+	}
 	return QObject::eventFilter(watched, event);
+}
+
+TabsController::DockSizes TabsController::measureDocks() const
+{
+	DockSizes out;
+	out.window = m_main->size();
+	for (QDockWidget *dock : topLevelDocks(m_main)) {
+		if (onScreen(dock) && !dock->objectName().isEmpty())
+			out.sizes.insert(dock->objectName(), dock->size());
+	}
+	return out;
+}
+
+void TabsController::takeReference()
+{
+	/* Closing hides the window and its docks before any shutdown event:
+	 * that is not a layout to keep. */
+	const DockSizes measured = measureDocks();
+	if (!m_main->isVisible() || measured.sizes.isEmpty())
+		return;
+	m_reference = measured;
+	m_layoutWindow = m_reference.window;
+	/* Docks added since (plugins load late) get watched too. */
+	for (QDockWidget *dock : topLevelDocks(m_main))
+		dock->installEventFilter(this);
+}
+
+/* After restoring a tab: its saved sizes are the reference; on another
+ * window size the docks scale to it right away. */
+void TabsController::useTabReference(const TabLayout &tab)
+{
+	if (!tab.window.isValid() || tab.sizes.isEmpty()) {
+		QTimer::singleShot(0, this, &TabsController::takeReference);
+		return;
+	}
+	m_reference = {tab.window, tab.sizes};
+	m_layoutWindow = tab.window;
+	for (QDockWidget *dock : topLevelDocks(m_main))
+		dock->installEventFilter(this);
+	QTimer::singleShot(0, this, &TabsController::scaleDocks);
+}
+
+void TabsController::scaleDocks()
+{
+	const QSize now = m_main->size();
+	if (!m_reference.window.isValid() || m_reference.window.width() <= 0 || m_reference.window.height() <= 0) {
+		takeReference();
+		return;
+	}
+	if (now == m_layoutWindow || m_main->isMinimized())
+		return;
+	const double fx = static_cast<double>(now.width()) / m_reference.window.width();
+	const double fy = static_cast<double>(now.height()) / m_reference.window.height();
+	QList<QDockWidget *> docks;
+	QList<int> widths, heights;
+	for (auto it = m_reference.sizes.constBegin(); it != m_reference.sizes.constEnd(); ++it) {
+		auto *dock = m_main->findChild<QDockWidget *>(it.key(), Qt::FindDirectChildrenOnly);
+		if (!dock || !onScreen(dock))
+			continue;
+		docks.append(dock);
+		widths.append(static_cast<int>(std::lround(it.value().width() * fx)));
+		heights.append(static_cast<int>(std::lround(it.value().height() * fy)));
+	}
+	m_layoutWindow = now;
+	if (docks.isEmpty())
+		return;
+	m_scaling = true;
+	m_main->resizeDocks(docks, widths, Qt::Horizontal);
+	m_main->resizeDocks(docks, heights, Qt::Vertical);
+	/* resizeDocks lands on the next layout pass: the dock resizes it
+	 * causes are ours, not the user's. */
+	QTimer::singleShot(kScaleQuietMs, this, [this]() { m_scaling = false; });
 }
 
 void TabsController::saveProfile()
@@ -346,8 +465,16 @@ void TabsController::captureCurrent(const QByteArray &state)
 	if (!m_loaded || !m_enabled)
 		return;
 	const qsizetype ci = m_cfg.indexOf(m_cfg.current);
-	if (ci >= 0)
-		m_cfg.tabs[ci].state = state.isEmpty() ? m_main->saveState() : state;
+	if (ci < 0)
+		return;
+	m_cfg.tabs[ci].state = state.isEmpty() ? m_main->saveState() : state;
+	/* While shutting down the docks are already going away: keep the last
+	 * layout the user saw. */
+	const DockSizes sizes = m_frozen || !m_main->isVisible() ? m_reference : measureDocks();
+	if (sizes.window.isValid() && !sizes.sizes.isEmpty()) {
+		m_cfg.tabs[ci].window = sizes.window;
+		m_cfg.tabs[ci].sizes = sizes.sizes;
+	}
 }
 
 void TabsController::onCurrentChanged(int index)
@@ -390,6 +517,7 @@ void TabsController::applyTab(int configIndex)
 		obs_log(LOG_WARNING, "[tabs] could not restore the layout of \"%s\"", tab.id.toUtf8().constData());
 	m_toolbar->setVisible(m_enabled);
 	ensurePreviewVisible(tab);
+	useTabReference(tab);
 }
 
 void TabsController::ensurePreviewVisible(TabLayout &tab)
@@ -470,6 +598,7 @@ void TabsController::applyDockList(const QString &id, const QList<DockPlacement>
 		if (!bottom.isEmpty())
 			m_main->resizeDocks({bottom.first()}, {220}, Qt::Vertical);
 		fillCentralSpace();
+		takeReference();
 		if (m_cfg.current == id) {
 			captureCurrent();
 			saveProfile();

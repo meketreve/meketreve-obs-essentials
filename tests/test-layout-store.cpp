@@ -50,6 +50,8 @@ private slots:
 		custom.name = QStringLiteral("Jogo");
 		custom.state = "abc";
 		custom.previewShown = true;
+		custom.window = QSize(1440, 863);
+		custom.sizes.insert(QStringLiteral("scenesDock"), QSize(290, 224));
 		cfg.tabs.append(custom);
 		cfg.current = custom.id;
 
@@ -60,6 +62,9 @@ private slots:
 		QCOMPARE(back.tabs[0].state, QByteArray("\x00\x01\xff", 3));
 		QCOMPARE(back.tabs[2].name, QStringLiteral("Jogo"));
 		QVERIFY(back.tabs[2].previewShown);
+		QCOMPARE(back.tabs[2].window, QSize(1440, 863));
+		QCOMPARE(back.tabs[2].sizes.value(QStringLiteral("scenesDock")), QSize(290, 224));
+		QVERIFY(!back.tabs[0].window.isValid());
 		QVERIFY(back.tabs[2].isRemovable());
 		QCOMPARE(back.newCustomId(), QStringLiteral("custom-2"));
 	}

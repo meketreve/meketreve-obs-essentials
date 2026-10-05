@@ -19,8 +19,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 #include <QByteArray>
+#include <QHash>
 #include <QJsonObject>
 #include <QList>
+#include <QSize>
 #include <QString>
 
 /* Where one dock goes in a declarative layout. Areas: left, right, top,
@@ -40,6 +42,11 @@ struct TabLayout {
 	QByteArray state;
 	QList<DockPlacement> docks; /* used while state is empty */
 	bool previewShown = false;
+	/* Dock sizes (objectName -> size) and the window size they belong to:
+	 * on another window size (another monitor) the docks scale by the same
+	 * proportion instead of the empty center taking the difference. */
+	QSize window;
+	QHash<QString, QSize> sizes;
 
 	bool isFixed() const { return id == QLatin1String("live") || id == QLatin1String("build"); }
 	bool isRemovable() const { return !isFixed(); }

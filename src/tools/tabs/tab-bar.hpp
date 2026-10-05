@@ -22,7 +22,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 #include <obs-hotkey.h>
 
+#include <QHash>
 #include <QJsonValue>
+#include <QSize>
 #include <QObject>
 #include <QPointer>
 
@@ -73,6 +75,15 @@ private:
 	void applyDockList(const QString &id, const QList<DockPlacement> &docks);
 	void fillCentralSpace();
 	void settleStartupLayout();
+	/* Proportional docks: sizes of the visible docked docks for a window size. */
+	struct DockSizes {
+		QSize window;
+		QHash<QString, QSize> sizes;
+	};
+	DockSizes measureDocks() const;
+	void takeReference();
+	void useTabReference(const TabLayout &tab);
+	void scaleDocks();
 	void ensurePreviewVisible(TabLayout &tab);
 	void onCurrentChanged(int index);
 	void showContextMenu(const QPoint &pos);
@@ -104,6 +115,17 @@ private:
 	 * reaches its final size (see loadProfile). */
 	QByteArray m_startupState;
 	QTimer *m_settle = nullptr;
+	/* The layout the docks scale from when the window changes size (another
+	 * monitor), and the window size the docks have now. The reference only
+	 * moves when the user resizes a dock, so moving back and forth between
+	 * monitors does not drift. */
+	DockSizes m_reference;
+	QSize m_layoutWindow;
+	QTimer *m_referenceTimer = nullptr;
+	QTimer *m_scaleTimer = nullptr;
+	bool m_proportional = false; /* on once startup has settled */
+	bool m_scaling = false;      /* our own resizeDocks is being applied */
+	bool m_frozen = false;       /* shutting down: docks are being removed */
 	std::vector<obs_hotkey_id> m_hotkeys;
 	std::vector<std::string> m_hotkeyNames;
 };
