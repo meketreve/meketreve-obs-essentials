@@ -29,7 +29,7 @@
 
 <div lang="pt-BR">
 <h1>Política de privacidade</h1>
-<p class="updated">Última atualização: 3 de outubro de 2026</p>
+<p class="updated">Última atualização: 5 de outubro de 2026</p>
 
 <p>O <b>Meketreve OBS Essentials</b> é um plugin gratuito e de código aberto para o OBS Studio (<a href="https://github.com/meketreve/meketreve-obs-essentials">código-fonte</a>). Ele roda no seu computador, dentro do OBS. Esta política explica que dados o plugin acessa, para quê, onde eles ficam e com quem são compartilhados.</p>
 
@@ -45,12 +45,13 @@
 <p>Se você escolher <b>Entrar</b> no YouTube em Chat Unificado → Configurar, o plugin pede ao Google a permissão <code>https://www.googleapis.com/auth/youtube</code> (gerenciar a sua conta do YouTube). Com ela, e só quando você usa o recurso correspondente, o plugin:</p>
 <ul>
   <li><b>lê o ID e o nome do seu canal</b>, para mostrar em qual conta você entrou e para o bot não responder às próprias mensagens;</li>
-  <li><b>lê a sua transmissão ao vivo (ou a próxima agendada)</b>: ID, título, categoria e o ID do chat ao vivo, para saber onde enviar mensagens e o que mostrar no painel Informações da live;</li>
-  <li><b>muda o título e a categoria</b> dessa transmissão quando você clica em Atualizar no painel Informações da live (o resto da descrição do vídeo é mantido como está);</li>
+  <li><b>lê a sua transmissão ao vivo (ou a próxima agendada)</b>: ID, título, categoria e o ID do chat ao vivo, para saber onde enviar mensagens e o que mostrar no painel Título e categoria;</li>
+  <li><b>muda o título e a categoria</b> dessa transmissão quando você clica em Atualizar no painel Título e categoria (o resto da descrição do vídeo é mantido como está);</li>
+  <li><b>prepara a transmissão para a saída do YouTube</b>: quando você liga uma saída para o YouTube no painel Multistream, o plugin lê as suas chaves de transmissão (para achar a que está configurada na saída) e as suas transmissões ao vivo, inclusive as já encerradas; se nenhuma estiver pronta para aquela chave, cria uma nova com o título, a descrição e a privacidade da última encerrada e a liga à chave — o que o YouTube Studio faz quando você abre a página da live;</li>
   <li><b>envia mensagens</b> no chat da sua transmissão quando você escreve pela caixa do Chat Unificado, ou quando o bot Texuguito, que você ligou, responde a um comando;</li>
   <li><b>silencia, bane, desbane e apaga mensagens</b> no chat da sua transmissão quando você escolhe essas ações no menu do nome de alguém.</li>
 </ul>
-<p>O plugin não lê os seus vídeos, inscrições, histórico, e-mail, contatos nem nenhum outro dado da sua conta Google, e não publica nada sem uma ação sua ou do bot que você configurou. A leitura das mensagens do chat é feita pela página pública do chat ao vivo do YouTube, sem usar o seu login.</p>
+<p>Fora as transmissões ao vivo acima, o plugin não lê os seus vídeos, inscrições, histórico, e-mail, contatos nem nenhum outro dado da sua conta Google, e não publica nada sem uma ação sua ou do bot que você configurou. A leitura das mensagens do chat é feita pela página pública do chat ao vivo do YouTube, sem usar o seu login.</p>
 <p>O uso e a transferência, para qualquer outro app, de informações recebidas das APIs do Google seguem a <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de dados do usuário dos serviços de API do Google</a>, incluindo os requisitos de Uso limitado. Ao usar os recursos do YouTube você também concorda com os <a href="https://www.youtube.com/t/terms">Termos de Serviço do YouTube</a> e a <a href="https://policies.google.com/privacy">Política de Privacidade do Google</a>.</p>
 
 <h2>Twitch e Kick</h2>
@@ -88,7 +89,7 @@
 
 <div lang="en">
 <h1>Privacy policy</h1>
-<p class="updated">Last updated: October 3, 2026</p>
+<p class="updated">Last updated: October 5, 2026</p>
 
 <p><b>Meketreve OBS Essentials</b> is a free, open-source plugin for OBS Studio (<a href="https://github.com/meketreve/meketreve-obs-essentials">source code</a>). It runs on your computer, inside OBS. This policy explains what data the plugin accesses, what for, where it is kept and who it is shared with.</p>
 
@@ -104,12 +105,13 @@
 <p>If you choose <b>Log in</b> for YouTube under Unified Chat → Settings, the plugin asks Google for the <code>https://www.googleapis.com/auth/youtube</code> permission (manage your YouTube account). With it, and only when you use the matching feature, the plugin:</p>
 <ul>
   <li><b>reads your channel ID and name</b>, to show which account you are logged in with and so the bot does not answer its own messages;</li>
-  <li><b>reads your live broadcast (or the next scheduled one)</b>: its ID, title, category and live chat ID, to know where to send messages and what to show in the Stream info dock;</li>
-  <li><b>changes that broadcast's title and category</b> when you click Update in the Stream info dock (the rest of the video's description is kept as it is);</li>
+  <li><b>reads your live broadcast (or the next scheduled one)</b>: its ID, title, category and live chat ID, to know where to send messages and what to show in the Title and category dock;</li>
+  <li><b>changes that broadcast's title and category</b> when you click Update in the Title and category dock (the rest of the video's description is kept as it is);</li>
+  <li><b>prepares the broadcast for the YouTube output</b>: when you turn on a YouTube output in the Multistream dock, the plugin reads your stream keys (to find the one set in that output) and your live broadcasts, finished ones included; if none is ready for that key, it creates one with the title, description and privacy of the last finished broadcast and binds it to the key — what YouTube Studio does when you open the live page;</li>
   <li><b>sends messages</b> to your broadcast's chat when you type in the Unified Chat box, or when the Texuguito bot, which you turned on, answers a command;</li>
   <li><b>times out, bans, unbans and deletes messages</b> in your broadcast's chat when you pick those actions from someone's name menu.</li>
 </ul>
-<p>The plugin does not read your videos, subscriptions, history, email, contacts or any other Google account data, and it posts nothing without an action from you or from the bot you set up. Chat messages are read from YouTube's public live chat page, without your login.</p>
+<p>Apart from the live broadcasts above, the plugin does not read your videos, subscriptions, history, email, contacts or any other Google account data, and it posts nothing without an action from you or from the bot you set up. Chat messages are read from YouTube's public live chat page, without your login.</p>
 <p>Meketreve OBS Essentials' use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. By using the YouTube features you also agree to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a> and the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>
 
 <h2>Twitch and Kick</h2>
