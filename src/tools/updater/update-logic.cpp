@@ -98,6 +98,26 @@ QHash<QString, QString> parseChecksums(const QString &body)
 	return sums;
 }
 
+QString notesFor(const QString &notes, const QString &lang)
+{
+	static const QRegularExpression marker(QStringLiteral("<!--\\s*lang:(\\w+)\\s*-->"));
+	QString found;
+	QString fallback;
+	auto it = marker.globalMatch(notes);
+	while (it.hasNext()) {
+		const QRegularExpressionMatch m = it.next();
+		const qsizetype end = notes.indexOf(QStringLiteral("<!--"), m.capturedEnd());
+		const QString block = notes.mid(m.capturedEnd(), end < 0 ? -1 : end - m.capturedEnd()).trimmed();
+		if (m.captured(1) == lang)
+			found = block;
+		else if (m.captured(1) == QLatin1String("en"))
+			fallback = block;
+	}
+	if (!found.isEmpty())
+		return found;
+	return fallback.isEmpty() ? notes : fallback;
+}
+
 QString stripChecksums(const QString &body)
 {
 	const qsizetype start = body.indexOf(kChecksumHeader);

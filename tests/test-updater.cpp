@@ -72,6 +72,22 @@ private slots:
 			 QStringLiteral("meketreve-obs-essentials-1.1.0-macos-universal.pkg"));
 	}
 
+	void notesInThePluginLanguage()
+	{
+		const QString both =
+			QStringLiteral("<!-- lang:pt -->\n## Novidades\n- **chat:** emotes animados (abc1234)\n\n"
+				       "<!-- lang:en -->\n## New\n- **chat:** animated emotes (abc1234)\n");
+		QCOMPARE(notesFor(both, QStringLiteral("pt")),
+			 QStringLiteral("## Novidades\n- **chat:** emotes animados (abc1234)"));
+		QCOMPARE(notesFor(both, QStringLiteral("en")),
+			 QStringLiteral("## New\n- **chat:** animated emotes (abc1234)"));
+		/* Unknown language: English. Old notes without markers: whole. */
+		QCOMPARE(notesFor(both, QStringLiteral("es")),
+			 QStringLiteral("## New\n- **chat:** animated emotes (abc1234)"));
+		const QString old = QStringLiteral("## ✨ Novidades / New\n- **x:** y (1234567)");
+		QCOMPARE(notesFor(old, QStringLiteral("pt")), old);
+	}
+
 	void noChecksumsNoAssets()
 	{
 		const Release r = parseRelease(QJsonObject{{QStringLiteral("tag_name"), QStringLiteral("v1.2.0")},

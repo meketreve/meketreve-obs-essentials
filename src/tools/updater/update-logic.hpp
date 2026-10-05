@@ -47,6 +47,10 @@ bool isNewer(const QString &candidate, const QString &current);
 /* The "### Checksums" block the release workflow writes: "    <file>: <hex>". */
 QHash<QString, QString> parseChecksums(const QString &body);
 QString stripChecksums(const QString &body);
+/* Notes written in both languages ("<!-- lang:pt -->" … "<!-- lang:en -->"
+ * blocks, from next_release.py) give the block of <lang> ("pt" or "en");
+ * notes without the markers come back whole. */
+QString notesFor(const QString &notes, const QString &lang);
 /* The asset for that package ("…-windows-x64-installer.exe", "….deb" but not
  * the "-dbgsym.ddeb", "….pkg"); empty when the release has none. */
 QString pickAsset(const Release &release, Package package);

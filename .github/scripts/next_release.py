@@ -6,6 +6,11 @@ Conventional commit subjects decide it: "feat" bumps the minor version,
 "refactor" and "perf" go into the notes under "Other changes" but do not
 warrant a release on their own; chore, docs, test, style and ci stay out.
 
+A "Changelog-pt: <texto>" line in the commit body is the entry's Portuguese
+text; without it the subject is used in both languages. The notes come in
+two blocks, "<!-- lang:pt -->" and "<!-- lang:en -->" (invisible on GitHub),
+so the plugin's updater shows only the plugin language.
+
 Prints key=value lines for $GITHUB_OUTPUT (version, previous, release) and
 writes the release notes (Markdown) to the path given as the first argument.
 Run it locally to preview: python3 .github/scripts/next_release.py notes.md
@@ -17,6 +22,12 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+PT_TRAILER = re.compile(r"^Changelog-pt:\s*(?P<text>.+)$", re.MULTILINE)
+HEADINGS = {
+    "pt": {"breaking": "⚠️ Mudanças que quebram compatibilidade", "feat": "✨ Novidades", "fix": "🐛 Correções",
+           "other": "🔧 Outras mudanças"},
+    "en": {"breaking": "⚠️ Breaking changes", "feat": "✨ New", "fix": "🐛 Fixes", "other": "🔧 Other changes"},
+}
 SUBJECT = re.compile(r"^(?P<type>feat|fix|refactor|perf)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<text>.+)$")
 
 
@@ -48,36 +59,36 @@ def main() -> None:
     else:
         log = git("log", "--format=%H%x1f%s%x1f%b%x1e", f"{previous}..HEAD")
 
-    features, fixes, breaking, others = [], [], [], []
+    groups = {"breaking": [], "feat": [], "fix": [], "other": []}
     for entry in filter(None, (e.strip() for e in log.split("\x1e"))):
         sha, subject, body = (entry.split("\x1f") + ["", ""])[:3]
         m = SUBJECT.match(subject.strip())
         if not m:
             continue
         scope = f"**{m['scope']}:** " if m["scope"] else ""
-        line = f"- {scope}{m['text']} ({sha[:7]})"
+        pt = PT_TRAILER.search(body)
+        texts = {"en": m["text"], "pt": pt["text"].strip() if pt else m["text"]}
+        line = {lang: f"- {scope}{text} ({sha[:7]})" for lang, text in texts.items()}
         if m["bang"] or "BREAKING CHANGE" in body:
-            breaking.append(line)
-        elif m["type"] == "feat":
-            features.append(line)
-        elif m["type"] == "fix":
-            fixes.append(line)
+            groups["breaking"].append(line)
+        elif m["type"] in ("feat", "fix"):
+            groups[m["type"]].append(line)
         else:
-            others.append(line)
+            groups["other"].append(line)
+    features, fixes, breaking, others = groups["feat"], groups["fix"], groups["breaking"], groups["other"]
 
     level = "major" if breaking else "minor" if features else "patch" if fixes else None
     version = bump(previous, level) if level else ""
 
-    sections = []
-    if breaking:
-        sections.append("## ⚠️ Mudanças que quebram compatibilidade / Breaking changes\n" + "\n".join(breaking))
-    if features:
-        sections.append("## ✨ Novidades / New\n" + "\n".join(features))
-    if fixes:
-        sections.append("## 🐛 Correções / Fixes\n" + "\n".join(fixes))
-    if others and level:
-        sections.append("## 🔧 Outras mudanças / Other changes\n" + "\n".join(others))
-    notes = "\n\n".join(sections) + "\n"
+    blocks = []
+    for lang in ("pt", "en"):
+        sections = []
+        for kind in ("breaking", "feat", "fix", "other"):
+            if groups[kind] and (kind != "other" or level):
+                sections.append(f"## {HEADINGS[lang][kind]}\n" + "\n".join(line[lang] for line in groups[kind]))
+        if sections:
+            blocks.append(f"<!-- lang:{lang} -->\n" + "\n\n".join(sections))
+    notes = "\n\n".join(blocks) + "\n"
     if notes_path:
         notes_path.write_text(notes, encoding="utf-8")
 

@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "updater.h"
 #include "update-logic.hpp"
+#include "../../i18n/i18n.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -326,7 +327,7 @@ void showAvailable(const Release &release)
 	layout->addWidget(head);
 	auto *notes = new QTextBrowser(&dialog);
 	notes->setOpenExternalLinks(true);
-	notes->setMarkdown(release.notes);
+	notes->setMarkdown(UpdateLogic::notesFor(release.notes, I18n::plugin()));
 	layout->addWidget(notes, 1);
 
 	const Plan plan = installPlan();
