@@ -66,7 +66,7 @@ async function act(body, { redraw = true } = {}) {
 let settingsTimer = null;
 function saveSettings() {
   clearTimeout(settingsTimer);
-  settingsTimer = setTimeout(() => act({ action: "settings", volume: state.volume, cooldowns: state.cooldowns }, { redraw: false }), 400);
+  settingsTimer = setTimeout(() => act({ action: "settings", volume: state.volume }, { redraw: false }), 400);
 }
 
 function row(label, control, note) {
@@ -74,9 +74,9 @@ function row(label, control, note) {
 }
 
 // What is typed in the import card survives the redraws.
-const importDraft = { url: "", price: null, name: "" };
-const PRICES = [0, 10, 20, 50, 100, 200, 300, 500, 1000];
+const importDraft = { url: "", group: "", name: "" };
 let importTimer = null;
+let dragged = ""; // the sound being dragged
 
 // While a link downloads, ask how it is going until it is done.
 function followImport(before) {
@@ -95,7 +95,7 @@ function followImport(before) {
     }, 800);
   } else if (before && before.state === "downloading") {
     if (now.state === "done") {
-      setSave("ok", t("Imported", now.name, now.price));
+      setSave("ok", t("Imported", now.name, now.group));
       importDraft.url = "";
       importDraft.name = "";
       render();
@@ -105,53 +105,123 @@ function followImport(before) {
   }
 }
 
-function soundRow(s) {
-  const price = el("input", { type: "number", min: 0, max: state.maxPrice, step: 1, value: s.price, class: "num", title: t("MovePrice") });
-  price.addEventListener("change", () => act({ action: "price", name: s.name, price: Number(price.value) }));
-  return el("div", { class: "list-row" },
-    el("code", { text: "!tocar " + s.name }),
-    el("div", { class: "inline" }, price, el("span", { class: "muted", text: t("Points") }),
-      el("button", { type: "button", class: "btn small", text: t("Test"), onclick: () => act({ action: "test", name: s.name }, { redraw: false }) }),
-      el("button", { type: "button", class: "btn small", text: t("Rename"),
-        onclick: () => {
-          const next = prompt(t("RenamePrompt", s.name), s.name);
-          if (next !== null && next.trim() && next.trim() !== s.name) act({ action: "rename", name: s.name, newName: next });
-        } }),
-      el("button", { type: "button", class: "btn small", text: t("Remove"),
-        onclick: () => { if (confirm(t("RemoveConfirm", s.name))) act({ action: "remove", name: s.name }); } })));
+function button(text, onclick, extra = "") {
+  return el("button", { type: "button", class: "btn small " + extra, text, onclick });
 }
 
-// One block per price: its wait between sounds, then its sounds.
-function priceGroup(price, sounds) {
-  const wait = el("input", { type: "number", min: 0, max: 3600, step: 5, value: state.cooldowns[price], class: "num" });
-  wait.addEventListener("change", () => { state.cooldowns[price] = Number(wait.value); saveSettings(); });
-  return el("div", { class: "price-group" },
-    el("div", { class: "price-head" }, el("h4", { text: t("PricePoints", price) }),
-      el("div", { class: "inline" }, el("span", { class: "muted", text: t("Wait") }), wait, el("span", { class: "muted", text: "s" }))),
-    sounds.map(soundRow));
+// One sound: drag it by its row to another group or place.
+function soundRow(group, name, index) {
+  const tr = el("tr", { class: "sound-row", draggable: "true" },
+    el("td", { class: "grip", text: "⠿", title: t("DragHint") }),
+    el("td", { text: name }),
+    el("td", {}, el("code", { text: "!tocar " + name })),
+    el("td", { class: "sound-actions" },
+      button(t("Test"), () => act({ action: "test", name }, { redraw: false })),
+      button(t("Rename"), () => {
+        const next = prompt(t("RenamePrompt", name), name);
+        if (next !== null && next.trim() && next.trim() !== name) act({ action: "rename", name, newName: next });
+      }),
+      button(t("Remove"), () => { if (confirm(t("RemoveConfirm", name))) act({ action: "remove", name }); })));
+  tr.addEventListener("dragstart", (e) => {
+    dragged = name;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", name);
+    tr.classList.add("dragging");
+  });
+  tr.addEventListener("dragend", () => {
+    dragged = "";
+    tr.classList.remove("dragging");
+    document.querySelectorAll(".drop-before, .drop-into").forEach((n) => n.classList.remove("drop-before", "drop-into"));
+  });
+  tr.dataset.index = index;
+  return tr;
+}
+
+// Where a drop lands: before the row under the pointer, or at the end.
+function dropTarget(panel, group) {
+  const clear = () => panel.querySelectorAll(".drop-before").forEach((n) => n.classList.remove("drop-before"));
+  panel.addEventListener("dragover", (e) => {
+    if (!dragged) return;
+    e.preventDefault();
+    clear();
+    panel.classList.add("drop-into");
+    const row = e.target.closest && e.target.closest(".sound-row");
+    if (row && panel.contains(row)) row.classList.add("drop-before");
+  });
+  panel.addEventListener("dragleave", (e) => {
+    if (!panel.contains(e.relatedTarget)) {
+      panel.classList.remove("drop-into");
+      clear();
+    }
+  });
+  panel.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const name = dragged || e.dataTransfer.getData("text/plain");
+    const row = e.target.closest && e.target.closest(".sound-row");
+    let index = row && panel.contains(row) ? Number(row.dataset.index) : group.sounds.length;
+    // Inside the same group, the sound's own place goes away first.
+    const from = group.sounds.indexOf(name);
+    if (from >= 0 && from < index) index -= 1;
+    panel.classList.remove("drop-into");
+    clear();
+    if (name && !(from >= 0 && from === index)) act({ action: "move", name, group: group.id, index });
+  });
+}
+
+// One panel per group: its switch, name, price and wait on top, then its
+// sounds as a table. Changing the price changes it for every sound in it.
+function groupPanel(group) {
+  const save = (changes) => act({ action: "group", group: group.id, ...changes });
+  const on = el("input", { type: "checkbox" });
+  on.checked = group.enabled;
+  on.addEventListener("change", () => save({ enabled: on.checked }));
+  const name = el("input", { type: "text", value: group.name, class: "group-name", spellcheck: "false", maxlength: 40 });
+  name.addEventListener("change", () => { if (name.value.trim()) save({ name: name.value }); else name.value = group.name; });
+  const price = el("input", { type: "number", min: 0, max: state.maxPrice, step: 1, value: group.price, class: "num" });
+  price.addEventListener("change", () => save({ price: Number(price.value) }));
+  const wait = el("input", { type: "number", min: 0, max: state.maxCooldown, step: 5, value: group.cooldown, class: "num" });
+  wait.addEventListener("change", () => save({ cooldown: Number(wait.value) }));
+  const remove = group.sounds.length ? null : button(t("DeleteGroup"), () => act({ action: "deleteGroup", group: group.id }));
+
+  const body = el("tbody", {}, group.sounds.map((s, i) => soundRow(group, s, i)));
+  if (!group.sounds.length) body.append(el("tr", { class: "empty-row" }, el("td", { colspan: 4, text: t("EmptyGroup") })));
+  const panel = el("section", { class: "group-panel" + (group.enabled ? "" : " off") },
+    el("div", { class: "group-head" },
+      el("label", { class: "switch", title: group.enabled ? t("GroupOn") : t("GroupOff") }, on, el("span")),
+      name,
+      el("label", { class: "inline" }, el("span", { class: "muted", text: t("Price") }), price, el("span", { class: "muted", text: t("Points") })),
+      el("label", { class: "inline" }, el("span", { class: "muted", text: t("Wait") }), wait, el("span", { class: "muted", text: "s" })),
+      el("span", { class: "muted count", text: t("SoundCount", group.sounds.length) }),
+      remove),
+    el("table", { class: "sound-table" },
+      el("thead", {}, el("tr", {}, el("th", {}), el("th", { text: t("ColSound") }), el("th", { text: t("ColCommand") }),
+        el("th", { text: t("ColActions") }))),
+      body));
+  dropTarget(panel, group);
+  return panel;
 }
 
 function importCard() {
-  const prices = [...new Set([...PRICES, ...state.sounds.map((s) => s.price)])].filter((p) => p <= state.maxPrice).sort((a, b) => a - b);
-  if (importDraft.price === null) importDraft.price = state.sounds.length ? state.sounds[0].price : 50;
+  const groups = state.groups;
+  if (!groups.some((g) => g.id === importDraft.group)) importDraft.group = groups.length ? groups[0].id : "";
   const url = el("input", { type: "url", value: importDraft.url, placeholder: t("ImportUrlPlaceholder"), spellcheck: "false" });
   url.addEventListener("input", () => { importDraft.url = url.value; });
-  const price = el("select", {}, prices.map((p) => el("option", { value: p, text: t("PriceOption", p) })));
-  price.value = importDraft.price;
-  price.addEventListener("change", () => { importDraft.price = Number(price.value); });
+  const group = el("select", {}, groups.map((g) => el("option", { value: g.id, text: t("GroupOption", g.name, g.price) })));
+  group.value = importDraft.group;
+  group.addEventListener("change", () => { importDraft.group = group.value; });
   const name = el("input", { type: "text", value: importDraft.name, placeholder: t("ImportNamePlaceholder"), spellcheck: "false" });
   name.addEventListener("input", () => { importDraft.name = name.value; });
   const busy = state.import && state.import.state === "downloading";
-  const go = el("button", { type: "button", class: "btn small primary", text: busy ? t("Downloading") : t("ImportButton"), disabled: busy });
+  const go = el("button", { type: "button", class: "btn small primary", text: busy ? t("Downloading") : t("ImportButton"),
+    disabled: busy || !groups.length });
   go.addEventListener("click", async () => {
     if (!importDraft.url.trim()) return;
-    const before = { state: "downloading" };
-    await act({ action: "import", url: importDraft.url, price: importDraft.price, name: importDraft.name });
-    if (!state.error) followImport(before);
+    await act({ action: "import", url: importDraft.url, group: importDraft.group, name: importDraft.name });
+    if (!state.error) followImport({ state: "downloading" });
   });
   return el("section", { class: "card" }, el("h3", { text: t("Import") }), el("p", { class: "hint", text: t("ImportNote") }),
     row(t("ImportUrl"), url),
-    row(t("ImportPrice"), price),
+    row(t("ImportGroup"), groups.length ? group : el("span", { class: "muted", text: t("NoGroups") })),
     row(t("ImportName"), name, t("ImportNameNote")),
     row("", el("div", { class: "inline" }, go)));
 }
@@ -161,13 +231,7 @@ function render() {
   const volume = el("input", { type: "range", min: 0, max: 100, step: 5, value: state.volume });
   volume.addEventListener("input", () => { state.volume = Number(volume.value); volumeOut.textContent = volume.value + "%"; saveSettings(); });
 
-  const byPrice = new Map();
-  for (const s of state.sounds) {
-    if (!byPrice.has(s.price)) byPrice.set(s.price, []);
-    byPrice.get(s.price).push(s);
-  }
-  const groups = [...byPrice.keys()].sort((a, b) => a - b)
-    .map((p) => priceGroup(p, byPrice.get(p).sort((a, b) => a.name.localeCompare(b.name))));
+  const add = button(t("NewGroup"), () => act({ action: "group", group: "", name: t("NewGroupName"), price: 50, cooldown: 30, enabled: true }), "primary");
 
   const commandRows = state.commands.map((c) => {
     const reply = el("input", { type: "text", value: c.reply, spellcheck: "false" });
@@ -187,8 +251,9 @@ function render() {
     el("h2", { text: t("Tab") }),
     el("section", { class: "card" }, el("h3", { text: t("Sounds") }),
       row(t("Volume"), el("div", { class: "inline" }, volume, volumeOut)),
-      el("p", { class: "hint", text: state.sounds.length ? t("SoundsNote") : t("NoSounds") }),
-      groups),
+      el("p", { class: "hint", text: state.groups.some((g) => g.sounds.length) ? t("SoundsNote") : t("NoSounds") }),
+      state.groups.map(groupPanel),
+      el("div", { class: "inline" }, add)),
     importCard(),
     el("section", { class: "card" }, el("h3", { text: t("Commands") }), el("p", { class: "hint", text: t("CommandsNote") }),
       commandRows, el("div", { class: "list-row" }, newName, el("div", { class: "inline grow" }, newReply, create))));

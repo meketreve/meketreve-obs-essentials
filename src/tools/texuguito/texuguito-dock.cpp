@@ -41,6 +41,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -289,12 +290,14 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 
 QJsonObject TexuguitoDock::botPanelState() const
 {
-	QJsonArray sounds;
-	QJsonObject cooldowns;
-	for (const auto &[name, clip] : m_engine->clips()) {
-		sounds.append(QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("price"), clip.cost}});
-		cooldowns.insert(QString::number(clip.cost), m_engine->clipCooldownSeconds(clip.cost));
-	}
+	QJsonArray groups;
+	for (const SoundGroup &g : m_engine->soundLibrary().groups())
+		groups.append(QJsonObject{{QStringLiteral("id"), g.id},
+					  {QStringLiteral("name"), g.name},
+					  {QStringLiteral("price"), g.price},
+					  {QStringLiteral("cooldown"), g.cooldown},
+					  {QStringLiteral("enabled"), g.enabled},
+					  {QStringLiteral("sounds"), QJsonArray::fromStringList(g.sounds)}});
 	QJsonArray commands;
 	CustomCommandStore &store = m_engine->customCommands();
 	QStringList names = store.names();
@@ -303,11 +306,11 @@ QJsonObject TexuguitoDock::botPanelState() const
 		commands.append(
 			QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("reply"), store.get(name)}});
 	return QJsonObject{{QStringLiteral("volume"), qRound(m_volume * 100.0)},
-			   {QStringLiteral("sounds"), sounds},
-			   {QStringLiteral("cooldowns"), cooldowns},
+			   {QStringLiteral("groups"), groups},
 			   {QStringLiteral("commands"), commands},
 			   {QStringLiteral("import"), m_import},
 			   {QStringLiteral("maxPrice"), BotEngine::kMaxClipCost},
+			   {QStringLiteral("maxCooldown"), SoundLibrary::kMaxCooldown},
 			   {QStringLiteral("listeners"), m_server->clientCount()}};
 }
 
@@ -315,61 +318,60 @@ QJsonObject TexuguitoDock::applyBotPanel(const QJsonObject &panel)
 {
 	const QString action = panel.value(QStringLiteral("action")).toString();
 	const QString name = panel.value(QStringLiteral("name")).toString().trimmed().toLower();
+	const QString groupId = panel.value(QStringLiteral("group")).toString();
+	SoundLibrary &library = m_engine->soundLibrary();
 	const auto clip = m_engine->clips().find(name);
 	const bool known = clip != m_engine->clips().end();
-	/* "/audios/<price>/<file>" -> the file on disk. */
-	const QString file =
-		known ? QDir(m_engine->audioDir()).filePath(QUrl::fromPercentEncoding(clip->second.url.mid(8).toUtf8()))
-		      : QString();
 	QString error;
 	if (action == QLatin1String("settings")) {
 		m_volume = std::clamp(panel.value(QStringLiteral("volume")).toDouble(m_volume * 100.0), 0.0, 100.0) /
 			   100.0;
 		m_engine->setVolume(m_volume);
-		const QJsonObject waits = panel.value(QStringLiteral("cooldowns")).toObject();
-		for (auto it = waits.constBegin(); it != waits.constEnd(); ++it) {
-			bool ok = false;
-			const int cost = it.key().toInt(&ok);
-			if (ok && cost >= 0)
-				m_cooldowns.insert(cost, std::clamp(it.value().toInt(), 0, 3600));
-		}
-		m_engine->setClipCooldowns(m_cooldowns);
 		saveSettings();
-	} else if (action == QLatin1String("price") && known) {
-		/* The folder is the price: moving the file changes it. */
-		const int price = panel.value(QStringLiteral("price")).toInt(-1);
-		const QDir target(QDir(m_engine->audioDir()).filePath(QString::number(price)));
-		if (price < 0 || price > BotEngine::kMaxClipCost || !QDir().mkpath(target.path()) ||
-		    !QFile::rename(file, target.filePath(QFileInfo(file).fileName())))
-			error = T("Texuguito.BotPanel.MoveFailed");
+	} else if (action == QLatin1String("group")) {
+		/* {group (empty = new), name, price, cooldown, enabled}: the price
+		 * of every sound in the group changes at once. */
+		SoundGroup g;
+		if (const SoundGroup *old = library.group(groupId))
+			g = *old;
+		g.id = groupId;
+		g.name = panel.value(QStringLiteral("name")).toString(g.name);
+		g.price = panel.value(QStringLiteral("price")).toInt(g.price);
+		g.cooldown = panel.value(QStringLiteral("cooldown")).toInt(g.cooldown);
+		g.enabled = panel.value(QStringLiteral("enabled")).toBool(g.enabled);
+		/* A name made from the price ("50 pts") follows the new price. */
+		if (const SoundGroup *old = library.group(groupId);
+		    old && !panel.contains(QStringLiteral("name")) && g.price != old->price &&
+		    old->name == T("Texuguito.Groups.PriceName").arg(old->price))
+			g.name = T("Texuguito.Groups.PriceName").arg(g.price);
+		if (g.price < 0 || g.price > BotEngine::kMaxClipCost)
+			error = T("Texuguito.Bot.AddAudioBadPrice").arg(BotEngine::kMaxClipCost);
+		else if (library.saveGroup(g).isEmpty())
+			error = T("Texuguito.Groups.BadGroup");
+		m_engine->reloadClips();
+	} else if (action == QLatin1String("deleteGroup")) {
+		if (!library.deleteGroup(groupId))
+			error = T("Texuguito.Groups.NotEmpty");
+		m_engine->reloadClips();
+	} else if (action == QLatin1String("move") && known) {
+		/* Dragged onto another group (or another place in the same one). */
+		if (!library.move(name, groupId, panel.value(QStringLiteral("index")).toInt(-1)))
+			error = T("Texuguito.Groups.NoGroup");
 		m_engine->reloadClips();
 	} else if (action == QLatin1String("remove") && known) {
 		/* Deleted from disk: the page asks first. */
-		if (!QFile::remove(file))
-			error = T("Texuguito.BotPanel.DeleteFailed");
-		m_engine->reloadClips();
+		error = m_engine->removeClip(name);
 	} else if (action == QLatin1String("rename") && known) {
-		/* Same folder and type, new name: "!tocar <new name>". */
-		const QString renamed = SoundFetch::clipName(panel.value(QStringLiteral("newName")).toString());
-		const QFileInfo info(file);
-		if (renamed.isEmpty())
-			error = T("Texuguito.Bot.AddAudioNoName");
-		else if (renamed != name && m_engine->clips().count(renamed))
-			error = T("Texuguito.Bot.AddAudioExists").arg(renamed);
-		else if (renamed != name &&
-			 !QFile::rename(file, info.dir().filePath(renamed + QLatin1Char('.') + info.suffix())))
-			error = T("Texuguito.BotPanel.MoveFailed");
-		m_engine->reloadClips();
+		error = m_engine->renameClip(name, panel.value(QStringLiteral("newName")).toString());
 	} else if (action == QLatin1String("import")) {
 		const QString link = panel.value(QStringLiteral("url")).toString().trimmed();
-		const int price = panel.value(QStringLiteral("price")).toInt(-1);
 		const QString wanted = panel.value(QStringLiteral("name")).toString();
 		if (m_import.value(QStringLiteral("state")).toString() == QLatin1String("downloading"))
 			error = T("Texuguito.BotPanel.ImportBusy");
 		else if (link.isEmpty())
 			error = T("Texuguito.Bot.AddAudioBadLink");
-		else if (price < 0 || price > BotEngine::kMaxClipCost)
-			error = T("Texuguito.Bot.AddAudioBadPrice").arg(BotEngine::kMaxClipCost);
+		else if (!library.group(groupId))
+			error = T("Texuguito.Groups.NoGroup");
 		else if (!wanted.trimmed().isEmpty() && SoundFetch::clipName(wanted).isEmpty())
 			error = T("Texuguito.Bot.AddAudioNoName");
 		else if (!wanted.trimmed().isEmpty() && m_engine->clips().count(SoundFetch::clipName(wanted)))
@@ -379,18 +381,20 @@ QJsonObject TexuguitoDock::applyBotPanel(const QJsonObject &panel)
 					       {QStringLiteral("url"), link}};
 			SoundFetch::fetch(
 				&m_net, link,
-				[this, price, wanted](const SoundFetch::Result &r) {
+				[this, groupId, wanted](const SoundFetch::Result &r) {
 					QString failed = m_engine->soundFetchError(r);
 					/* No name typed: the one the link suggests. */
 					const QString clip =
 						SoundFetch::clipName(wanted.trimmed().isEmpty() ? r.name : wanted);
 					if (failed.isEmpty())
-						failed = m_engine->addClip(r.data, r.ext, clip, price);
+						failed = m_engine->addClipToGroup(r.data, r.ext, clip, groupId);
+					const SoundGroup *g = m_engine->soundLibrary().group(groupId);
 					m_import =
 						failed.isEmpty()
 							? QJsonObject{{QStringLiteral("state"), QStringLiteral("done")},
 								      {QStringLiteral("name"), clip},
-								      {QStringLiteral("price"), price}}
+								      {QStringLiteral("group"),
+								       g ? g->name : QString()}}
 							: QJsonObject{{QStringLiteral("state"),
 								       QStringLiteral("error")},
 								      {QStringLiteral("message"), failed}};
@@ -593,11 +597,13 @@ void TexuguitoDock::addAudio()
 	linkRow->addWidget(link, 1);
 	linkRow->addWidget(pick);
 	form->addRow(T("Texuguito.AddAudioLink"), linkRow);
-	auto *price = new QSpinBox(&dialog);
-	price->setRange(0, BotEngine::kMaxClipCost);
-	const QList<int> costs = m_engine->clipCosts();
-	price->setValue(costs.isEmpty() ? 50 : costs.first());
-	form->addRow(T("Texuguito.AddAudioPrice"), price);
+	/* Into a group; without any, a group of 50 points is made. */
+	auto *price = new QComboBox(&dialog);
+	for (const SoundGroup &g : m_engine->soundLibrary().groups())
+		price->addItem(T("Texuguito.Groups.Option").arg(g.name).arg(g.price), g.id);
+	if (price->count() == 0)
+		price->addItem(T("Texuguito.Groups.Option").arg(T("Texuguito.Groups.PriceName").arg(50)).arg(50));
+	form->addRow(T("Texuguito.AddAudioGroup"), price);
 	auto *name = new QLineEdit(&dialog);
 	form->addRow(T("Texuguito.AddAudioName"), name);
 	layout->addLayout(form);
@@ -623,7 +629,9 @@ void TexuguitoDock::addAudio()
 	const auto save = [this, &dialog, name, price, status, buttons](const QByteArray &data, const QString &ext,
 									const QString &suggested) {
 		const QString clip = SoundFetch::clipName(name->text().trimmed().isEmpty() ? suggested : name->text());
-		const QString error = m_engine->addClip(data, ext, clip, price->value());
+		const QString group = price->currentData().toString();
+		const QString error = group.isEmpty() ? m_engine->addClip(data, ext, clip, 50)
+						      : m_engine->addClipToGroup(data, ext, clip, group);
 		buttons->setEnabled(true);
 		if (!error.isEmpty()) {
 			status->setText(error);
@@ -631,7 +639,7 @@ void TexuguitoDock::addAudio()
 		}
 		refreshStatus();
 		QMessageBox::information(&dialog, T("Texuguito.AddAudioTitle"),
-					 T("Texuguito.Bot.AudioAdded").arg(clip).arg(price->value()));
+					 T("Texuguito.Groups.AudioAdded").arg(clip, price->currentText()));
 		dialog.accept();
 	};
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, [this, &dialog, link, status, buttons, save]() {
@@ -817,24 +825,10 @@ void TexuguitoDock::openSettings()
 	note->setWordWrap(true);
 	layout->addWidget(note);
 
-	/* One wait per price folder that has sounds. */
-	QHash<int, QSpinBox *> cooldownSpins;
-	const QList<int> costs = m_engine->clipCosts();
-	if (!costs.isEmpty()) {
-		auto *cooldownForm = new QFormLayout();
-		auto *title =
-			new QLabel(QStringLiteral("<b>%1</b>").arg(T("Texuguito.Cooldowns").toHtmlEscaped()), &dialog);
-		layout->addWidget(title);
-		for (int cost : costs) {
-			auto *spin = new QSpinBox(&dialog);
-			spin->setRange(0, 3600);
-			spin->setSuffix(QStringLiteral(" s"));
-			spin->setValue(m_engine->clipCooldownSeconds(cost));
-			cooldownForm->addRow(T("Texuguito.CooldownPrice").arg(cost), spin);
-			cooldownSpins.insert(cost, spin);
-		}
-		layout->addLayout(cooldownForm);
-	}
+	/* Groups, prices and waits are set in the web panel's Chat bot tab. */
+	auto *groupsNote = new QLabel(T("Texuguito.Groups.SettingsNote"), &dialog);
+	groupsNote->setWordWrap(true);
+	layout->addWidget(groupsNote);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -845,9 +839,6 @@ void TexuguitoDock::openSettings()
 	const auto newPort = static_cast<quint16>(port->value());
 	m_volume = volume->value() / 100.0;
 	m_engine->setVolume(m_volume);
-	for (auto it = cooldownSpins.constBegin(); it != cooldownSpins.constEnd(); ++it)
-		m_cooldowns.insert(it.key(), it.value()->value());
-	m_engine->setClipCooldowns(m_cooldowns);
 	if (audio->text().trimmed() != m_engine->audioDir())
 		m_engine->setAudioDir(audio->text().trimmed());
 	if (newPort != m_port) {

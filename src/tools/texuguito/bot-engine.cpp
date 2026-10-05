@@ -140,11 +140,12 @@ BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *p
 	  m_viewers(dataDir + QStringLiteral("/viewers.json")),
 	  m_points(dataDir + QStringLiteral("/points.json")),
 	  m_custom(dataDir + QStringLiteral("/custom_commands.json")),
-	  m_audioDir(audioDir)
+	  m_audioDir(audioDir),
+	  m_library(dataDir + QStringLiteral("/sound-groups.json"))
 {
 	m_clock.start();
 	registerCommands();
-	reloadClips();
+	/* The sounds are read by setText(), once names and waits are known. */
 
 	m_pointsTimer.setInterval(kPointsTickSeconds * 1000);
 	connect(&m_pointsTimer, &QTimer::timeout, this, &BotEngine::pointsTick);
@@ -178,26 +179,24 @@ void BotEngine::setAudioDir(const QString &dir)
 int BotEngine::reloadClips()
 {
 	m_clips.clear();
-	const QDir root(m_audioDir);
-	if (!root.exists())
+	if (!QDir(m_audioDir).exists())
 		QDir().mkpath(m_audioDir);
-	/* <audio dir>/<cost>/<name>.<ext>: the folder name is the price. */
-	for (const QString &folder : root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
-		bool numeric = false;
-		const int cost = folder.toInt(&numeric);
-		if (!numeric || cost < 0)
-			continue;
-		const QDir dir(root.filePath(folder));
-		for (const QFileInfo &file : dir.entryInfoList(QDir::Files, QDir::Name)) {
-			const QString ext = file.suffix().toLower();
-			if (ext != QLatin1String("mp3") && ext != QLatin1String("wav") && ext != QLatin1String("ogg"))
-				continue;
-			const QString name = file.completeBaseName().toLower();
-			const QString relative = folder + QLatin1Char('/') + file.fileName();
-			m_clips[name] = AudioClip{name, cost,
-						  QStringLiteral("/audios/") +
-							  QString::fromLatin1(QUrl::toPercentEncoding(relative, "/"))};
-		}
+	SoundLibrary::Defaults defaults;
+	defaults.priceGroupName = [this](int price) {
+		return t("Texuguito.Groups.PriceName").arg(price);
+	};
+	defaults.priceCooldown = [this](int price) {
+		return m_cooldowns.value(price, defaultCooldownSeconds(price));
+	};
+	defaults.looseGroupName = t("Texuguito.Groups.LooseName");
+	m_library.sync(m_audioDir, defaults);
+	for (const SoundGroup &g : m_library.groups()) {
+		for (const QString &name : g.sounds)
+			m_clips[name] = AudioClip{
+				name, g.price,
+				QStringLiteral("/audios/") +
+					QString::fromLatin1(QUrl::toPercentEncoding(m_library.file(name), "/")),
+				g.id, g.enabled};
 	}
 	return static_cast<int>(m_clips.size());
 }
@@ -208,22 +207,77 @@ QString BotEngine::addClip(const QByteArray &data, const QString &ext, const QSt
 	const auto tr = [&](const char *key) {
 		return invoked.isEmpty() ? t(key) : tCmd(invoked, key);
 	};
+	if (cost < 0 || cost > kMaxClipCost)
+		return tr("Texuguito.Bot.AddAudioBadPrice").arg(kMaxClipCost);
 	const QString clean = SoundFetch::clipName(name);
 	if (clean.isEmpty())
 		return tr("Texuguito.Bot.AddAudioNoName");
-	if (cost < 0 || cost > kMaxClipCost)
-		return tr("Texuguito.Bot.AddAudioBadPrice").arg(kMaxClipCost);
+	if (m_clips.count(clean))
+		return tr("Texuguito.Bot.AddAudioExists").arg(clean);
+	return addClipToGroup(data, ext, name, m_library.groupForPrice(cost, t("Texuguito.Groups.PriceName").arg(cost)),
+			      invoked);
+}
+
+QString BotEngine::addClipToGroup(const QByteArray &data, const QString &ext, const QString &name,
+				  const QString &groupId, const QString &invoked)
+{
+	const auto tr = [&](const char *key) {
+		return invoked.isEmpty() ? t(key) : tCmd(invoked, key);
+	};
+	const QString clean = SoundFetch::clipName(name);
+	if (clean.isEmpty())
+		return tr("Texuguito.Bot.AddAudioNoName");
+	if (!m_library.group(groupId))
+		return tr("Texuguito.Groups.NoGroup");
 	if (data.size() > SoundFetch::kMaxAudioBytes)
 		return tr("Texuguito.Bot.AddAudioTooBig").arg(SoundFetch::kMaxAudioBytes / (1024 * 1024));
 	if (SoundFetch::audioType(data.left(16)) != ext)
 		return tr("Texuguito.Bot.AddAudioNoSound");
 	if (m_clips.count(clean))
 		return tr("Texuguito.Bot.AddAudioExists").arg(clean);
-	const QDir dir(QDir(m_audioDir).filePath(QString::number(cost)));
-	QSaveFile file(dir.filePath(clean + QLatin1Char('.') + ext));
-	if (!QDir().mkpath(dir.path()) || !file.open(QIODevice::WriteOnly) || file.write(data) != data.size() ||
+	const QString fileName = clean + QLatin1Char('.') + ext;
+	QSaveFile file(QDir(m_audioDir).filePath(fileName));
+	if (!QDir().mkpath(m_audioDir) || !file.open(QIODevice::WriteOnly) || file.write(data) != data.size() ||
 	    !file.commit())
 		return tr("Texuguito.Bot.AddAudioSaveFailed");
+	m_library.added(clean, fileName, groupId);
+	reloadClips();
+	return QString();
+}
+
+QString BotEngine::renameClip(const QString &name, const QString &newName)
+{
+	const QString clean = SoundFetch::clipName(newName);
+	const QString from = m_library.file(name);
+	if (from.isEmpty())
+		return t("Texuguito.Bot.AudioNotFound").arg(name);
+	if (clean.isEmpty())
+		return t("Texuguito.Bot.AddAudioNoName");
+	if (clean == name)
+		return QString();
+	if (m_clips.count(clean))
+		return t("Texuguito.Bot.AddAudioExists").arg(clean);
+	/* Same folder and type, new name. */
+	const QFileInfo info(QDir(m_audioDir).filePath(from));
+	const QString relative =
+		QFileInfo(from).path() == QLatin1String(".")
+			? clean + QLatin1Char('.') + info.suffix()
+			: QFileInfo(from).path() + QLatin1Char('/') + clean + QLatin1Char('.') + info.suffix();
+	if (!QFile::rename(info.filePath(), QDir(m_audioDir).filePath(relative)))
+		return t("Texuguito.BotPanel.MoveFailed");
+	m_library.renamed(name, clean, relative);
+	reloadClips();
+	return QString();
+}
+
+QString BotEngine::removeClip(const QString &name)
+{
+	const QString file = m_library.file(name);
+	if (file.isEmpty())
+		return t("Texuguito.Bot.AudioNotFound").arg(name);
+	if (!QFile::remove(QDir(m_audioDir).filePath(file)))
+		return t("Texuguito.BotPanel.DeleteFailed");
+	m_library.removed(name);
 	reloadClips();
 	return QString();
 }
@@ -522,17 +576,6 @@ int BotEngine::defaultCooldownSeconds(int cost)
 	if (cost <= 200)
 		return 60;
 	return 120;
-}
-
-QList<int> BotEngine::clipCosts() const
-{
-	QList<int> costs;
-	for (const auto &entry : m_clips) {
-		if (!costs.contains(entry.second.cost))
-			costs.append(entry.second.cost);
-	}
-	std::sort(costs.begin(), costs.end());
-	return costs;
 }
 
 QString BotEngine::handleCustomCommand(const BotMessage &msg, const QString &name, const QStringList &args)
@@ -904,15 +947,20 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.AudioNotFound").arg(name));
 				 return;
 			 }
-			 /* Each price has its own wait: a cheap sound can play right
-			  * after an expensive one. */
-			 const int cost = clip->second.cost;
-			 const QElapsedTimer last = m_lastClip.value(cost);
+			 const SoundGroup *group = m_library.group(clip->second.group);
+			 if (!group || !group->enabled) {
+				 say(m.platform, tCmd(invoked, "Texuguito.Bot.AudioOff").arg(name));
+				 return;
+			 }
+			 /* Each group has its own wait: a sound of another group can
+			  * play right after. */
+			 const QElapsedTimer last = m_lastClip.value(group->id);
 			 if (last.isValid()) {
-				 const qint64 left = clipCooldownSeconds(cost) * 1000LL - last.elapsed();
+				 const qint64 left = group->cooldown * 1000LL - last.elapsed();
 				 if (left > 0) {
-					 say(m.platform,
-					     tCmd(invoked, "Texuguito.Bot.Cooldown").arg(cost).arg(left / 1000 + 1));
+					 say(m.platform, tCmd(invoked, "Texuguito.Bot.Cooldown")
+								 .arg(group->name)
+								 .arg(left / 1000 + 1));
 					 return;
 				 }
 			 }
@@ -926,7 +974,7 @@ void BotEngine::registerCommands()
 							 .arg(clip->second.cost));
 				 return;
 			 }
-			 m_lastClip[cost].start();
+			 m_lastClip[group->id].start();
 			 emit overlayMessage(QJsonObject{{QStringLiteral("type"), QStringLiteral("audio")},
 							 {QStringLiteral("url"), clip->second.url},
 							 {QStringLiteral("volume"), m_volume}});
@@ -942,19 +990,27 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("sons"), QStringLiteral("sounds"), QStringLiteral("audio")},
 		 [this](const BotMessage &m, const QString &, const QStringList &) {
 			 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
-			 if (m_clips.empty()) {
+			 /* One block per group that is on, cheapest first; a name
+			  * like "50 pts" already says the price. */
+			 QList<const SoundGroup *> on;
+			 for (const SoundGroup &g : m_library.groups())
+				 if (g.enabled && !g.sounds.isEmpty())
+					 on.append(&g);
+			 if (on.isEmpty()) {
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.NoAudios"));
 				 return;
 			 }
-			 std::map<int, QStringList> byCost;
-			 for (const auto &c : m_clips)
-				 byCost[c.second.cost].append(c.second.name);
+			 std::stable_sort(on.begin(), on.end(),
+					  [](const SoundGroup *a, const SoundGroup *b) { return a->price < b->price; });
 			 QStringList parts;
-			 for (auto &entry : byCost) {
-				 entry.second.sort();
-				 parts.append(QStringLiteral("[%1 pts: %2]")
-						      .arg(entry.first)
-						      .arg(entry.second.join(QStringLiteral(", "))));
+			 for (const SoundGroup *g : on) {
+				 QStringList names = g->sounds;
+				 names.sort();
+				 const QString label =
+					 g->name.contains(QString::number(g->price))
+						 ? g->name
+						 : QStringLiteral("%1 · %2 pts").arg(g->name).arg(g->price);
+				 parts.append(QStringLiteral("[%1: %2]").arg(label, names.join(QStringLiteral(", "))));
 			 }
 			 say(m.platform,
 			     BotText::truncate(

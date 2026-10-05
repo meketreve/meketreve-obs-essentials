@@ -44,9 +44,30 @@ button, input, select { font: inherit; color: inherit; }
 .list-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inline.grow > input[type=text] { flex: 1; min-width: 120px; }
 input.num { width: 90px; }
-.price-group { margin-top: 12px; }
-.price-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
-.price-head h4 { margin: 0; font-size: 13px; color: var(--accent); }
+/* Chat bot tab: one panel per sound group, its sounds as a table. */
+.group-panel { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.group-panel.off .sound-table { opacity: 0.55; }
+.group-panel.drop-into { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.group-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; background: var(--panel-2); }
+.group-head .group-name { flex: 1; min-width: 140px; font-weight: 600; }
+.group-head .count { margin-left: auto; }
+.sound-table { width: 100%; border-collapse: collapse; }
+.sound-table th:nth-child(1) { width: 1%; }
+.sound-table th:nth-child(2) { width: 35%; }
+.sound-table th:nth-child(4) { width: 1%; text-align: right; }
+.sound-table td:nth-child(2), .sound-table td:nth-child(3) { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sound-table th { text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.sound-table td { padding: 7px 14px; }
+.sound-table tbody tr:nth-child(even) td { background: var(--panel); }
+.sound-table code { color: var(--muted); }
+.sound-table .grip { width: 1px; color: var(--muted); cursor: grab; user-select: none; }
+.sound-table .sound-actions { text-align: right; white-space: nowrap; }
+.sound-table .sound-actions .btn + .btn { margin-left: 6px; }
+.sound-row { cursor: grab; }
+.sound-row.dragging { opacity: 0.4; }
+.sound-row.drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+.empty-row td { color: var(--muted); text-align: center; padding: 14px; }
+@media (max-width: 720px) { .sound-table th:nth-child(3), .sound-table td:nth-child(3) { display: none; } .sound-table .sound-actions { white-space: normal; } }
 .muted { color: var(--muted); font-size: 13px; }
 @media (max-width: 720px) { .list-row { grid-template-columns: 1fr; } }
 .parade-frame { width: 100%; aspect-ratio: 16 / 5; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line);

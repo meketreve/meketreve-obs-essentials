@@ -118,6 +118,8 @@ add_executable(
   ${_texuguito}/overlay-server.hpp
   ${_texuguito}/sound-fetch.cpp
   ${_texuguito}/sound-fetch.hpp
+  ${_texuguito}/sound-library.cpp
+  ${_texuguito}/sound-library.hpp
   ${_texuguito}/tts-client.cpp
 )
 target_include_directories(test-texuguito PRIVATE ${_texuguito})

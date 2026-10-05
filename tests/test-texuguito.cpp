@@ -219,6 +219,7 @@ private slots:
 		bot.setText(locale("pt-BR.ini"));
 		QCOMPARE(bot.clips().size(), size_t(1));
 		QCOMPARE(bot.clips().begin()->second.url, QStringLiteral("/audios/10/Buzina%20Alta.mp3"));
+		QCOMPARE(bot.soundLibrary().groupOf(QStringLiteral("buzina alta"))->price, 10);
 
 		QSignalSpy said(&bot, &BotEngine::reply);
 		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
@@ -248,7 +249,7 @@ private slots:
 		QCOMPARE(replies(said).last(), QStringLiteral("🎵 Sons Disponíveis: [10 pts: buzina alta]"));
 	}
 
-	void cooldownPerPrice()
+	void cooldownPerGroup()
 	{
 		QTemporaryDir dir;
 		const QString audio = dir.filePath(QStringLiteral("audios"));
@@ -258,32 +259,110 @@ private slots:
 		writeFile(audio + QStringLiteral("/20/sino.mp3"), "x");
 		writeFile(audio + QStringLiteral("/200/trovao.mp3"), "x");
 		BotEngine bot(dir.path(), audio);
+		/* The old waits are set before the text, as the dock does. */
+		bot.setClipCooldowns({{200, 6}});
 		bot.setText(locale("pt-BR.ini"));
 		bot.setOverlayListeners(1);
 		bot.points().add(QStringLiteral("ana"), 1000);
-		QCOMPARE(bot.clipCosts(), (QList<int>{20, 200}));
-		QCOMPARE(bot.clipCooldownSeconds(20), 10);
-		QCOMPARE(bot.clipCooldownSeconds(200), 60);
-		QCOMPARE(bot.clipCooldownSeconds(500), 120);
+
+		/* Each old price folder became a group with its wait. */
+		SoundLibrary &library = bot.soundLibrary();
+		QCOMPARE(library.groups().size(), 2);
+		const SoundGroup cheap = *library.groupOf(QStringLiteral("pato"));
+		QCOMPARE(cheap.name, QStringLiteral("20 pts"));
+		QCOMPARE(cheap.price, 20);
+		QCOMPARE(cheap.cooldown, 10);
+		QCOMPARE(library.groupOf(QStringLiteral("trovao"))->cooldown, 6);
+		QCOMPARE(bot.clips().at(QStringLiteral("trovao")).url, QStringLiteral("/audios/200/trovao.mp3"));
 		QSignalSpy said(&bot, &BotEngine::reply);
 
-		/* An expensive sound does not hold back a cheap one... */
+		/* A sound of another group does not wait... */
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar trovao")));
 		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: trovao")));
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar pato")));
 		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: pato")));
-		/* ...but the same price waits, even for another sound. */
+		/* ...but the same group does, even for another sound. */
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar sino")));
 		QVERIFY(replies(said).last().startsWith(
 			QStringLiteral("⏳ Os sons de 20 pts estão em espera! Aguarde mais 1")));
-		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar trovao")));
-		QVERIFY(replies(said).last().contains(QStringLiteral("Aguarde mais 6")));
 
-		/* The streamer's own wait replaces the default; 0 turns it off. */
-		bot.setClipCooldowns({{20, 0}});
+		/* Changing the group changes every sound in it: price and wait. */
+		SoundGroup changed = cheap;
+		changed.price = 5;
+		changed.cooldown = 0;
+		QCOMPARE(library.saveGroup(changed), cheap.id);
+		bot.reloadClips();
+		QCOMPARE(bot.clips().at(QStringLiteral("sino")).cost, 5);
 		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar sino")));
 		QVERIFY(replies(said).last().startsWith(QStringLiteral("🔊 Tocando: sino")));
-		QCOMPARE(bot.clipCooldownSeconds(200), 60);
+
+		/* A group turned off does not play, and leaves the list. */
+		changed.enabled = false;
+		library.saveGroup(changed);
+		bot.reloadClips();
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!tocar sino")));
+		QVERIFY(replies(said).last().contains(QStringLiteral("desligado")));
+		bot.handleMessage(msg(QStringLiteral("ana"), QStringLiteral("!sons")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🎵 Sons Disponíveis: [200 pts: trovao]"));
+	}
+
+	void soundGroups()
+	{
+		QTemporaryDir dir;
+		const QString audio = dir.filePath(QStringLiteral("audios"));
+		QDir().mkpath(audio + QStringLiteral("/50"));
+		writeFile(audio + QStringLiteral("/50/bip.mp3"), "x");
+		writeFile(audio + QStringLiteral("/solto.ogg"), "x");
+		writeFile(audio + QStringLiteral("/leia-me.txt"), "x");
+		const QString json = dir.filePath(QStringLiteral("sound-groups.json"));
+		SoundLibrary::Defaults defaults;
+		defaults.priceGroupName = [](int price) {
+			return QStringLiteral("%1 pts").arg(price);
+		};
+		defaults.looseGroupName = QStringLiteral("Novos");
+
+		SoundLibrary library(json);
+		library.sync(audio, defaults);
+		/* The old folder became a group; a file dropped in by hand waits,
+		 * turned off. Files stay where they were. */
+		QCOMPARE(library.groups().size(), 2);
+		QCOMPARE(library.groupOf(QStringLiteral("bip"))->price, 50);
+		QVERIFY(library.groupOf(QStringLiteral("bip"))->enabled);
+		QCOMPARE(library.groupOf(QStringLiteral("solto"))->name, QStringLiteral("Novos"));
+		QVERIFY(!library.groupOf(QStringLiteral("solto"))->enabled);
+		QCOMPARE(library.file(QStringLiteral("bip")), QStringLiteral("50/bip.mp3"));
+		QVERIFY(QFile::exists(audio + QStringLiteral("/50/bip.mp3")));
+
+		/* Two groups may cost the same; dragging moves a sound over. */
+		SoundGroup memes;
+		memes.name = QStringLiteral("Memes");
+		memes.price = 50;
+		const QString id = library.saveGroup(memes);
+		QVERIFY(!id.isEmpty());
+		QVERIFY(library.saveGroup(SoundGroup()).isEmpty()); /* no name */
+		QVERIFY(library.move(QStringLiteral("bip"), id));
+		QVERIFY(library.move(QStringLiteral("solto"), id, 0));
+		QCOMPARE(library.group(id)->sounds, (QStringList{QStringLiteral("solto"), QStringLiteral("bip")}));
+		QVERIFY(!library.move(QStringLiteral("nada"), id));
+
+		/* Only an empty group can be deleted. */
+		QVERIFY(!library.deleteGroup(id));
+		const QString old = library.groups().at(0).id;
+		QVERIFY(library.deleteGroup(old));
+
+		/* Kept on disk: a new library reads the same groups. A file that is
+		 * gone leaves its group. */
+		QFile::remove(audio + QStringLiteral("/solto.ogg"));
+		SoundLibrary again(json);
+		again.sync(audio, defaults);
+		QCOMPARE(again.group(id)->sounds, QStringList{QStringLiteral("bip")});
+		QCOMPARE(again.group(id)->name, QStringLiteral("Memes"));
+		QVERIFY(!again.group(old));
+
+		/* !addaudio <price>: the first group on with that price. */
+		QCOMPARE(again.groupForPrice(50, QStringLiteral("x")), id);
+		const QString made = again.groupForPrice(70, QStringLiteral("70 pts"));
+		QCOMPARE(again.group(made)->price, 70);
 	}
 
 	void ttsChargesAndRefunds()
@@ -508,20 +587,23 @@ private slots:
 		QVERIFY(replies(said).last().contains(QStringLiteral("!addaudio")));
 		QVERIFY(links.isEmpty());
 
-		/* The link keeps its case; the sound lands in audios/<price>/. */
+		/* The link keeps its case; the sound lands in audios/, in a group of
+		 * that price. */
 		mod.text = QStringLiteral("!addaudio https://x.com/Vine.mp3 50");
 		bot.handleMessage(mod);
 		QCOMPARE(links.last(), QStringLiteral("https://x.com/Vine.mp3"));
 		QVERIFY(replies(said).last().contains(QStringLiteral("vine-boom")));
-		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/50/vine-boom.mp3"))));
+		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/vine-boom.mp3"))));
 		QCOMPARE(bot.clips().at(QStringLiteral("vine-boom")).cost, 50);
+		QCOMPARE(bot.soundLibrary().groupOf(QStringLiteral("vine-boom"))->name, QStringLiteral("50 pts"));
 
 		/* Same name again: refused. A name of your own: fine. */
 		bot.handleMessage(mod);
 		QVERIFY(replies(said).last().contains(QStringLiteral("Já existe")));
 		mod.text = QStringLiteral("!addaudio https://x.com/Vine.mp3 100 Bum Alto");
 		bot.handleMessage(mod);
-		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/100/bum-alto.mp3"))));
+		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/bum-alto.mp3"))));
+		QCOMPARE(bot.soundLibrary().groups().size(), 2);
 
 		/* The streamer too; a page with no sound is reported. */
 		BotMessage owner = msg(QStringLiteral("dono"), QStringLiteral("!addaudio https://x.com/page 10"));
@@ -534,7 +616,16 @@ private slots:
 		/* Not audio, or a price out of range: nothing saved. */
 		QVERIFY(!bot.addClip("<html>", QStringLiteral("mp3"), QStringLiteral("fake"), 10).isEmpty());
 		QVERIFY(!bot.addClip(mp3, QStringLiteral("mp3"), QStringLiteral("caro"), -1).isEmpty());
-		QVERIFY(!QFile::exists(dir.filePath(QStringLiteral("audios/10/fake.mp3"))));
+		QVERIFY(!QFile::exists(dir.filePath(QStringLiteral("audios/fake.mp3"))));
+
+		/* Rename and delete go to the file and the group. */
+		QVERIFY(bot.renameClip(QStringLiteral("bum-alto"), QStringLiteral("Bum Baixo")).isEmpty());
+		QVERIFY(QFile::exists(dir.filePath(QStringLiteral("audios/bum-baixo.mp3"))));
+		QCOMPARE(bot.soundLibrary().groupOf(QStringLiteral("bum-baixo"))->price, 100);
+		QVERIFY(!bot.renameClip(QStringLiteral("bum-baixo"), QStringLiteral("vine-boom")).isEmpty());
+		QVERIFY(bot.removeClip(QStringLiteral("bum-baixo")).isEmpty());
+		QVERIFY(!QFile::exists(dir.filePath(QStringLiteral("audios/bum-baixo.mp3"))));
+		QVERIFY(!bot.soundLibrary().groupOf(QStringLiteral("bum-baixo")));
 	}
 
 	void englishReplies()

@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "bot-data.hpp"
 #include "sound-fetch.hpp"
+#include "sound-library.hpp"
 #include "../unified-chat/chat-connector.hpp"
 
 #include <QElapsedTimer>
@@ -48,8 +49,10 @@ struct BotMessage {
 
 struct AudioClip {
 	QString name;
-	int cost = 0;
-	QString url; /* "/audios/<cost>/<file>" */
+	int cost = 0;  /* the group's price */
+	QString url;   /* "/audios/<file>" */
+	QString group; /* SoundGroup id */
+	bool enabled = true;
 };
 
 /* Texuguito: the chat parade overlay, channel points, soundboard, TTS,
@@ -93,14 +96,30 @@ public:
 	using SoundFetchFunction =
 		std::function<void(const QString &link, std::function<void(const SoundFetch::Result &)> done)>;
 	void setSoundFetch(SoundFetchFunction fetch) { m_soundFetch = std::move(fetch); }
-	/* Saves a sound as <audio dir>/<cost>/<name>.<ext> for !tocar. Empty on
-	 * success, else the reason (in the command's language; empty invoked
-	 * means the OBS language, for the dock button). */
+	/* Saves a sound as <audio dir>/<name>.<ext> for !tocar, in a group of
+	 * that price (made if there is none). Empty on success, else the reason
+	 * (in the command's language; empty invoked means the OBS language, for
+	 * the dock button). */
 	QString addClip(const QByteArray &data, const QString &ext, const QString &name, int cost,
 			const QString &invoked = QString());
+	/* The same, into one group (the web panel's import). */
+	QString addClipToGroup(const QByteArray &data, const QString &ext, const QString &name, const QString &groupId,
+			       const QString &invoked = QString());
+	/* The web panel's sound actions; empty on success, else the reason in
+	 * the OBS language. */
+	QString renameClip(const QString &name, const QString &newName);
+	QString removeClip(const QString &name);
+	SoundLibrary &soundLibrary() { return m_library; }
 	/* What a fetch error means, in the bot's language. */
 	QString soundFetchError(const SoundFetch::Result &result, const QString &invoked = QString()) const;
-	void setText(TextFunction text) { m_text = std::move(text); }
+	/* Also reads the sounds: groups made from old price folders get their
+	 * name in this language (and the waits of setClipCooldowns, so set
+	 * those first). */
+	void setText(TextFunction text)
+	{
+		m_text = std::move(text);
+		reloadClips();
+	}
 	void setCommandTexts(const QHash<QString, QString> &en, const QHash<QString, QString> &pt)
 	{
 		m_cmdEn = en;
@@ -111,12 +130,11 @@ public:
 	static std::optional<bool> commandEnglish(const QString &invoked);
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
-	/* Seconds between two sounds of the same price (per price folder); a
-	 * price without an entry uses defaultCooldownSeconds(). */
+	/* The waits of the old layout, one per price folder: a price folder
+	 * that becomes a group takes its wait from here (else
+	 * defaultCooldownSeconds()). After that each group has its own. */
 	void setClipCooldowns(const QHash<int, int> &seconds) { m_cooldowns = seconds; }
-	int clipCooldownSeconds(int cost) const { return m_cooldowns.value(cost, defaultCooldownSeconds(cost)); }
 	static int defaultCooldownSeconds(int cost);
-	QList<int> clipCosts() const;
 	void setAudioDir(const QString &dir);
 	QString audioDir() const { return m_audioDir; }
 	int reloadClips();
@@ -205,7 +223,8 @@ private:
 	QList<Command> m_commands;
 	std::map<QString, AudioClip> m_clips;
 	QString m_audioDir;
-	QHash<int, QElapsedTimer> m_lastClip; /* by price */
+	QHash<QString, QElapsedTimer> m_lastClip; /* by group */
+	SoundLibrary m_library;
 	/* A command the streamer sent to every chat at once comes back from
 	 * each platform: only the first one runs. */
 	struct StreamerCommand {

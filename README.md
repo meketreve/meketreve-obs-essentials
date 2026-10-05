@@ -52,22 +52,25 @@ panel (**Chat parade → Add to scene**, or the URL
 - **Parade:** everyone chatting walks along the bottom of the stream with an
   LPC pixel-art avatar they customize with `!cor`, `!chapeu`, `!acessorio`,
   `!apelido` and `!dança`. Bits, Super Chats and Kick gifts make them cheer.
-- **Points:** a point per minute in chat, spent on `!tocar <clip>` (clips in
-  the audio folder, in subfolders named after their price, e.g.
-  `audios/50/horn.mp3`) and `!falar <text>` (Google TTS, 200 points). Each
-  price has its own wait between sounds, set in the dock's **Settings**
-  (defaults: up to 20 pts 10 s, up to 100 pts 30 s, up to 200 pts 60 s,
-  above that 120 s); a cheap sound can play right after an expensive one.
-  The web panel's **Chat bot** tab lists the sounds grouped by price, each
-  price with its wait: changing a sound's price moves the file to that price's
-  folder, **Test** plays it on the parade, **Rename** renames the file (and the
-  `!tocar` name) and **Remove** deletes it. Its **Import a sound** card takes
-  a link, a price and the name the file gets, and downloads it the same way
-  as `!addaudio`.
+- **Points:** a point per minute in chat, spent on `!tocar <clip>` and
+  `!falar <text>` (Google TTS, 200 points).
+- **Sound groups:** the sounds are set up in the web panel's **Chat bot**
+  tab, one panel per group. A group has a name, a price, a wait between two
+  of its sounds and an on/off switch; changing the price changes it for every
+  sound in the group, two groups may cost the same, and a sound of another
+  group can play right after. Drag a sound by its ⠿ to another group.
+  **Test** plays it on the parade, **Rename** renames the file (and the
+  `!tocar` name) and **Remove** deletes it. **Import a sound** takes a link,
+  a group and the name the file gets. The files stay in the audio folder and
+  `sound-groups.json` (in the bot's config folder) says which group each one
+  is in. Sounds from older versions, in subfolders named after their price
+  (`audios/50/horn.mp3`), stay where they are: each folder becomes a group of
+  that price with the wait it had.
 - **Adding sounds:** mods and the streamer can type `!addaudio <link> <price>
   [name]` with a [myinstants](https://www.myinstants.com) page or a link to an
-  `.mp3`/`.wav`/`.ogg` file (https, up to 3 MB); the dock's **Add sound** does
-  the same, or takes a file from your computer.
+  `.mp3`/`.wav`/`.ogg` file (https, up to 3 MB): it goes into the first group
+  that is on with that price, or a new one. The dock's **Add sound** does the
+  same into a group you pick, or takes a file from your computer.
 - **More:** `!pontos`, `!audios`, `!parar`, `!sorteio <points> <minutes>` /
   `!entrar`, `!comando add|edit|del <name> <reply>` for mods (or the web
   panel's **Chat bot** tab), `!comandos` for
