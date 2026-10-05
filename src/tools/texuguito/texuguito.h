@@ -24,7 +24,6 @@ extern "C" {
 /* Texuguito: chat parade overlay, points, soundboard, TTS and chat commands
  * (the texuguito-seu-bot-amigo bot, now inside OBS). Needs Unified Chat. */
 void texuguito_register(void);
-void texuguito_unregister(void);
 
 #ifdef __cplusplus
 }

@@ -1042,5 +1042,3 @@ void alerts_register(void)
 			 return T("ChatOverlay.Describe").arg(names.join(QStringLiteral(", ")));
 		 }});
 }
-
-void alerts_unregister(void) {}

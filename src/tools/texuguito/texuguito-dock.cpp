@@ -888,5 +888,3 @@ void texuguito_register(void)
 		});
 	}
 }
-
-void texuguito_unregister(void) {}

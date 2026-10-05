@@ -25,7 +25,6 @@ extern "C" {
  * platform shown on a Browser Source, set up in a local web editor. Needs
  * Unified Chat. */
 void alerts_register(void);
-void alerts_unregister(void);
 
 #ifdef __cplusplus
 }

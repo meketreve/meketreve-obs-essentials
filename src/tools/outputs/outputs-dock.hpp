@@ -51,7 +51,6 @@ public:
 	bool startOutput(const QString &id, bool interactive);
 	void stopOutput(const QString &id);
 	QString stateText(const QString &id) const;
-	QStringList outputIds() const;
 
 private:
 	enum class State { Stopped, Starting, Live, Stalled, Reconnecting, Stopping, Error };

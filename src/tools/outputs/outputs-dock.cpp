@@ -222,14 +222,6 @@ qsizetype OutputsDock::indexOf(const QString &id) const
 	return -1;
 }
 
-QStringList OutputsDock::outputIds() const
-{
-	QStringList ids;
-	for (const OutputConfig &c : m_outputs)
-		ids.append(c.id);
-	return ids;
-}
-
 void OutputsDock::loadProfile()
 {
 	stopAll(false);
