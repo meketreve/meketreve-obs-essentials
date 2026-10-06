@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "face-mask.h"
+#include "ort-loader.hpp"
 #include "frame-grab.hpp"
 #include "tracker.hpp"
 #include "pose.hpp"
@@ -27,6 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <util/platform.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -41,17 +43,41 @@ namespace {
 
 using namespace FaceMask;
 
-/* The models live in the plugin's config folder, where they are downloaded. */
+/* onnxruntime and the models live in the plugin's config folder
+ * (face-mask/ and face-mask/models/), where they are downloaded. */
 constexpr const char *kModelFile = "face_detection_yunet_2023mar.onnx";
 constexpr const char *kHeadposeFile = "headpose_mobilenetv2.onnx";
 constexpr const char *kLandmarkFile = "face_landmark_468.onnx";
 
+std::string componentPath(const std::string &file)
+{
+	char *path = obs_module_config_path(("face-mask/" + file).c_str());
+	std::string full = path ? path : "";
+	bfree(path);
+	return full;
+}
+
 std::string modelPath(const char *file)
 {
-	char *path = obs_module_config_path((std::string("face-mask/models/") + file).c_str());
-	std::string found = path && os_file_exists(path) ? path : "";
-	bfree(path);
-	return found;
+	const std::string path = componentPath(std::string("models/") + file);
+	return os_file_exists(path.c_str()) ? path : "";
+}
+
+/* Opens onnxruntime once; says why not only the first time. */
+bool runtimeReady()
+{
+	static std::atomic<bool> told{false};
+	std::string why;
+	if (loadOnnxRuntime(componentPath(onnxRuntimeFileName()), &why))
+		return true;
+	if (!told.exchange(true))
+		obs_log(LOG_WARNING, "[face-mask] onnxruntime not available: %s", why.c_str());
+	return false;
+}
+
+bool componentsReady()
+{
+	return runtimeReady() && !modelPath(kModelFile).empty() && !modelPath(kHeadposeFile).empty();
 }
 
 struct mask_filter {
@@ -209,13 +235,13 @@ void *mask_create(obs_data_t *settings, obs_source_t *source)
 
 	mask_update(f, settings);
 
-	const std::string yunet = modelPath(kModelFile);
-	const std::string headpose = modelPath(kHeadposeFile);
-	if (!yunet.empty() && !headpose.empty())
-		f->tracker.start(yunet, headpose, modelPath(kLandmarkFile), f->score_thresh);
+	/* Without onnxruntime and the models the filter passes the video
+	 * through, and its properties say what is missing. */
+	if (componentsReady())
+		f->tracker.start(modelPath(kModelFile), modelPath(kHeadposeFile), modelPath(kLandmarkFile),
+				 f->score_thresh);
 	else
-		obs_log(LOG_WARNING, "[face-mask] models not found in face-mask/models: %s / %s", kModelFile,
-			kHeadposeFile);
+		obs_log(LOG_WARNING, "[face-mask] components missing in %s", componentPath("").c_str());
 	return f;
 }
 
@@ -272,6 +298,12 @@ bool add_video_source_to_list(void *data, obs_source_t *src)
 obs_properties_t *mask_properties(void *)
 {
 	obs_properties_t *p = obs_properties_create();
+
+	if (!componentsReady()) {
+		obs_property_t *missing =
+			obs_properties_add_text(p, "missing", obs_module_text("FaceMask.Missing"), OBS_TEXT_INFO);
+		obs_property_text_set_info_type(missing, OBS_TEXT_INFO_WARNING);
+	}
 
 	obs_property_t *ml = obs_properties_add_list(p, kMaskSource, obs_module_text("FaceMask.Source"),
 						     OBS_COMBO_TYPE_EDITABLE, OBS_COMBO_FORMAT_STRING);
