@@ -44,6 +44,7 @@ h2 { font-size: 26px; margin: 0 0 16px; }
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
 .shot { margin: 18px 0; }
 .shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.shot img.natural { width: auto; max-width: 100%; }
 .shot figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
 code, pre { background: var(--code); border-radius: 6px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; }
@@ -99,8 +100,8 @@ html.pt [lang="en"], html.en [lang="pt-BR"] { display: none !important; }
       <p lang="pt-BR">Exporte abas, canais e saídas como um texto <code>MOE1:</code> e importe em outro PC. Chaves nunca vão junto.</p>
       <p lang="en">Export tabs, channels and outputs as one <code>MOE1:</code> text and import it on another PC. Keys never go along.</p></div>
     <div class="card"><h3 lang="pt-BR">Bot do chat (Texuguito)</h3><h3 lang="en">Chat bot (Texuguito)</h3>
-      <p lang="pt-BR">Bot do chat com desfile pixel art de quem assiste, pontos, áudios, TTS, sorteio e comandos criados pelo chat, para todas as plataformas.</p>
-      <p lang="en">Chat bot with a pixel-art parade of your viewers, points, sound clips, TTS, raffles and chat-made commands, for every platform.</p>
+      <p lang="pt-BR">Bot do chat com desfile pixel art de quem assiste, pontos, áudios, TTS, sorteio, comandos criados pelo chat e mensagens automáticas por tempo, para todas as plataformas.</p>
+      <p lang="en">Chat bot with a pixel-art parade of your viewers, points, sound clips, TTS, raffles, chat-made commands and automatic messages on a timer, for every platform.</p>
       <p style="margin-top: 8px"><a lang="pt-BR" href="comandos.html">Ver todos os comandos →</a><a lang="en" href="commands.html">See every command →</a></p></div>
     <div class="card"><h3>Overlays</h3>
       <p lang="pt-BR">Alertas, chat na tela, eventos na tela, metas, enquete pelo chat (<code>!voto</code>), subathon, o desfile do bot e Tocando agora, com os eventos das 3 plataformas. Tudo num painel web que abre no navegador, com um tema para todos de uma vez.</p>
@@ -116,20 +117,34 @@ html.pt [lang="en"], html.en [lang="pt-BR"] { display: none !important; }
 
 <section>
   <h2 lang="pt-BR">Como fica</h2><h2 lang="en">How it looks</h2>
-  <figure class="shot"><img src="img/tab-live.png" alt="OBS with the Live tab: preview, unified chat, mixer and controls" loading="lazy" width="1280" height="868">
-    <figcaption lang="pt-BR">Aba Ao vivo: prévia, chat unificado, mixer e controles.</figcaption>
-    <figcaption lang="en">Live tab: preview, unified chat, mixer and controls.</figcaption></figure>
-  <figure class="shot"><img src="img/tab-build.png" alt="OBS with the Build tab: scenes, sources, preview, transitions and mixer" loading="lazy" width="1280" height="868">
-    <figcaption lang="pt-BR">Aba Montagem: cenas, fontes, prévia, transições e mixer.</figcaption>
-    <figcaption lang="en">Build tab: scenes, sources, preview, transitions and mixer.</figcaption></figure>
-  <figure class="shot"><img src="img/activity.png" alt="Unified chat and Activity docks with subs, gifts and raids" loading="lazy">
+  <figure class="shot"><img src="img/tab-live.png" alt="OBS with the Live tab: preview with an alert, chat on screen and Now Playing, Stream events, Multistream and unified chat" loading="lazy" width="1440" height="863">
+    <figcaption lang="pt-BR">Aba Ao vivo: prévia com alerta, chat na tela e Tocando agora; Eventos da live, Multistream e chat unificado.</figcaption>
+    <figcaption lang="en">Live tab: preview with an alert, chat on screen and Now Playing; Stream events, Multistream and unified chat.</figcaption></figure>
+  <figure class="shot"><img src="img/tab-build.png" alt="OBS with the Build tab: scenes, sources, preview, mixer and the Overlays dock" loading="lazy" width="1440" height="863">
+    <figcaption lang="pt-BR">Aba Montagem: cenas, fontes, prévia, mixer e o painel Overlays.</figcaption>
+    <figcaption lang="en">Build tab: scenes, sources, preview, mixer and the Overlays dock.</figcaption></figure>
+  <figure class="shot"><img src="img/activity.png" alt="Unified chat and Stream events docks with subs, gifts, raids and emotes" loading="lazy" width="900" height="560">
     <figcaption lang="pt-BR">Chat unificado com eventos em destaque e o painel Eventos da live.</figcaption>
     <figcaption lang="en">Unified chat with highlighted events, and the Stream events dock.</figcaption></figure>
   <div class="pair">
-    <figure class="shot"><img src="img/outputs.png" alt="Outputs dock with Twitch, YouTube and Kick" loading="lazy">
+    <figure class="shot"><img class="natural" src="img/outputs.png" alt="Multistream dock with Kick and YouTube" loading="lazy" width="282" height="152">
       <figcaption lang="pt-BR">Painel Multistream.</figcaption><figcaption lang="en">Multistream dock.</figcaption></figure>
-    <figure class="shot"><img src="img/export.png" alt="Export configuration dialog with a MOE1 text" loading="lazy">
+    <figure class="shot"><img src="img/export.png" alt="Export configuration dialog with every section and a MOE1 text" loading="lazy" width="556" height="534">
       <figcaption lang="pt-BR">Exportar configuração.</figcaption><figcaption lang="en">Export configuration.</figcaption></figure>
+  </div>
+  <h3 lang="pt-BR">Painel web</h3><h3 lang="en">Web panel</h3>
+  <p lang="pt-BR">O botão Abrir painel web do painel Overlays abre no navegador uma aba para cada overlay, com prévia ao vivo.</p>
+  <p lang="en">The Open web panel button in the Overlays dock opens one browser tab per overlay, with a live preview.</p>
+  <figure class="shot"><img src="img/web-chat.png" alt="Web panel, Chat on screen tab: platforms, filters, look and a preview" loading="lazy" width="1440" height="900">
+    <figcaption lang="pt-BR">Chat na tela: plataformas, filtros, visual e prévia com emotes.</figcaption>
+    <figcaption lang="en">Chat on screen: platforms, filters, look and a preview with emotes.</figcaption></figure>
+  <div class="pair">
+    <figure class="shot"><img src="img/web-alertas.png" alt="Web panel, Alerts tab: position, queue, volume, GIF search and the overlay link" loading="lazy" width="1440" height="900">
+      <figcaption lang="pt-BR">Alertas: um tipo por evento, fila, GIFs e link da fonte.</figcaption>
+      <figcaption lang="en">Alerts: one type per event, queue, GIFs and the source link.</figcaption></figure>
+    <figure class="shot"><img src="img/web-tema.png" alt="Web panel, Theme tab: one font and colors for every overlay, with a goal and poll preview" loading="lazy" width="1440" height="900">
+      <figcaption lang="pt-BR">Tema: uma fonte e cores para todos os overlays.</figcaption>
+      <figcaption lang="en">Theme: one font and colors for every overlay.</figcaption></figure>
   </div>
 </section>
 
