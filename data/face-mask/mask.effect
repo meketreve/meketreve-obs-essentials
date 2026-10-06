@@ -1,0 +1,71 @@
+// Face mask — draws a textured quad whose corners are already projected
+// to screen pixels on the CPU. Perspective-correct texturing is recovered from
+// projective texcoords: uvq = (u/z, v/z, 1/z) per corner, divided in the pixel
+// shader. The vertex positions live in OBS's current 2D ortho space.
+
+uniform float4x4 ViewProj;
+uniform texture2d image;
+uniform float opacity;
+
+sampler_state linearClamp {
+	Filter   = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float4 uvq : TEXCOORD0;  // projective: (u/z, v/z, 0, 1/z); D3D11 needs width 2 or 4
+};
+
+VertData VSDraw(VertData v)
+{
+	VertData o;
+	o.pos = mul(float4(v.pos.xyz, 1.0), ViewProj);
+	o.uvq = v.uvq;
+	return o;
+}
+
+float4 PSDraw(VertData v) : TARGET
+{
+	float2 uv = v.uvq.xy / v.uvq.w;
+	float4 c = image.Sample(linearClamp, uv);
+	c.a = c.a * opacity;
+	return c;
+}
+
+technique Draw {
+	pass {
+		vertex_shader = VSDraw(v);
+		pixel_shader  = PSDraw(v);
+	}
+}
+
+// Mesh-morph: the deformed FaceMesh is drawn directly in screen space, so
+// texturing is a plain (non-projective) float2 UV lookup.
+struct MeshVert {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+MeshVert VSMesh(MeshVert v)
+{
+	MeshVert o;
+	o.pos = mul(float4(v.pos.xyz, 1.0), ViewProj);
+	o.uv  = v.uv;
+	return o;
+}
+
+float4 PSMesh(MeshVert v) : TARGET
+{
+	float4 c = image.Sample(linearClamp, v.uv);
+	c.a = c.a * opacity;
+	return c;
+}
+
+technique DrawMesh {
+	pass {
+		vertex_shader = VSMesh(v);
+		pixel_shader  = PSMesh(v);
+	}
+}

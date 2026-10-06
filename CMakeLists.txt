@@ -7,6 +7,10 @@ project(${_name} VERSION ${_version})
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
 option(ENABLE_DEV_TOOLS "Build local test harnesses and unit tests (not shipped)" OFF)
+# The Face Mask filter (absorbed from the Eye Mask Tracker plugin) still needs
+# OpenCV and onnxruntime at build time: off until it only loads onnxruntime at
+# runtime.
+option(ENABLE_FACE_MASK "Build the Face Mask filter (needs OpenCV and onnxruntime)" OFF)
 
 include(compilerconfig)
 include(defaults)
@@ -192,6 +196,38 @@ target_sources(
     src/tools/unified-chat/youtube-broadcast.cpp
     src/tools/unified-chat/youtube-broadcast.hpp
 )
+
+if(ENABLE_FACE_MASK)
+  find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+  set(ORT_ROOT "" CACHE PATH "Prebuilt onnxruntime folder (include/ and lib/)")
+  find_library(ORT_LIB NAMES onnxruntime PATHS "${ORT_ROOT}/lib" REQUIRED NO_DEFAULT_PATH)
+  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${OpenCV_INCLUDE_DIRS} "${ORT_ROOT}/include")
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OpenCV_LIBS} "${ORT_LIB}")
+  target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MEKETREVE_FACE_MASK)
+  target_sources(
+    ${CMAKE_PROJECT_NAME}
+    PRIVATE
+      src/tools/face-mask/face-mask-filter.cpp
+      src/tools/face-mask/face-mask.h
+      src/tools/face-mask/facemesh-tables.hpp
+      src/tools/face-mask/frame-grab.cpp
+      src/tools/face-mask/frame-grab.hpp
+      src/tools/face-mask/headpose.cpp
+      src/tools/face-mask/headpose.hpp
+      src/tools/face-mask/landmarks.cpp
+      src/tools/face-mask/landmarks.hpp
+      src/tools/face-mask/mask-renderer.cpp
+      src/tools/face-mask/mask-renderer.hpp
+      src/tools/face-mask/pose.cpp
+      src/tools/face-mask/pose.hpp
+      src/tools/face-mask/smoothing.cpp
+      src/tools/face-mask/smoothing.hpp
+      src/tools/face-mask/tracker.cpp
+      src/tools/face-mask/tracker.hpp
+      src/tools/face-mask/yunet.cpp
+      src/tools/face-mask/yunet.hpp
+  )
+endif()
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
