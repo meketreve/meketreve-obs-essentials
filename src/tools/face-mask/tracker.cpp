@@ -163,8 +163,8 @@ void FaceTracker::worker()
 					if (landmarks.infer(frame, mcrop, pts, presence) && presence > 0.f) {
 						best.mesh.resize(pts.size());
 						for (size_t i = 0; i < pts.size(); ++i)
-							best.mesh[i] = {(pts[i].x + mx0) * scale,
-									(pts[i].y + my0) * scale};
+							best.mesh[i] = {(pts[i].x + static_cast<float>(mx0)) * scale,
+									(pts[i].y + static_cast<float>(my0)) * scale};
 						best.has_mesh = true;
 
 						// Steadier eye centres than the

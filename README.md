@@ -13,6 +13,7 @@ required, though building locally on Linux is a one-liner (see
 | Tool | Type | What it does |
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
+| **Face Mask** | Video filter | Finds the face and draws an image or video over it: a flat mask that turns with the head, or bent onto the 468-point face mesh. Runs on your PC; onnxruntime and the face models (~25 MB) download on first use. Absorbed from the Eye Mask Tracker plugin. |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube and Kick chat merged into one panel inside OBS. |
 | **Share configuration** | Tools menu | Export tabs, chat channels and outputs as one line of text (`MOE1:...`) and import it elsewhere, or start from a built-in preset. |
@@ -324,6 +325,21 @@ source's **Filters**). Each module is a checkbox section you can enable and chai
 
 > Pitch is a real-time granular shifter (time-domain), so extreme settings add
 > some artifacts — expected for live use without latency.
+
+### Face Mask
+
+Add it as a filter on the camera (or any video with a face):
+
+1. Right-click the source → **Filters** → **+** → **Face Mask**.
+2. The first time, click **Download the components** in its properties: onnxruntime 1.20.1 and three face
+   models come from [meketreve-obs-essentials-components](https://github.com/meketreve/meketreve-obs-essentials-components),
+   are checked by size and SHA-256 and saved in the plugin's config folder (`face-mask/`). The mask starts as soon as
+   they are in.
+3. **Mask** — an Image Source (PNG with transparency) or Media Source (video) to put on the face.
+4. Turn on **Deform the mask onto the face** to bend it onto the face mesh instead of a flat mask over the eyes;
+   size, offset, depth, smoothing and what happens when the face is lost are sliders.
+
+> Everything runs on your computer: no picture or face data leaves it.
 
 ### Bass Shake
 

@@ -8,9 +8,10 @@ option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
 option(ENABLE_DEV_TOOLS "Build local test harnesses and unit tests (not shipped)" OFF)
 # The Face Mask filter (absorbed from the Eye Mask Tracker plugin). It opens
-# onnxruntime at runtime (headers in src/tools/face-mask/onnxruntime), so
-# building it needs nothing extra.
-option(ENABLE_FACE_MASK "Build the Face Mask filter" OFF)
+# onnxruntime at runtime (headers in src/tools/face-mask/onnxruntime) and
+# downloads it with the models on first use, so building it needs nothing
+# extra.
+option(ENABLE_FACE_MASK "Build the Face Mask filter" ON)
 
 include(compilerconfig)
 include(defaults)

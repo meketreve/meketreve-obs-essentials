@@ -63,8 +63,10 @@ std::vector<FaceBox> YuNet::detect(const Image &bgr, float score_threshold, floa
 	try {
 		/* Fit into 640x640, top-left; the rest stays black. */
 		const float scale = static_cast<float>(kSize) / static_cast<float>(std::max(bgr.width, bgr.height));
-		const int w = std::clamp(static_cast<int>(std::lround(bgr.width * scale)), 1, kSize);
-		const int h = std::clamp(static_cast<int>(std::lround(bgr.height * scale)), 1, kSize);
+		const int w =
+			std::clamp(static_cast<int>(std::lround(static_cast<float>(bgr.width) * scale)), 1, kSize);
+		const int h =
+			std::clamp(static_cast<int>(std::lround(static_cast<float>(bgr.height) * scale)), 1, kSize);
 		std::fill(blob_.begin(), blob_.end(), 0.f);
 		sampleToPlanes(bgr, {0, 0, bgr.width, bgr.height}, w, h, blob_.data(), kSize,
 			       static_cast<size_t>(kSize) * kSize, false, {1.f, 1.f, 1.f}, {0.f, 0.f, 0.f});
