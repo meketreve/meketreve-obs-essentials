@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "face-mask.h"
-#include "ort-loader.hpp"
+#include "face-mask-setup.hpp"
 #include "frame-grab.hpp"
 #include "tracker.hpp"
 #include "pose.hpp"
@@ -28,7 +28,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <util/platform.h>
 
 #include <algorithm>
-#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -43,42 +42,11 @@ namespace {
 
 using namespace FaceMask;
 
-/* onnxruntime and the models live in the plugin's config folder
- * (face-mask/ and face-mask/models/), where they are downloaded. */
+/* The models, downloaded with onnxruntime into the plugin's config folder
+ * (Setup). */
 constexpr const char *kModelFile = "face_detection_yunet_2023mar.onnx";
 constexpr const char *kHeadposeFile = "headpose_mobilenetv2.onnx";
 constexpr const char *kLandmarkFile = "face_landmark_468.onnx";
-
-std::string componentPath(const std::string &file)
-{
-	char *path = obs_module_config_path(("face-mask/" + file).c_str());
-	std::string full = path ? path : "";
-	bfree(path);
-	return full;
-}
-
-std::string modelPath(const char *file)
-{
-	const std::string path = componentPath(std::string("models/") + file);
-	return os_file_exists(path.c_str()) ? path : "";
-}
-
-/* Opens onnxruntime once; says why not only the first time. */
-bool runtimeReady()
-{
-	static std::atomic<bool> told{false};
-	std::string why;
-	if (loadOnnxRuntime(componentPath(onnxRuntimeFileName()), &why))
-		return true;
-	if (!told.exchange(true))
-		obs_log(LOG_WARNING, "[face-mask] onnxruntime not available: %s", why.c_str());
-	return false;
-}
-
-bool componentsReady()
-{
-	return runtimeReady() && !modelPath(kModelFile).empty() && !modelPath(kHeadposeFile).empty();
-}
 
 struct mask_filter {
 	obs_source_t *source = nullptr;
@@ -109,6 +77,8 @@ struct mask_filter {
 	uint64_t last_grab_ns = 0;
 	uint64_t frame_counter = 0;
 	bool effect_tried = false;
+	/* Setup::generation() when tracking last started (-1 = never). */
+	int started_generation = -1;
 
 	// face-loss handling
 	HeadPose last_good_pose;
@@ -228,6 +198,13 @@ void mask_update(void *data, obs_data_t *settings)
 	f->tracker.set_landmarks_enabled(obs_data_get_bool(settings, kUseMesh));
 }
 
+void start_tracking(mask_filter *f)
+{
+	f->started_generation = Setup::generation();
+	f->tracker.start(Setup::modelPath(kModelFile), Setup::modelPath(kHeadposeFile), Setup::modelPath(kLandmarkFile),
+			 f->score_thresh);
+}
+
 void *mask_create(obs_data_t *settings, obs_source_t *source)
 {
 	auto *f = new mask_filter();
@@ -236,12 +213,12 @@ void *mask_create(obs_data_t *settings, obs_source_t *source)
 	mask_update(f, settings);
 
 	/* Without onnxruntime and the models the filter passes the video
-	 * through, and its properties say what is missing. */
-	if (componentsReady())
-		f->tracker.start(modelPath(kModelFile), modelPath(kHeadposeFile), modelPath(kLandmarkFile),
-				 f->score_thresh);
+	 * through and its properties offer the download; tracking starts by
+	 * itself once they are in (mask_video_render). */
+	if (Setup::check())
+		start_tracking(f);
 	else
-		obs_log(LOG_WARNING, "[face-mask] components missing in %s", componentPath("").c_str());
+		obs_log(LOG_INFO, "[face-mask] components not installed yet");
 	return f;
 }
 
@@ -299,10 +276,20 @@ obs_properties_t *mask_properties(void *)
 {
 	obs_properties_t *p = obs_properties_create();
 
-	if (!componentsReady()) {
+	if (!Setup::check()) {
 		obs_property_t *missing =
 			obs_properties_add_text(p, "missing", obs_module_text("FaceMask.Missing"), OBS_TEXT_INFO);
 		obs_property_text_set_info_type(missing, OBS_TEXT_INFO_WARNING);
+		std::string label = obs_module_text("FaceMask.Download");
+		if (const size_t at = label.find("%1"); at != std::string::npos)
+			label.replace(at, 2, std::to_string(Setup::downloadMegabytes()));
+		obs_properties_add_button2(
+			p, "download", label.c_str(),
+			[](obs_properties_t *, obs_property_t *, void *) {
+				Setup::download();
+				return false;
+			},
+			nullptr);
 	}
 
 	obs_property_t *ml = obs_properties_add_list(p, kMaskSource, obs_module_text("FaceMask.Source"),
@@ -354,6 +341,10 @@ void mask_video_render(void *data, gs_effect_t *effect)
 		obs_source_skip_video_filter(f->source);
 		return;
 	}
+
+	// 0. Components downloaded after this filter was made: start now.
+	if (!f->tracker.running() && Setup::ready() && f->started_generation != Setup::generation())
+		start_tracking(f);
 
 	// 1. Throttled offscreen grab -> submit to tracker (before drawing).
 	if (f->tracker.running()) {
@@ -482,4 +473,5 @@ void face_mask_register(void)
 	info.update = mask_update;
 	info.video_render = mask_video_render;
 	obs_register_source(&info);
+	Setup::registerSelfTest();
 }

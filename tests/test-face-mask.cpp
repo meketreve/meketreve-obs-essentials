@@ -17,10 +17,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "face-boxes.hpp"
 #include "face-image.hpp"
+#include "face-mask-components.hpp"
 #include "face-math.hpp"
 #include "pose.hpp"
 #include "smoothing.hpp"
 
+#include <QFile>
+#include <QTemporaryDir>
 #include <QTest>
 
 #include <cmath>
@@ -32,6 +35,34 @@ class TestFaceMask : public QObject {
 	Q_OBJECT
 
 private slots:
+	void componentsAreCheckedBySizeAndHash()
+	{
+		/* onnxruntime for this system and the three models, each with a
+		 * SHA-256 and a link to the components release. */
+		QCOMPARE(components().size(), size_t(4));
+		qint64 total = 0;
+		for (const Component &c : components()) {
+			QCOMPARE(QString::fromLatin1(c.sha256).size(), 64);
+			QVERIFY(componentUrl(c).startsWith(QLatin1String(kComponentsRelease)));
+			QVERIFY(c.size > 0);
+			total += c.size;
+		}
+		QCOMPARE(componentsBytes(), total);
+
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("abc"));
+		QFile file(path);
+		QVERIFY(file.open(QIODevice::WriteOnly));
+		file.write("abc");
+		file.close();
+		const QString abc = QStringLiteral("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+		QVERIFY(fileMatches(path, 3, abc));
+		QVERIFY(fileMatches(path, 3, abc.toUpper()));
+		QVERIFY(!fileMatches(path, 4, abc));
+		QVERIFY(!fileMatches(path, 3, QString(abc).replace(0, 1, QStringLiteral("c"))));
+		QVERIFY(!fileMatches(dir.filePath(QStringLiteral("missing")), 3, abc));
+	}
+
 	void sampleCopiesResizesAndSwapsChannels()
 	{
 		/* 2x1 picture: pixel 0 is B=10 G=20 R=30, pixel 1 is B=50 G=60 R=70. */

@@ -139,6 +139,7 @@ add_executable(
   test-face-mask.cpp
   ${_face}/face-boxes.cpp
   ${_face}/face-image.cpp
+  ${_face}/face-mask-components.cpp
   ${_face}/pose.cpp
   ${_face}/smoothing.cpp
 )

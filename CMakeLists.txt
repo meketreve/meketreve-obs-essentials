@@ -208,7 +208,11 @@ if(ENABLE_FACE_MASK)
       src/tools/face-mask/face-boxes.hpp
       src/tools/face-mask/face-image.cpp
       src/tools/face-mask/face-image.hpp
+      src/tools/face-mask/face-mask-components.cpp
+      src/tools/face-mask/face-mask-components.hpp
       src/tools/face-mask/face-mask-filter.cpp
+      src/tools/face-mask/face-mask-setup.cpp
+      src/tools/face-mask/face-mask-setup.hpp
       src/tools/face-mask/face-mask.h
       src/tools/face-mask/face-math.hpp
       src/tools/face-mask/facemesh-tables.hpp
