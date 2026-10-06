@@ -17,8 +17,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "yunet.hpp"
 
-#include <plugin-support.h>
 #include <util/base.h>
+#include <plugin-support.h>
 
 #include <algorithm>
 #include <cmath>

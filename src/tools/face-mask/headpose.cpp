@@ -17,8 +17,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "headpose.hpp"
 
-#include <plugin-support.h>
 #include <util/base.h>
+#include <plugin-support.h>
 
 #include <array>
 #include <filesystem>
