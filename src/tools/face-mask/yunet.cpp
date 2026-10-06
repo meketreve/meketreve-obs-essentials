@@ -20,8 +20,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/base.h>
 
-#include <opencv2/imgproc.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -58,87 +56,18 @@ bool YuNet::load(const std::string &model_path)
 	}
 }
 
-void YuNet::decode(int stride, const float *cls, const float *obj, const float *bbox, const float *kps,
-		   float score_threshold, std::vector<FaceBox> &out)
-{
-	/* As OpenCV 4.8's FaceDetectorYN: score = sqrt(cls * obj), box centre
-	 * and landmarks are offsets from the cell, size is exp() of the cell. */
-	const int cols = kSize / stride;
-	const int rows = kSize / stride;
-	const auto s = static_cast<float>(stride);
-	for (int r = 0; r < rows; ++r) {
-		for (int c = 0; c < cols; ++c) {
-			const size_t i = static_cast<size_t>(r) * cols + c;
-			const float score = std::sqrt(std::clamp(cls[i], 0.f, 1.f) * std::clamp(obj[i], 0.f, 1.f));
-			if (score < score_threshold)
-				continue;
-			const float *b = bbox + i * 4;
-			const float cx = (static_cast<float>(c) + b[0]) * s;
-			const float cy = (static_cast<float>(r) + b[1]) * s;
-			const float w = std::exp(b[2]) * s;
-			const float h = std::exp(b[3]) * s;
-			FaceBox f;
-			f.x = cx - w * 0.5f;
-			f.y = cy - h * 0.5f;
-			f.w = w;
-			f.h = h;
-			f.score = score;
-			const float *k = kps + i * 10;
-			for (int n = 0; n < 5; ++n) {
-				f.kps[n * 2] = (k[n * 2] + static_cast<float>(c)) * s;
-				f.kps[n * 2 + 1] = (k[n * 2 + 1] + static_cast<float>(r)) * s;
-			}
-			out.push_back(f);
-		}
-	}
-}
-
-std::vector<FaceBox> YuNet::suppress(std::vector<FaceBox> boxes, float iou_threshold, int top_k)
-{
-	std::stable_sort(boxes.begin(), boxes.end(),
-			 [](const FaceBox &a, const FaceBox &b) { return a.score > b.score; });
-	std::vector<FaceBox> kept;
-	for (const FaceBox &b : boxes) {
-		if (static_cast<int>(kept.size()) >= top_k)
-			break;
-		bool overlaps = false;
-		for (const FaceBox &k : kept) {
-			const float ix = std::max(0.f, std::min(b.x + b.w, k.x + k.w) - std::max(b.x, k.x));
-			const float iy = std::max(0.f, std::min(b.y + b.h, k.y + k.h) - std::max(b.y, k.y));
-			const float inter = ix * iy;
-			const float uni = b.w * b.h + k.w * k.h - inter;
-			if (uni > 0.f && inter / uni > iou_threshold) {
-				overlaps = true;
-				break;
-			}
-		}
-		if (!overlaps)
-			kept.push_back(b);
-	}
-	return kept;
-}
-
-std::vector<FaceBox> YuNet::detect(const cv::Mat &bgr, float score_threshold, float nms_threshold, int top_k)
+std::vector<FaceBox> YuNet::detect(const Image &bgr, float score_threshold, float nms_threshold, int top_k)
 {
 	if (!session_ || bgr.empty())
 		return {};
 	try {
 		/* Fit into 640x640, top-left; the rest stays black. */
-		const float scale = static_cast<float>(kSize) / static_cast<float>(std::max(bgr.cols, bgr.rows));
-		const int w = std::clamp(static_cast<int>(std::lround(bgr.cols * scale)), 1, kSize);
-		const int h = std::clamp(static_cast<int>(std::lround(bgr.rows * scale)), 1, kSize);
-		cv::Mat fitted;
-		cv::resize(bgr, fitted, cv::Size(w, h));
+		const float scale = static_cast<float>(kSize) / static_cast<float>(std::max(bgr.width, bgr.height));
+		const int w = std::clamp(static_cast<int>(std::lround(bgr.width * scale)), 1, kSize);
+		const int h = std::clamp(static_cast<int>(std::lround(bgr.height * scale)), 1, kSize);
 		std::fill(blob_.begin(), blob_.end(), 0.f);
-		const size_t plane = static_cast<size_t>(kSize) * kSize;
-		for (int y = 0; y < h; ++y) {
-			const uint8_t *row = fitted.ptr<uint8_t>(y);
-			for (int x = 0; x < w; ++x) {
-				const size_t at = static_cast<size_t>(y) * kSize + x;
-				for (int ch = 0; ch < 3; ++ch)
-					blob_[ch * plane + at] = static_cast<float>(row[x * 3 + ch]);
-			}
-		}
+		sampleToPlanes(bgr, {0, 0, bgr.width, bgr.height}, w, h, blob_.data(), kSize,
+			       static_cast<size_t>(kSize) * kSize, false, {1.f, 1.f, 1.f}, {0.f, 0.f, 0.f});
 
 		const int64_t shape[4] = {1, 3, kSize, kSize};
 		Ort::Value input = Ort::Value::CreateTensor<float>(mem_, blob_.data(), blob_.size(), shape, 4);
@@ -150,10 +79,10 @@ std::vector<FaceBox> YuNet::detect(const cv::Mat &bgr, float score_threshold, fl
 
 		std::vector<FaceBox> found;
 		for (int i = 0; i < 3; ++i)
-			decode(kStrides[i], outputs[i].GetTensorData<float>(), outputs[3 + i].GetTensorData<float>(),
-			       outputs[6 + i].GetTensorData<float>(), outputs[9 + i].GetTensorData<float>(),
-			       score_threshold, found);
-		std::vector<FaceBox> faces = suppress(std::move(found), nms_threshold, top_k);
+			decodeYuNet(kStrides[i], kSize, outputs[i].GetTensorData<float>(),
+				    outputs[3 + i].GetTensorData<float>(), outputs[6 + i].GetTensorData<float>(),
+				    outputs[9 + i].GetTensorData<float>(), score_threshold, found);
+		std::vector<FaceBox> faces = suppressBoxes(std::move(found), nms_threshold, top_k);
 		for (FaceBox &f : faces) {
 			f.x /= scale;
 			f.y /= scale;

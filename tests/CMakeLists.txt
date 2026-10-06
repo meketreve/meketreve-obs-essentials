@@ -133,6 +133,20 @@ target_link_libraries(test-texuguito PRIVATE chat-core Qt6::Test)
 set_target_properties(test-texuguito PROPERTIES AUTOMOC ON)
 add_test(NAME texuguito COMMAND test-texuguito)
 
+set(_face "${CMAKE_SOURCE_DIR}/src/tools/face-mask")
+add_executable(
+  test-face-mask
+  test-face-mask.cpp
+  ${_face}/face-boxes.cpp
+  ${_face}/face-image.cpp
+  ${_face}/pose.cpp
+  ${_face}/smoothing.cpp
+)
+target_include_directories(test-face-mask PRIVATE ${_face})
+target_link_libraries(test-face-mask PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-face-mask PROPERTIES AUTOMOC ON)
+add_test(NAME face-mask COMMAND test-face-mask)
+
 set(_updater "${CMAKE_SOURCE_DIR}/src/tools/updater")
 add_executable(test-updater test-updater.cpp ${_updater}/update-logic.cpp)
 target_include_directories(test-updater PRIVATE ${_updater})

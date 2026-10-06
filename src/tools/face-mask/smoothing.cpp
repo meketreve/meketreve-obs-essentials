@@ -33,7 +33,7 @@ void OneEuro::configure(double mincutoff, double beta, double dcutoff)
 
 double OneEuro::alpha(double dt, double cutoff)
 {
-	double tau = 1.0 / (2.0 * CV_PI * cutoff);
+	double tau = 1.0 / (2.0 * kPi * cutoff);
 	return 1.0 / (1.0 + tau / dt);
 }
 
@@ -96,23 +96,23 @@ void PoseSmoother::reset()
 	q_hist_.clear();
 }
 
-cv::Matx33d PoseSmoother::billboard_rotation(const cv::Vec3d &center) const
+Matx33d PoseSmoother::billboard_rotation(const Vec3d &center) const
 {
 	// Orientation (object->camera) that makes the face plane square to the
 	// camera: object +Z maps along the view ray (away from camera), object
 	// +Y to camera-up (-Y in OpenCV image coords).
-	cv::Vec3d f = center;
-	double n = cv::norm(f);
-	f = (n > 1e-9) ? f / n : cv::Vec3d(0, 0, 1);
+	Vec3d f = center;
+	double n = f.norm();
+	f = (n > 1e-9) ? f / n : Vec3d(0, 0, 1);
 
-	cv::Vec3d up(0, -1, 0);
-	cv::Vec3d r = up.cross(f);
-	double rn = cv::norm(r);
-	r = (rn > 1e-9) ? r / rn : cv::Vec3d(1, 0, 0);
-	cv::Vec3d u = f.cross(r);
+	Vec3d up(0, -1, 0);
+	Vec3d r = up.cross(f);
+	double rn = r.norm();
+	r = (rn > 1e-9) ? r / rn : Vec3d(1, 0, 0);
+	Vec3d u = f.cross(r);
 
 	// columns = [r, u, f]
-	return cv::Matx33d(r[0], u[0], f[0], r[1], u[1], f[1], r[2], u[2], f[2]);
+	return Matx33d(r[0], u[0], f[0], r[1], u[1], f[1], r[2], u[2], f[2]);
 }
 
 HeadPose PoseSmoother::smooth(const HeadPose &in, uint64_t now_ns, double rotation_follow)
@@ -134,14 +134,14 @@ HeadPose PoseSmoother::smooth(const HeadPose &in, uint64_t now_ns, double rotati
 	out.t[2] = tz_.filter(in.t[2], dt);
 
 	// Rotation target (optionally blended toward billboard).
-	cv::Quatd q = cv::Quatd::createFromRotMat(in.R);
-	cv::Quatd q_target = q;
+	Quatd q = Quatd::createFromRotMat(in.R);
+	Quatd q_target = q;
 	if (rotation_follow < 0.999) {
-		cv::Matx33d Rbb = billboard_rotation(out.t);
-		cv::Quatd qbb = cv::Quatd::createFromRotMat(Rbb);
+		Matx33d Rbb = billboard_rotation(out.t);
+		Quatd qbb = Quatd::createFromRotMat(Rbb);
 		if (q.dot(qbb) < 0)
 			qbb = -qbb;
-		q_target = cv::Quatd::slerp(qbb, q, std::clamp(rotation_follow, 0.0, 1.0));
+		q_target = Quatd::slerp(qbb, q, std::clamp(rotation_follow, 0.0, 1.0));
 	}
 
 	if (!q_init_) {
@@ -154,7 +154,7 @@ HeadPose PoseSmoother::smooth(const HeadPose &in, uint64_t now_ns, double rotati
 		double ang = 2.0 * std::acos(std::abs(d)); // radians between
 		double cutoff = rot_mincut_ + rot_beta_ * (ang / dt);
 		double a = OneEuro::alpha(dt, cutoff);
-		q_s_ = cv::Quatd::slerp(q_s_, q_target, a).normalize();
+		q_s_ = Quatd::slerp(q_s_, q_target, a).normalize();
 	}
 
 	out.R = q_s_.toRotMat3x3();
@@ -169,17 +169,17 @@ HeadPose PoseSmoother::smooth(const HeadPose &in, uint64_t now_ns, double rotati
 		q_hist_.pop_front();
 
 	if (avg_n_ > 1 && t_hist_.size() > 1) {
-		cv::Vec3d tsum(0, 0, 0);
+		Vec3d tsum(0, 0, 0);
 		for (const auto &v : t_hist_)
 			tsum += v;
 		out.t = tsum * (1.0 / (double)t_hist_.size());
 
 		// Average quaternions: sign-align to a reference, sum, normalize.
 		// Valid for the small angular spread typical of jitter.
-		const cv::Quatd ref = q_hist_.back();
-		cv::Quatd qsum(0, 0, 0, 0);
+		const Quatd ref = q_hist_.back();
+		Quatd qsum(0, 0, 0, 0);
 		for (const auto &qq : q_hist_) {
-			const cv::Quatd q2 = (qq.dot(ref) < 0) ? -qq : qq;
+			const Quatd q2 = (qq.dot(ref) < 0) ? -qq : qq;
 			qsum = qsum + q2;
 		}
 		out.R = qsum.normalize().toRotMat3x3();

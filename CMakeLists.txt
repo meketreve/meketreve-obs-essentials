@@ -7,10 +7,9 @@ project(${_name} VERSION ${_version})
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
 option(ENABLE_DEV_TOOLS "Build local test harnesses and unit tests (not shipped)" OFF)
-# The Face Mask filter (absorbed from the Eye Mask Tracker plugin) still needs
-# OpenCV and onnxruntime at build time: off until it only loads onnxruntime at
-# runtime.
-option(ENABLE_FACE_MASK "Build the Face Mask filter (needs OpenCV and onnxruntime)" OFF)
+# The Face Mask filter (absorbed from the Eye Mask Tracker plugin) still links
+# onnxruntime at build time: off until it only loads onnxruntime at runtime.
+option(ENABLE_FACE_MASK "Build the Face Mask filter (needs onnxruntime)" OFF)
 
 include(compilerconfig)
 include(defaults)
@@ -198,17 +197,21 @@ target_sources(
 )
 
 if(ENABLE_FACE_MASK)
-  find_package(OpenCV REQUIRED COMPONENTS core imgproc)
   set(ORT_ROOT "" CACHE PATH "Prebuilt onnxruntime folder (include/ and lib/)")
   find_library(ORT_LIB NAMES onnxruntime PATHS "${ORT_ROOT}/lib" REQUIRED NO_DEFAULT_PATH)
-  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${OpenCV_INCLUDE_DIRS} "${ORT_ROOT}/include")
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OpenCV_LIBS} "${ORT_LIB}")
+  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "${ORT_ROOT}/include")
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE "${ORT_LIB}")
   target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MEKETREVE_FACE_MASK)
   target_sources(
     ${CMAKE_PROJECT_NAME}
     PRIVATE
+      src/tools/face-mask/face-boxes.cpp
+      src/tools/face-mask/face-boxes.hpp
+      src/tools/face-mask/face-image.cpp
+      src/tools/face-mask/face-image.hpp
       src/tools/face-mask/face-mask-filter.cpp
       src/tools/face-mask/face-mask.h
+      src/tools/face-mask/face-math.hpp
       src/tools/face-mask/facemesh-tables.hpp
       src/tools/face-mask/frame-grab.cpp
       src/tools/face-mask/frame-grab.hpp

@@ -19,7 +19,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <onnxruntime_cxx_api.h>
 
-#include <opencv2/core.hpp>
+#include "face-image.hpp"
+#include "face-math.hpp"
 
 #include <memory>
 #include <string>
@@ -46,9 +47,10 @@ public:
 	bool load(const std::string &model_path);
 	bool loaded() const { return session_ != nullptr; }
 
-	/* bgr_crop: a (roughly square) face crop. Fills pts (kNumPoints) in CROP
-	 * pixel coordinates and the presence logit. Returns false on failure. */
-	bool infer(const cv::Mat &bgr_crop, std::vector<cv::Point2f> &pts, float &presence);
+	/* face: a (roughly square) region of frame, inside it. Fills pts
+	 * (kNumPoints) in pixels relative to the region's corner and the
+	 * presence logit. Returns false on failure. */
+	bool infer(const Image &frame, const RectI &face, std::vector<Point2f> &pts, float &presence);
 
 private:
 	Ort::Env env_;

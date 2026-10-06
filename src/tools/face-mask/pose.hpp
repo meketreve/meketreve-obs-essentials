@@ -19,7 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "tracker.hpp"
 
-#include <opencv2/core.hpp>
+#include "face-math.hpp"
 
 namespace FaceMask {
 
@@ -28,19 +28,19 @@ namespace FaceMask {
  * intrinsic matrix. */
 struct HeadPose {
 	bool valid = false;
-	cv::Matx33d R;
-	cv::Vec3d t;
-	cv::Matx33d K;
+	Matx33d R;
+	Vec3d t;
+	Matx33d K;
 };
 
 /* Canonical 3D head model (arbitrary mm-ish units), Y up, X = image-right,
  * +Z = toward back of head (camera sits on the -Z side). */
 namespace facemodel {
-cv::Vec3d eye_anchor();    // midpoint between the eyes
-double interocular();      // eye-to-eye distance (model units)
-cv::Vec3d axis_right();    // +X
-cv::Vec3d axis_up();       // +Y (projects to screen-up)
-cv::Vec3d toward_camera(); // unit vector from the face toward the camera (-Z)
+Vec3d eye_anchor();    // midpoint between the eyes
+double interocular();  // eye-to-eye distance (model units)
+Vec3d axis_right();    // +X
+Vec3d axis_up();       // +Y (projects to screen-up)
+Vec3d toward_camera(); // unit vector from the face toward the camera (-Z)
 } // namespace facemodel
 
 /* Build pose from the head-pose NET rotation (f.head_R) plus geometric
@@ -51,6 +51,6 @@ bool build_pose_from_net(const FaceResult &f, int w, int h, double fov_deg, bool
 
 /* Project an object-space point to screen pixels; also returns camera-space
  * depth (z_cam > 0 in front of camera) for perspective-correct texturing. */
-void project_point(const HeadPose &p, const cv::Vec3d &obj, cv::Point2d &screen, double &z_cam);
+void project_point(const HeadPose &p, const Vec3d &obj, Point2d &screen, double &z_cam);
 
 } // namespace FaceMask

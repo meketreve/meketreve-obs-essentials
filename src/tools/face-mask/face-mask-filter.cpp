@@ -26,8 +26,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/platform.h>
 
-#include <opencv2/core.hpp>
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -92,7 +90,7 @@ struct mask_filter {
 	uint64_t last_valid_ns = 0;
 
 	// mesh-morph mode: EMA-smoothed landmark positions
-	std::vector<cv::Point2f> mesh_s;
+	std::vector<Point2f> mesh_s;
 	bool mesh_init = false;
 };
 
@@ -145,12 +143,12 @@ void draw_solid_rect(float x, float y, float w, float h, const vec4 &color)
 	gs_technique_end(tech);
 }
 
-void draw_dot(const cv::Point2f &p, float s, const vec4 &color)
+void draw_dot(const Point2f &p, float s, const vec4 &color)
 {
 	draw_solid_rect(p.x - s * 0.5f, p.y - s * 0.5f, s, s, color);
 }
 
-void draw_box(const cv::Rect2f &b, float t, const vec4 &color)
+void draw_box(const Rect2f &b, float t, const vec4 &color)
 {
 	draw_solid_rect(b.x, b.y, b.width, t, color);                // top
 	draw_solid_rect(b.x, b.y + b.height - t, b.width, t, color); // bottom
@@ -329,10 +327,10 @@ void mask_video_render(void *data, gs_effect_t *effect)
 	if (f->tracker.running()) {
 		uint64_t now = os_gettime_ns();
 		if (now - f->last_grab_ns >= f->detect_interval_ns) {
-			cv::Mat bgr;
+			Image bgr;
 			float scale = 1.f;
 			if (f->grabber.grab(target, w, h, f->detect_max_dim, f->flip_readback, bgr, scale)) {
-				f->tracker.submit(bgr, scale, ++f->frame_counter);
+				f->tracker.submit(std::move(bgr), scale, ++f->frame_counter);
 			}
 			f->last_grab_ns = now;
 		}

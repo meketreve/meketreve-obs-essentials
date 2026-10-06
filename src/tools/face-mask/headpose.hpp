@@ -19,7 +19,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <onnxruntime_cxx_api.h>
 
-#include <opencv2/core.hpp>
+#include "face-image.hpp"
+#include "face-math.hpp"
 
 #include <memory>
 #include <string>
@@ -36,9 +37,9 @@ public:
 	bool load(const std::string &model_path);
 	bool loaded() const { return session_ != nullptr; }
 
-	/* bgr_crop: face crop (any size). Returns the raw network rotation
-	 * matrix. Returns false on failure. */
-	bool infer(const cv::Mat &bgr_crop, cv::Matx33d &R);
+	/* face: the face's region of frame (any size, inside it). Returns the
+	 * raw network rotation matrix. Returns false on failure. */
+	bool infer(const Image &frame, const RectI &face, Matx33d &R);
 
 private:
 	Ort::Env env_;

@@ -23,8 +23,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-module.h>
 #include <plugin-support.h>
 
-#include <opencv2/imgproc.hpp>
-
 #include <algorithm>
 
 namespace FaceMask {
@@ -56,13 +54,13 @@ void FaceTracker::stop()
 		thread_.join();
 }
 
-void FaceTracker::submit(const cv::Mat &bgr, float scale_to_full, uint64_t frame_id)
+void FaceTracker::submit(Image bgr, float scale_to_full, uint64_t frame_id)
 {
 	if (!running_.load() || bgr.empty())
 		return;
 	{
 		std::lock_guard<std::mutex> lk(in_mtx_);
-		bgr.copyTo(pending_); // keep only the latest frame
+		pending_ = std::move(bgr); // keep only the latest frame
 		pending_scale_ = scale_to_full;
 		pending_id_ = frame_id;
 		has_pending_ = true;
@@ -98,7 +96,7 @@ void FaceTracker::worker()
 	obs_log(LOG_INFO, "[face-mask] YuNet + head-pose%s loaded", landmarks.loaded() ? " + FaceMesh" : "");
 
 	while (running_.load()) {
-		cv::Mat frame;
+		Image frame;
 		float scale = 1.f;
 		uint64_t fid = 0;
 		{
@@ -106,7 +104,7 @@ void FaceTracker::worker()
 			in_cv_.wait(lk, [&] { return has_pending_ || !running_.load(); });
 			if (!running_.load())
 				break;
-			cv::swap(pending_, frame); // take ownership; leaves pending_ empty
+			std::swap(pending_, frame); // take ownership; leaves the old one in pending_
 			scale = pending_scale_;
 			fid = pending_id_;
 			has_pending_ = false;
@@ -127,7 +125,7 @@ void FaceTracker::worker()
 			float r[14] = {face.x, face.y, face.w, face.h};
 			std::copy(face.kps.begin(), face.kps.end(), r + 4);
 			best.score = face.score;
-			best.bbox = cv::Rect2f(r[0] * scale, r[1] * scale, r[2] * scale, r[3] * scale);
+			best.bbox = {r[0] * scale, r[1] * scale, r[2] * scale, r[3] * scale};
 			best.right_eye = {r[4] * scale, r[5] * scale};
 			best.left_eye = {r[6] * scale, r[7] * scale};
 			best.nose = {r[8] * scale, r[9] * scale};
@@ -138,12 +136,11 @@ void FaceTracker::worker()
 			const float f = 0.2f;
 			int x0 = std::max(0, (int)std::lround(r[0] - f * r[3]));
 			int y0 = std::max(0, (int)std::lround(r[1] - f * r[2]));
-			int x1 = std::min(frame.cols, (int)std::lround(r[0] + r[2] + f * r[3]));
-			int y1 = std::min(frame.rows, (int)std::lround(r[1] + r[3] + f * r[2]));
+			int x1 = std::min(frame.width, (int)std::lround(r[0] + r[2] + f * r[3]));
+			int y1 = std::min(frame.height, (int)std::lround(r[1] + r[3] + f * r[2]));
 			if (x1 - x0 > 4 && y1 - y0 > 4) {
-				cv::Mat crop = frame(cv::Rect(x0, y0, x1 - x0, y1 - y0));
-				cv::Matx33d R;
-				if (headpose.infer(crop, R)) {
+				Matx33d R;
+				if (headpose.infer(frame, {x0, y0, x1 - x0, y1 - y0}, R)) {
 					best.head_R = R;
 					best.has_R = true;
 				}
@@ -157,13 +154,13 @@ void FaceTracker::worker()
 				float side = std::max(r[2], r[3]) * 1.5f;
 				int mx0 = std::max(0, (int)std::lround(cx - side * 0.5f));
 				int my0 = std::max(0, (int)std::lround(cy - side * 0.5f));
-				int mx1 = std::min(frame.cols, (int)std::lround(cx + side * 0.5f));
-				int my1 = std::min(frame.rows, (int)std::lround(cy + side * 0.5f));
+				int mx1 = std::min(frame.width, (int)std::lround(cx + side * 0.5f));
+				int my1 = std::min(frame.height, (int)std::lround(cy + side * 0.5f));
 				if (mx1 - mx0 > 8 && my1 - my0 > 8) {
-					cv::Mat mcrop = frame(cv::Rect(mx0, my0, mx1 - mx0, my1 - my0));
-					std::vector<cv::Point2f> pts;
+					const RectI mcrop{mx0, my0, mx1 - mx0, my1 - my0};
+					std::vector<Point2f> pts;
 					float presence = 0.f;
-					if (landmarks.infer(mcrop, pts, presence) && presence > 0.f) {
+					if (landmarks.infer(frame, mcrop, pts, presence) && presence > 0.f) {
 						best.mesh.resize(pts.size());
 						for (size_t i = 0; i < pts.size(); ++i)
 							best.mesh[i] = {(pts[i].x + mx0) * scale,
@@ -173,8 +170,8 @@ void FaceTracker::worker()
 						// Steadier eye centres than the
 						// 5-point YuNet keypoints.
 						auto ec = [&](int a, int b) {
-							return cv::Point2f((best.mesh[a].x + best.mesh[b].x) * 0.5f,
-									   (best.mesh[a].y + best.mesh[b].y) * 0.5f);
+							return Point2f{(best.mesh[a].x + best.mesh[b].x) * 0.5f,
+								       (best.mesh[a].y + best.mesh[b].y) * 0.5f};
 						};
 						best.right_eye =
 							ec(LandmarkNet::kRightEyeOuter, LandmarkNet::kRightEyeInner);

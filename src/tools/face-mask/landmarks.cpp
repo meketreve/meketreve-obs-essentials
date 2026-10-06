@@ -20,8 +20,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/base.h>
 
-#include <opencv2/imgproc.hpp>
-
 #include <filesystem>
 
 namespace FaceMask {
@@ -62,21 +60,15 @@ bool LandmarkNet::load(const std::string &model_path)
 	}
 }
 
-bool LandmarkNet::infer(const cv::Mat &bgr_crop, std::vector<cv::Point2f> &pts, float &presence)
+bool LandmarkNet::infer(const Image &frame, const RectI &face, std::vector<Point2f> &pts, float &presence)
 {
-	if (!session_ || bgr_crop.empty())
+	if (!session_ || frame.empty() || face.width <= 0 || face.height <= 0)
 		return false;
 	try {
-		cv::Mat resized, rgb;
-		cv::resize(bgr_crop, resized, cv::Size(kSize, kSize));
-		cv::cvtColor(resized, rgb, cv::COLOR_BGR2RGB);
-		rgb.convertTo(rgb, CV_32F, 1.0 / 255.0);
-
-		// HWC -> CHW into blob_.
-		std::vector<cv::Mat> ch(3);
-		for (int c = 0; c < 3; ++c)
-			ch[c] = cv::Mat(kSize, kSize, CV_32F, blob_.data() + (size_t)c * kSize * kSize);
-		cv::split(rgb, ch);
+		/* RGB, 0..1. */
+		const float k = 1.f / 255.f;
+		sampleToPlanes(frame, face, kSize, kSize, blob_.data(), kSize, static_cast<size_t>(kSize) * kSize, true,
+			       {k, k, k}, {0.f, 0.f, 0.f});
 
 		const int64_t in_shape[4] = {1, 3, kSize, kSize};
 		Ort::Value in = Ort::Value::CreateTensor<float>(mem_, blob_.data(), blob_.size(), in_shape, 4);
@@ -89,8 +81,8 @@ bool LandmarkNet::infer(const cv::Mat &bgr_crop, std::vector<cv::Point2f> &pts, 
 		const float *sc = out[1].GetTensorData<float>(); // 1
 		presence = sc[0];
 
-		const float sx = (float)bgr_crop.cols / (float)kSize;
-		const float sy = (float)bgr_crop.rows / (float)kSize;
+		const float sx = (float)face.width / (float)kSize;
+		const float sy = (float)face.height / (float)kSize;
 		pts.resize(kNumPoints);
 		for (int i = 0; i < kNumPoints; ++i) {
 			pts[i].x = lm[i * 3 + 0] * sx;

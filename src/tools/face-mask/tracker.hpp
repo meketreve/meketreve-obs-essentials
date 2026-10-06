@@ -17,7 +17,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #pragma once
 
-#include <opencv2/core.hpp>
+#include "face-image.hpp"
+#include "face-math.hpp"
 
 #include <atomic>
 #include <condition_variable>
@@ -34,16 +35,16 @@ namespace FaceMask {
 struct FaceResult {
 	bool valid = false;
 	float score = 0.f;
-	cv::Point2f right_eye; // subject's right eye (image left)
-	cv::Point2f left_eye;  // subject's left eye  (image right)
-	cv::Point2f nose;
-	cv::Point2f mouth_right;
-	cv::Point2f mouth_left;
-	cv::Rect2f bbox;
-	cv::Matx33d head_R = cv::Matx33d::eye(); // raw rotation from head-pose net
+	Point2f right_eye; // subject's right eye (image left)
+	Point2f left_eye;  // subject's left eye  (image right)
+	Point2f nose;
+	Point2f mouth_right;
+	Point2f mouth_left;
+	Rect2f bbox;
+	Matx33d head_R = Matx33d::eye(); // raw rotation from head-pose net
 	bool has_R = false;
 	// Dense FaceMesh landmarks (full-res pixels) when the landmark net ran.
-	std::vector<cv::Point2f> mesh;
+	std::vector<Point2f> mesh;
 	bool has_mesh = false;
 	uint64_t frame_id = 0;
 };
@@ -72,7 +73,7 @@ public:
 	/* Called from the graphics thread. Non-blocking: keeps only the most
 	 * recent frame. scale_to_full multiplies detected coords back to the
 	 * full-resolution source. */
-	void submit(const cv::Mat &bgr, float scale_to_full, uint64_t frame_id);
+	void submit(Image bgr, float scale_to_full, uint64_t frame_id);
 
 	/* Thread-safe snapshot of the latest detection. */
 	FaceResult latest();
@@ -94,7 +95,7 @@ private:
 	// input handoff (graphics -> worker)
 	std::mutex in_mtx_;
 	std::condition_variable in_cv_;
-	cv::Mat pending_;
+	Image pending_;
 	float pending_scale_ = 1.f;
 	uint64_t pending_id_ = 0;
 	bool has_pending_ = false;

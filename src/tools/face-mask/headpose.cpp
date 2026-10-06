@@ -20,8 +20,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/base.h>
 
-#include <opencv2/imgproc.hpp>
-
 #include <array>
 #include <filesystem>
 
@@ -64,27 +62,19 @@ bool HeadPoseNet::load(const std::string &model_path)
 	}
 }
 
-bool HeadPoseNet::infer(const cv::Mat &bgr_crop, cv::Matx33d &R)
+bool HeadPoseNet::infer(const Image &frame, const RectI &face, Matx33d &R)
 {
-	if (!session_ || bgr_crop.empty())
+	if (!session_ || frame.empty() || face.width <= 0 || face.height <= 0)
 		return false;
 	try {
-		cv::Mat rgb;
-		cv::cvtColor(bgr_crop, rgb, cv::COLOR_BGR2RGB);
-		cv::resize(rgb, rgb, cv::Size(kSize, kSize));
-		rgb.convertTo(rgb, CV_32F, 1.0 / 255.0);
-
-		// HWC float -> NCHW normalized.
-		const int plane = kSize * kSize;
-		for (int y = 0; y < kSize; ++y) {
-			const cv::Vec3f *row = rgb.ptr<cv::Vec3f>(y);
-			for (int x = 0; x < kSize; ++x) {
-				const cv::Vec3f &px = row[x];
-				int idx = y * kSize + x;
-				for (int c = 0; c < 3; ++c)
-					blob_[(size_t)c * plane + idx] = (px[c] - kMean[c]) / kStd[c];
-			}
+		/* RGB, 0..1, then ImageNet's mean and deviation per channel. */
+		std::array<float, 3> mul, add;
+		for (int c = 0; c < 3; ++c) {
+			mul[c] = 1.f / (255.f * kStd[c]);
+			add[c] = -kMean[c] / kStd[c];
 		}
+		sampleToPlanes(frame, face, kSize, kSize, blob_.data(), kSize, static_cast<size_t>(kSize) * kSize, true,
+			       mul, add);
 
 		std::array<int64_t, 4> shape{1, 3, kSize, kSize};
 		Ort::Value input =
@@ -98,7 +88,7 @@ bool HeadPoseNet::infer(const cv::Mat &bgr_crop, cv::Matx33d &R)
 		size_t n = outputs[0].GetTensorTypeAndShapeInfo().GetElementCount();
 		if (n < 9)
 			return false;
-		R = cv::Matx33d(o[0], o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8]);
+		R = Matx33d(o[0], o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8]);
 		return true;
 	} catch (const std::exception &e) {
 		obs_log(LOG_WARNING, "[face-mask] head-pose infer failed: %s", e.what());

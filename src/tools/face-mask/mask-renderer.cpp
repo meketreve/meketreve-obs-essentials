@@ -159,26 +159,25 @@ void MaskRenderer::render(const HeadPose &pose, const MaskParams &p)
 
 	// Quad corners in head-model object space.
 	const double io = facemodel::interocular();
-	const cv::Vec3d X = facemodel::axis_right();
-	const cv::Vec3d Y = facemodel::axis_up();
-	const cv::Vec3d N = facemodel::toward_camera();
-	const cv::Vec3d C = facemodel::eye_anchor() + (double)p.offset_x * io * X + (double)p.offset_y * io * Y +
-			    (double)p.depth * io * N;
+	const Vec3d X = facemodel::axis_right();
+	const Vec3d Y = facemodel::axis_up();
+	const Vec3d N = facemodel::toward_camera();
+	const Vec3d C = facemodel::eye_anchor() + (double)p.offset_x * io * X + (double)p.offset_y * io * Y +
+			(double)p.depth * io * N;
 
 	const double hw = 0.5 * io * (double)p.scale_x;
 	const double hh = 0.5 * io * (double)p.scale_y;
 
 	// Triangle-strip order: TL, TR, BL, BR. UV (0,0) = top-left of the mask.
-	const std::array<cv::Vec3d, 4> corners = {
+	const std::array<Vec3d, 4> corners = {
 		C - hw * X + hh * Y, // TL
 		C + hw * X + hh * Y, // TR
 		C - hw * X - hh * Y, // BL
 		C + hw * X - hh * Y, // BR
 	};
-	const std::array<cv::Vec2d, 4> uv = {cv::Vec2d{0.0, 0.0}, cv::Vec2d{1.0, 0.0}, cv::Vec2d{0.0, 1.0},
-					     cv::Vec2d{1.0, 1.0}};
+	const std::array<std::array<double, 2>, 4> uv = {{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0}}};
 
-	std::array<cv::Point2d, 4> screen;
+	std::array<Point2d, 4> screen;
 	std::array<double, 4> zc;
 	for (int i = 0; i < 4; ++i) {
 		project_point(pose, corners[i], screen[i], zc[i]);
@@ -255,7 +254,7 @@ gs_indexbuffer_t *MaskRenderer::mesh_index_buffer()
 	return mesh_ib_;
 }
 
-void MaskRenderer::render_mesh(const std::vector<cv::Point2f> &mesh, float opacity)
+void MaskRenderer::render_mesh(const std::vector<Point2f> &mesh, float opacity)
 {
 	if (!effect_ || (int)mesh.size() < facemesh::kNumVerts)
 		return;

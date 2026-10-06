@@ -19,14 +19,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <obs.h>
 
-#include <opencv2/core.hpp>
+#include "face-image.hpp"
 
 #include <cstdint>
 
 namespace FaceMask {
 
 /* Renders an OBS source into an offscreen texrender, downscales it, stages it
- * to CPU memory and returns a BGR cv::Mat for OpenCV. Lives entirely on the
+ * to CPU memory and returns it as a BGR Image. Lives entirely on the
  * graphics thread (texrender / stagesurface are GPU objects). */
 class FrameGrabber {
 public:
@@ -37,7 +37,7 @@ public:
 	 * to the full (w,h) source. flip_v vertically flips the readback (some
 	 * graphics backends stage bottom-up). Returns false on failure.
 	 * MUST be called on the graphics thread. */
-	bool grab(obs_source_t *target, uint32_t w, uint32_t h, int max_dim, bool flip_v, cv::Mat &out_bgr,
+	bool grab(obs_source_t *target, uint32_t w, uint32_t h, int max_dim, bool flip_v, Image &out_bgr,
 		  float &out_scale);
 
 	/* Free GPU objects. MUST be called inside obs_enter_graphics(). */

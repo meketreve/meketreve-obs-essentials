@@ -17,8 +17,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #include "frame-grab.hpp"
 
-#include <opencv2/imgproc.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -49,7 +47,7 @@ void FrameGrabber::release()
 	stage_w_ = stage_h_ = 0;
 }
 
-bool FrameGrabber::grab(obs_source_t *target, uint32_t w, uint32_t h, int max_dim, bool flip_v, cv::Mat &out_bgr,
+bool FrameGrabber::grab(obs_source_t *target, uint32_t w, uint32_t h, int max_dim, bool flip_v, Image &out_bgr,
 			float &out_scale)
 {
 	if (!target || w == 0 || h == 0)
@@ -105,16 +103,8 @@ bool FrameGrabber::grab(obs_source_t *target, uint32_t w, uint32_t h, int max_di
 	if (!gs_stagesurface_map(stage_, &data, &linesize))
 		return false;
 
-	cv::Mat rgba((int)dh, (int)dw, CV_8UC4);
-	for (uint32_t y = 0; y < dh; ++y)
-		std::memcpy(rgba.ptr(y), data + (size_t)y * linesize, (size_t)dw * 4);
-
+	out_bgr = imageFromRgba(data, (int)dw, (int)dh, linesize, flip_v);
 	gs_stagesurface_unmap(stage_);
-
-	if (flip_v)
-		cv::flip(rgba, rgba, 0);
-
-	cv::cvtColor(rgba, out_bgr, cv::COLOR_RGBA2BGR);
 	return true;
 }
 

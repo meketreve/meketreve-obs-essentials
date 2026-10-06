@@ -19,8 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "pose.hpp"
 
-#include <opencv2/core.hpp>
-#include <opencv2/core/quaternion.hpp>
+#include "face-math.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -68,7 +67,7 @@ public:
 	void reset();
 
 private:
-	cv::Matx33d billboard_rotation(const cv::Vec3d &center) const;
+	Matx33d billboard_rotation(const Vec3d &center) const;
 
 	OneEuro tx_{4.0, 0.02};
 	OneEuro ty_{4.0, 0.02};
@@ -76,15 +75,15 @@ private:
 	double rot_mincut_ = 3.0;
 	double rot_beta_ = 0.2;
 
-	cv::Quatd q_s_;
+	Quatd q_s_;
 	bool q_init_ = false;
 	uint64_t last_ns_ = 0;
 	bool init_ = false;
 
 	// Moving-average post-filter state.
 	int avg_n_ = 1;
-	std::deque<cv::Vec3d> t_hist_;
-	std::deque<cv::Quatd> q_hist_;
+	std::deque<Vec3d> t_hist_;
+	std::deque<Quatd> q_hist_;
 };
 
 } // namespace FaceMask

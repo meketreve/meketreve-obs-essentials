@@ -21,7 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "pose.hpp"
 
-#include <opencv2/core.hpp>
+#include "face-math.hpp"
 
 #include <mutex>
 #include <string>
@@ -61,7 +61,7 @@ public:
 	 * deformed FaceMesh (mesh = 468 landmark points in screen pixels) via
 	 * the canonical triangulation + frontal UV. No-op without enough points
 	 * or a source. opacity in [0,1]. */
-	void render_mesh(const std::vector<cv::Point2f> &mesh, float opacity);
+	void render_mesh(const std::vector<Point2f> &mesh, float opacity);
 
 	void release(); // graphics thread
 
