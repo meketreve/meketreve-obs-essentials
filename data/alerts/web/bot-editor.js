@@ -1,5 +1,5 @@
 // The chat bot tab of the web panel: sounds and their price, the wait per
-// price, the volume and the chat-made commands. Every change is one "action"
+// price, the volume, the chat-made commands and the automatic messages. Every change is one "action"
 // sent to /api/tab/bot, which answers the new state.
 "use strict";
 
@@ -226,6 +226,74 @@ function importCard() {
     row("", el("div", { class: "inline" }, go)));
 }
 
+const PLATFORMS = [["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"]];
+let newTimerText = ""; // what is typed in the new message survives the redraws
+
+// One automatic message: its switch and text on top, then how often, after
+// how many chat lines, where, and its buttons. Fields save when they change.
+function timerPanel(timer) {
+  const save = (changes) => act({ action: "timer", id: timer.id, ...changes });
+  const on = el("input", { type: "checkbox" });
+  on.checked = timer.enabled;
+  on.addEventListener("change", () => save({ enabled: on.checked }));
+  const text = el("input", { type: "text", value: timer.text, spellcheck: "false", maxlength: 450 });
+  text.addEventListener("change", () => { if (text.value.trim()) save({ text: text.value }); else text.value = timer.text; });
+  const minutes = el("input", { type: "number", min: 1, max: state.maxMinutes, step: 1, value: timer.minutes, class: "num" });
+  minutes.addEventListener("change", () => save({ minutes: Number(minutes.value) }));
+  const lines = el("input", { type: "number", min: 0, max: state.maxLines, step: 1, value: timer.minLines, class: "num" });
+  lines.addEventListener("change", () => save({ minLines: Number(lines.value) }));
+
+  // No platform picked means all of them; the last one cannot be turned off.
+  const picked = timer.platforms.length ? timer.platforms : PLATFORMS.map((p) => p[0]);
+  const where = el("div", { class: "seg" }, PLATFORMS.map(([id, label]) => {
+    const active = picked.includes(id);
+    const sendable = state.sendable.includes(id);
+    return el("button", { type: "button", class: (active ? "active" : "") + (sendable ? "" : " nologin"), text: label,
+      title: sendable ? null : t("NoLoginTitle"),
+      onclick: () => {
+        const next = active ? picked.filter((p) => p !== id) : picked.concat(id);
+        if (next.length) save({ platforms: next });
+      } });
+  }));
+
+  return el("section", { class: "group-panel" + (timer.enabled ? "" : " off") },
+    el("div", { class: "group-head" },
+      el("label", { class: "switch", title: timer.enabled ? t("TimerOn") : t("TimerOff") }, on, el("span")), text),
+    el("div", { class: "timer-opts" },
+      el("label", { class: "inline" }, el("span", { class: "muted", text: t("ColEvery") }), minutes, el("span", { class: "muted", text: t("Minutes") })),
+      el("label", { class: "inline" }, el("span", { class: "muted", text: t("ColMinLines") }), lines),
+      el("span", { class: "inline" }, el("span", { class: "muted", text: t("ColPlatforms") }), where),
+      el("span", { class: "sound-actions" },
+        button(t("SendNow"), () => act({ action: "sendTimer", id: timer.id }, { redraw: false })),
+        button(t("Remove"), () => { if (confirm(t("RemoveTimerConfirm"))) act({ action: "deleteTimer", id: timer.id }); }))));
+}
+
+function timersCard() {
+  const onlyLive = el("input", { type: "checkbox" });
+  onlyLive.checked = state.timersOnlyLive;
+  onlyLive.addEventListener("change", () => act({ action: "timerSettings", onlyLive: onlyLive.checked }));
+  // Why nothing would go out right now, if anything stops it.
+  const status = !state.botOn ? t("TimersBotOff") : !state.sendable.length ? t("TimersNoLogin")
+    : state.timersOnlyLive ? (state.live ? t("TimersLive") : t("TimersOffline")) : "";
+
+  const text = el("input", { type: "text", value: newTimerText, placeholder: t("NewTimer"), spellcheck: "false", maxlength: 450 });
+  text.addEventListener("input", () => { newTimerText = text.value; });
+  const add = button(t("Add"), async () => {
+    if (!newTimerText.trim()) return;
+    await act({ action: "timer", id: "", text: newTimerText, minutes: 15, minLines: 5, enabled: true, platforms: [] });
+    if (!state.error) {
+      newTimerText = "";
+      render();
+    }
+  }, "primary");
+
+  return el("section", { class: "card" }, el("h3", { text: t("Timers") }), el("p", { class: "hint", text: t("TimersNote") }),
+    row(t("TimersOnlyLive"), el("label", { class: "switch" }, onlyLive, el("span")), t("TimersOnlyLiveNote")),
+    status ? el("p", { class: "hint timer-status", text: status }) : null,
+    state.timers.map(timerPanel),
+    el("section", { class: "group-panel" }, el("div", { class: "group-head" }, text, add)));
+}
+
 function render() {
   const volumeOut = el("span", { class: "value", text: state.volume + "%" });
   const volume = el("input", { type: "range", min: 0, max: 100, step: 5, value: state.volume });
@@ -261,7 +329,8 @@ function render() {
       el("div", { class: "inline" }, add)),
     importCard(),
     el("section", { class: "card" }, el("h3", { text: t("Commands") }), el("p", { class: "hint", text: t("CommandsNote") }),
-      el("div", { class: "group-panel" }, commandTable)));
+      el("div", { class: "group-panel" }, commandTable)),
+    timersCard());
 }
 
 async function init() {

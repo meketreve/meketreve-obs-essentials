@@ -69,6 +69,7 @@ constexpr const char *kDockId = "meketreve-texuguito";
 constexpr const char *kSourceName = "Texuguito";
 constexpr int kChattersPollMs = 45000;
 constexpr qint64 kEchoWindowMs = 60000;
+constexpr int kTimedTickMs = 15000;
 
 QString T(const char *key)
 {
@@ -93,6 +94,14 @@ QString webDir()
 }
 
 QPointer<TexuguitoDock> g_dock;
+
+const QList<QPair<ChatPlatform, QString>> &platformNames()
+{
+	static const QList<QPair<ChatPlatform, QString>> names{{ChatPlatform::Twitch, QStringLiteral("twitch")},
+							       {ChatPlatform::YouTube, QStringLiteral("youtube")},
+							       {ChatPlatform::Kick, QStringLiteral("kick")}};
+	return names;
+}
 
 } // namespace
 
@@ -200,6 +209,9 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 
 	m_chattersTimer.setInterval(kChattersPollMs);
 	connect(&m_chattersTimer, &QTimer::timeout, this, &TexuguitoDock::pollChatters);
+	m_timed = std::make_unique<TimedMessages>(QDir(m_dataDir).filePath(QStringLiteral("timed-messages.json")));
+	m_timedTimer.setInterval(kTimedTickMs);
+	connect(&m_timedTimer, &QTimer::timeout, this, &TexuguitoDock::timedTick);
 
 	applyEnabled();
 }
@@ -262,6 +274,13 @@ QJsonObject TexuguitoDock::botPanelState() const
 	return QJsonObject{{QStringLiteral("volume"), qRound(m_volume * 100.0)},
 			   {QStringLiteral("groups"), groups},
 			   {QStringLiteral("commands"), commands},
+			   {QStringLiteral("timers"), m_timed->toJson()},
+			   {QStringLiteral("timersOnlyLive"), m_timed->onlyLive()},
+			   {QStringLiteral("live"), streamLive()},
+			   {QStringLiteral("botOn"), m_enabled},
+			   {QStringLiteral("sendable"), QJsonArray::fromStringList(sendablePlatforms())},
+			   {QStringLiteral("maxMinutes"), TimedMessages::kMaxMinutes},
+			   {QStringLiteral("maxLines"), TimedMessages::kMaxLines},
 			   {QStringLiteral("import"), m_import},
 			   {QStringLiteral("maxPrice"), BotEngine::kMaxClipCost},
 			   {QStringLiteral("maxCooldown"), SoundLibrary::kMaxCooldown},
@@ -368,6 +387,33 @@ QJsonObject TexuguitoDock::applyBotPanel(const QJsonObject &panel)
 						   panel.value(QStringLiteral("reply")).toString());
 	} else if (action == QLatin1String("deleteCommand")) {
 		m_engine->customCommands().remove(name);
+	} else if (action == QLatin1String("timer")) {
+		/* {id (empty = new), text, minutes, minLines, enabled, platforms}:
+		 * what is left out keeps its value. */
+		const QString id = panel.value(QStringLiteral("id")).toString();
+		const TimedMessage *old = m_timed->find(id);
+		QJsonObject merged = old ? TimedMessages::toJson(*old) : QJsonObject();
+		for (auto it = panel.begin(); it != panel.end(); ++it)
+			merged.insert(it.key(), it.value());
+		merged.insert(QStringLiteral("id"), old ? id : QString());
+		QString why;
+		if (m_timed->set(TimedMessages::fromJson(merged), QDateTime::currentMSecsSinceEpoch(), &why).isEmpty())
+			error = why == QLatin1String("count")
+					? T("Texuguito.BotPanel.TimerLimit").arg(TimedMessages::kMaxMessages)
+					: T("Texuguito.BotPanel.TimerEmpty");
+	} else if (action == QLatin1String("deleteTimer")) {
+		m_timed->remove(panel.value(QStringLiteral("id")).toString());
+	} else if (action == QLatin1String("sendTimer")) {
+		const QString id = panel.value(QStringLiteral("id")).toString();
+		if (const TimedMessage *message = m_timed->find(id)) {
+			if (postTimed(*message))
+				m_timed->markSent(id, QDateTime::currentMSecsSinceEpoch());
+			else
+				error = T("Texuguito.BotPanel.TimerNoLogin");
+		}
+	} else if (action == QLatin1String("timerSettings")) {
+		m_timed->setOnlyLive(panel.value(QStringLiteral("onlyLive")).toBool(m_timed->onlyLive()));
+		m_wasLive = false;
 	}
 	QJsonObject state = botPanelState();
 	if (!error.isEmpty())
@@ -424,9 +470,14 @@ void TexuguitoDock::applyEnabled()
 			obs_log(LOG_WARNING, "[texuguito] port %d is in use, overlay not available", m_port);
 		m_chattersTimer.start();
 		pollChatters();
+		/* Nothing goes out the moment the bot is turned on. */
+		m_timed->restart(QDateTime::currentMSecsSinceEpoch());
+		m_wasLive = false;
+		m_timedTimer.start();
 	} else {
 		m_server->close();
 		m_chattersTimer.stop();
+		m_timedTimer.stop();
 	}
 	m_toggle->setText(m_enabled ? T("Texuguito.TurnOff") : T("Texuguito.TurnOn"));
 	refreshStatus();
@@ -483,6 +534,8 @@ void TexuguitoDock::onChat(const ChatMessage &msg)
 			return;
 	}
 
+	if (msg.event == ChatEvent::None)
+		m_timed->chatLine();
 	if (msg.event == ChatEvent::None || msg.event == ChatEvent::Bits) {
 		BotMessage bot;
 		bot.platform = msg.platform;
@@ -504,6 +557,65 @@ void TexuguitoDock::onReply(ChatPlatform platform, const QString &text)
 	if (!m_chat->sendAs(platform, text))
 		obs_log(LOG_INFO, "[texuguito] reply not sent (no login on that platform): %s",
 			text.toUtf8().constData());
+}
+
+QStringList TexuguitoDock::sendablePlatforms() const
+{
+	QStringList names;
+	for (const auto &[platform, name] : platformNames()) {
+		if (m_chat->accounts()->account(platform).loggedIn() && !m_chat->target(platform).trimmed().isEmpty())
+			names.append(name);
+	}
+	return names;
+}
+
+bool TexuguitoDock::streamLive()
+{
+	bool live = false;
+	obs_enum_outputs(
+		[](void *param, obs_output_t *output) {
+			if ((obs_output_get_flags(output) & OBS_OUTPUT_SERVICE) && obs_output_active(output)) {
+				*static_cast<bool *>(param) = true;
+				return false;
+			}
+			return true;
+		},
+		&live);
+	return live;
+}
+
+bool TexuguitoDock::postTimed(const TimedMessage &message)
+{
+	const QStringList sendable = sendablePlatforms();
+	bool sent = false;
+	for (const auto &[platform, name] : platformNames()) {
+		if ((message.platforms.isEmpty() || message.platforms.contains(name)) && sendable.contains(name)) {
+			onReply(platform, message.text);
+			sent = true;
+		}
+	}
+	return sent;
+}
+
+void TexuguitoDock::timedTick()
+{
+	if (!m_enabled)
+		return;
+	const qint64 now = QDateTime::currentMSecsSinceEpoch();
+	if (m_timed->onlyLive()) {
+		const bool live = streamLive();
+		/* The clocks start with the stream, not with OBS. */
+		if (live && !m_wasLive)
+			m_timed->restart(now);
+		m_wasLive = live;
+		if (!live)
+			return;
+	}
+	if (const std::optional<TimedMessage> message = m_timed->due(now)) {
+		if (!postTimed(*message))
+			obs_log(LOG_INFO, "[texuguito] automatic message %s not sent: no login on its platforms",
+				message->id.toUtf8().constData());
+	}
 }
 
 void TexuguitoDock::updateStreamerChannels()

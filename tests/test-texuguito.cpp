@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "bot-engine.hpp"
 #include "overlay-server.hpp"
 #include "sound-fetch.hpp"
+#include "timed-messages.hpp"
 #include "tts-client.hpp"
 
 #include <QFile>
@@ -843,6 +844,79 @@ private slots:
 		bot.handleMessage(owner);
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ Use: !sorteio <pontos> <minutos>"));
 		QVERIFY(bot.points().get(QStringLiteral("zeca")) == 0);
+	}
+
+	void timedMessages()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("timed-messages.json"));
+		const qint64 t0 = 1000000;
+		const qint64 minute = 60000;
+		TimedMessages timed(path);
+		timed.restart(t0);
+
+		QString error;
+		TimedMessage empty;
+		empty.text = QStringLiteral("   ");
+		QVERIFY(timed.set(empty, t0, &error).isEmpty());
+		QCOMPARE(error, QStringLiteral("text"));
+
+		TimedMessage a;
+		a.text = QStringLiteral("  siga   no instagram ");
+		a.minutes = 10;
+		a.minLines = 3;
+		a.platforms = {QStringLiteral("twitch"), QStringLiteral("orkut"), QStringLiteral("twitch")};
+		const QString idA = timed.set(a, t0);
+		QCOMPARE(idA, QStringLiteral("m1"));
+		QCOMPARE(timed.find(idA)->text, QStringLiteral("siga no instagram"));
+		QCOMPARE(timed.find(idA)->platforms, QStringList{QStringLiteral("twitch")});
+		TimedMessage b;
+		b.text = QStringLiteral("off");
+		b.minutes = 0;
+		b.enabled = false;
+		const QString idB = timed.set(b, t0);
+		QCOMPARE(timed.find(idB)->minutes, TimedMessages::kMinMinutes);
+		TimedMessage c;
+		c.text = QStringLiteral("discord");
+		c.minutes = 4;
+		c.minLines = 0;
+		const QString idC = timed.set(c, t0);
+
+		/* Not before its time, and A not without chat lines; B is off. */
+		QVERIFY(!timed.due(t0 + 3 * minute));
+		QCOMPARE(timed.due(t0 + 4 * minute)->id, idC);
+		QCOMPARE(timed.due(t0 + 8 * minute)->id, idC);
+		QVERIFY(!timed.due(t0 + 10 * minute));
+		for (int i = 0; i < 3; i++)
+			timed.chatLine();
+		QCOMPARE(timed.due(t0 + 10 * minute)->id, idA);
+		QCOMPARE(timed.due(t0 + 12 * minute)->id, idC);
+		/* A's time came again, but its lines start over with its clock. */
+		QCOMPARE(timed.due(t0 + 20 * minute)->id, idC);
+		QVERIFY(!timed.due(t0 + 22 * minute));
+
+		/* Saved and read back; the clocks start again on restart. */
+		timed.setOnlyLive(false);
+		TimedMessages again(path);
+		QCOMPARE(again.messages().size(), 3);
+		QVERIFY(!again.onlyLive());
+		QVERIFY(!again.find(idB)->enabled);
+		QVERIFY(again.remove(idA));
+		QVERIFY(!again.remove(idA));
+		QCOMPARE(again.messages().size(), 2);
+
+		/* Two due at once: one now, the other a gap later. */
+		TimedMessage d = *again.find(idB);
+		d.enabled = true;
+		d.minLines = 0;
+		again.set(d, t0);
+		again.restart(t0);
+		QCOMPARE(again.due(t0 + 4 * minute)->id, idB); /* the most overdue */
+		QVERIFY(!again.due(t0 + 4 * minute + 1000));
+		QCOMPARE(again.due(t0 + 5 * minute)->id, idC);
+		/* "Send now" counts as a post too. */
+		again.markSent(idB, t0 + 6 * minute);
+		QVERIFY(!again.due(t0 + 6 * minute + 1000));
 	}
 
 	void ttsHelpers()

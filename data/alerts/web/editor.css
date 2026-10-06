@@ -75,6 +75,15 @@ input.num { width: 90px; }
 .command-table input[type=text] { width: 100%; }
 .command-table .new-row td { background: var(--panel-2); border-top: 1px solid var(--line); }
 .empty-row td { color: var(--muted); text-align: center; padding: 14px; }
+/* Chat bot tab: automatic messages, one panel each. */
+.timer-opts { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; padding: 10px 14px; }
+.timer-opts .inline { display: flex; align-items: center; gap: 8px; }
+.timer-opts .sound-actions { margin-left: auto; white-space: nowrap; }
+.timer-opts .sound-actions .btn + .btn { margin-left: 6px; }
+.group-panel.off .timer-opts { opacity: 0.55; }
+.group-head input[type=text] { flex: 1; min-width: 160px; }
+.seg button.nologin { opacity: 0.5; }
+.hint.timer-status { color: #e0a000; }
 @media (max-width: 720px) { .sound-table th:nth-child(3), .sound-table td:nth-child(3) { display: none; } .sound-table .sound-actions { white-space: normal; } }
 @media (max-width: 720px) {
   .command-table th:nth-child(3), .command-table td:nth-child(3) { display: table-cell; }

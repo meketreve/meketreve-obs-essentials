@@ -123,6 +123,8 @@ add_executable(
   ${_texuguito}/sound-fetch.hpp
   ${_texuguito}/sound-library.cpp
   ${_texuguito}/sound-library.hpp
+  ${_texuguito}/timed-messages.cpp
+  ${_texuguito}/timed-messages.hpp
   ${_texuguito}/tts-client.cpp
 )
 target_include_directories(test-texuguito PRIVATE ${_texuguito})

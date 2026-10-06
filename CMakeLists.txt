@@ -153,6 +153,8 @@ target_sources(
     src/tools/texuguito/texuguito-dock.cpp
     src/tools/texuguito/texuguito-dock.hpp
     src/tools/texuguito/texuguito.h
+    src/tools/texuguito/timed-messages.cpp
+    src/tools/texuguito/timed-messages.hpp
     src/tools/texuguito/tts-client.cpp
     src/tools/texuguito/tts-client.hpp
     src/tools/unified-chat/chat-accounts.cpp

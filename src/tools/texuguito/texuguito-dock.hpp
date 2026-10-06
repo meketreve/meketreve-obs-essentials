@@ -19,10 +19,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "bot-engine.hpp"
 #include "overlay-server.hpp"
+#include "timed-messages.hpp"
 
 #include <QNetworkAccessManager>
 #include <QTimer>
 #include <QWidget>
+
+#include <memory>
 
 class QLabel;
 class QPushButton;
@@ -43,7 +46,7 @@ public:
 	QJsonObject panelState() const;
 	QJsonObject applyPanel(const QJsonObject &panel);
 	/* The web panel's Chat bot tab: sounds with their price, the wait per
-	 * price, the volume and the chat-made commands. applyBotPanel runs one
+	 * price, the volume, the chat-made commands and the automatic messages. applyBotPanel runs one
 	 * "action" and answers the new state (and "error" when it failed). An
 	 * "import" downloads in the background: "import" in the state says how
 	 * it is going. */
@@ -63,6 +66,14 @@ private:
 	QJsonObject lookJson() const;
 	void addAudio();
 	void openSettings();
+	/* Automatic messages: the timer asks which one is due and posts it. */
+	void timedTick();
+	/* Posts to the message's platforms that have a channel and a login;
+	 * false when none of them could take it. */
+	bool postTimed(const TimedMessage &message);
+	QStringList sendablePlatforms() const;
+	/* The OBS stream or any other streaming output (Multistream, vertical). */
+	static bool streamLive();
 
 	UnifiedChatDock *m_chat;
 	BotEngine *m_engine = nullptr;
@@ -71,6 +82,9 @@ private:
 	/* The web panel's last import: {state: downloading|done|error, ...}. */
 	QJsonObject m_import;
 	QTimer m_chattersTimer;
+	std::unique_ptr<TimedMessages> m_timed;
+	QTimer m_timedTimer;
+	bool m_wasLive = false;
 	QLabel *m_status = nullptr;
 	QLabel *m_replies = nullptr;
 	QPushButton *m_toggle = nullptr;
