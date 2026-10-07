@@ -41,6 +41,8 @@ h2 { font-size: 26px; margin: 0 0 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
 .card h3 { margin: 0 0 6px; font-size: 17px; }
+@media (min-width: 720px) { .card.wide { grid-column: span 2; } }
+.card-shot { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); display: block; margin-top: 10px; }
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
 .shot { margin: 18px 0; }
 .shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
@@ -106,9 +108,10 @@ html.pt [lang="en"], html.en [lang="pt-BR"] { display: none !important; }
     <div class="card"><h3>Overlays</h3>
       <p lang="pt-BR">Alertas, chat na tela, eventos na tela, metas, enquete pelo chat (<code>!voto</code>), subathon, o desfile do bot e Tocando agora, com os eventos das 3 plataformas. Tudo num painel web que abre no navegador, com um tema para todos de uma vez.</p>
       <p lang="en">Alerts, chat on screen, events on screen, goals, a chat poll (<code>!vote</code>), a subathon timer, the bot's parade and Now Playing, fed by the events of all 3 platforms. All set up in one web panel that opens in your browser, with one theme for all of them at once.</p></div>
-    <div class="card"><h3 lang="pt-BR">Máscara no rosto</h3><h3 lang="en">Face Mask</h3>
+    <div class="card wide"><h3 lang="pt-BR">Máscara no rosto</h3><h3 lang="en">Face Mask</h3>
       <p lang="pt-BR">Filtro que acha o rosto e põe uma imagem ou vídeo em cima: plana, virando com a cabeça, ou deformada na malha do rosto. Tudo no seu PC; os componentes (~25 MB) baixam no primeiro uso.</p>
-      <p lang="en">A filter that finds the face and puts an image or video over it: flat and turning with the head, or bent onto the face mesh. All on your PC; its components (~25 MB) download on first use.</p></div>
+      <p lang="en">A filter that finds the face and puts an image or video over it: flat and turning with the head, or bent onto the face mesh. All on your PC; its components (~25 MB) download on first use.</p>
+      <a href="img/face-mask.png"><img class="card-shot" src="img/face-mask.png" alt="Face Mask filter: a flat mask over the eyes, and the same mask bent onto the face" loading="lazy" width="960" height="270"></a></div>
     <div class="card"><h3>Voice FX</h3>
       <p lang="pt-BR">Modificador de voz: pitch, rádio, distorção, robô, bitcrusher, tremolo e eco.</p>
       <p lang="en">Voice changer: pitch, radio, distortion, robot, bitcrusher, tremolo and echo.</p></div>
