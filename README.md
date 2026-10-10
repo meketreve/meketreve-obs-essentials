@@ -334,7 +334,7 @@ Add it as a source: **+** → **PNGTuber Avatar**.
 1. **Mouth closed** is the only picture you need; add **Mouth open** for talking and the two **eyes closed**
    versions for blinking (any missing one falls back to the plainer picture). PNG with transparency or animated GIF.
    With no picture chosen it shows an example badger, so it works right away.
-2. **Voice** — your microphone (any audio source). **Talks above** sets the level in dB; **Keeps talking after you
+2. **Voice** — any audio source; left empty it listens to OBS's own microphone (Mic/Aux). **Talks above** sets the level in dB; **Keeps talking after you
    stop** keeps the mouth open between words.
 3. Blinks at random within the interval you set, hops when it starts talking and can bob while it talks.
 

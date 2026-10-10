@@ -102,14 +102,22 @@ void detach_audio(pngtuber *p)
 }
 
 /* The audio source may load after this one, or be renamed back: tried
- * again from the tick until it is found. */
+ * again from the tick until it is found. None chosen = OBS's own
+ * microphone (Mic/Aux, the first of output channels 3 to 5). */
 void attach_audio(pngtuber *p)
 {
-	if (p->audio || p->audioName.empty())
+	if (p->audio)
 		return;
-	obs_source_t *src = obs_get_source_by_name(p->audioName.c_str());
+	obs_source_t *src = nullptr;
+	if (!p->audioName.empty()) {
+		src = obs_get_source_by_name(p->audioName.c_str());
+	} else {
+		for (uint32_t channel = 3; channel <= 5 && !src; ++channel)
+			src = obs_get_output_source(channel);
+	}
 	if (!src)
 		return;
+	obs_log(LOG_INFO, "[pngtuber] listening to %s", obs_source_get_name(src));
 	obs_source_add_audio_capture_callback(src, audio_callback, p);
 	p->audio = obs_source_get_weak_source(src);
 	obs_source_release(src);
@@ -322,7 +330,7 @@ void pngtuber_tick(void *data, float seconds)
 	auto *p = static_cast<pngtuber *>(data);
 
 	const uint64_t now = obs_get_video_frame_time();
-	if (!p->audio && !p->audioName.empty() && now - p->lastBind > kRebindNs) {
+	if (!p->audio && now - p->lastBind > kRebindNs) {
 		p->lastBind = now;
 		attach_audio(p);
 	}
