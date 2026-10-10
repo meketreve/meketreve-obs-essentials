@@ -143,6 +143,10 @@ target_sources(
     src/tools/tabs/layout-store.hpp
     src/tools/tabs/tab-bar.cpp
     src/tools/tabs/tab-bar.hpp
+    src/tools/pngtuber/pngtuber-logic.cpp
+    src/tools/pngtuber/pngtuber-logic.hpp
+    src/tools/pngtuber/pngtuber-source.cpp
+    src/tools/pngtuber/pngtuber.h
     src/tools/texuguito/bot-colors.cpp
     src/tools/texuguito/bot-colors.hpp
     src/tools/texuguito/bot-data.cpp

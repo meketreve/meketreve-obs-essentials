@@ -13,6 +13,7 @@ required, though building locally on Linux is a one-liner (see
 | Tool | Type | What it does |
 |------|------|--------------|
 | **Bass Shake** | Video filter | Random camera/source shake driven by the bass energy of a chosen audio source (mic, desktop audio, …). |
+| **PNGTuber Avatar** | Source | An avatar that talks with your voice: up to four pictures (mouth closed/open, each with eyes open/closed; GIFs animate). It opens the mouth while a chosen audio source is above a threshold, blinks by itself and hops when it starts talking. |
 | **Face Mask** | Video filter | Finds the face and draws an image or video over it: a flat mask that turns with the head, or bent onto the 468-point face mesh. Runs on your PC; onnxruntime and the face models (~25 MB) download on first use. Absorbed from the Eye Mask Tracker plugin. |
 | **Voice FX Mixer** | Audio filter | Voicemod-style voice changer: a toggleable chain of Pitch, Telephone, Distortion, Ring Mod, Bitcrusher, Tremolo and Echo. |
 | **Unified Chat** | Dock | Twitch, YouTube and Kick chat merged into one panel inside OBS. |
@@ -325,6 +326,17 @@ source's **Filters**). Each module is a checkbox section you can enable and chai
 
 > Pitch is a real-time granular shifter (time-domain), so extreme settings add
 > some artifacts — expected for live use without latency.
+
+### PNGTuber Avatar
+
+Add it as a source: **+** → **PNGTuber Avatar**.
+
+1. **Mouth closed** is the only picture you need; add **Mouth open** for talking and the two **eyes closed**
+   versions for blinking (any missing one falls back to the plainer picture). PNG with transparency or animated GIF.
+   With no picture chosen it shows an example badger, so it works right away.
+2. **Voice** — your microphone (any audio source). **Talks above** sets the level in dB; **Keeps talking after you
+   stop** keeps the mouth open between words.
+3. Blinks at random within the interval you set, hops when it starts talking and can bob while it talks.
 
 ### Face Mask
 

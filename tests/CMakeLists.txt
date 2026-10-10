@@ -133,6 +133,13 @@ target_link_libraries(test-texuguito PRIVATE chat-core Qt6::Test)
 set_target_properties(test-texuguito PROPERTIES AUTOMOC ON)
 add_test(NAME texuguito COMMAND test-texuguito)
 
+set(_pngtuber "${CMAKE_SOURCE_DIR}/src/tools/pngtuber")
+add_executable(test-pngtuber test-pngtuber.cpp ${_pngtuber}/pngtuber-logic.cpp)
+target_include_directories(test-pngtuber PRIVATE ${_pngtuber})
+target_link_libraries(test-pngtuber PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(test-pngtuber PROPERTIES AUTOMOC ON)
+add_test(NAME pngtuber COMMAND test-pngtuber)
+
 set(_face "${CMAKE_SOURCE_DIR}/src/tools/face-mask")
 add_executable(
   test-face-mask

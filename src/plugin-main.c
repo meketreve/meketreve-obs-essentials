@@ -29,6 +29,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "tools/texuguito/texuguito.h"
 #include "tools/alerts/alerts.h"
 #include "tools/now-playing/now-playing.h"
+#include "tools/pngtuber/pngtuber.h"
 #ifdef MEKETREVE_FACE_MASK
 #include "tools/face-mask/face-mask.h"
 #endif
@@ -94,6 +95,7 @@ bool obs_module_load(void)
 	texuguito_register();
 	alerts_register();
 	now_playing_register();
+	pngtuber_register();
 #ifdef MEKETREVE_FACE_MASK
 	face_mask_register();
 #endif
