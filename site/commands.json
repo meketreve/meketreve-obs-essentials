@@ -50,6 +50,17 @@
       ]
     },
     {
+      "title": {"pt": "Quests e nível", "en": "Quests and level"},
+      "commands": [
+        {"pt": "!missoes", "en": "!quests", "also": ["!missões", "!quest"], "who": "all",
+         "desc": {"pt": "Mostra as suas quests desta live (sorteadas da lista do canal), o andamento de cada uma, o seu nível e o XP. Completar uma quest dá pontos e XP, e o avatar comemora no desfile. Na Twitch a resposta pode vir por sussurro.",
+                  "en": "Shows your quests for this stream (drawn from the channel's list), how each one is going, your level and XP. Finishing a quest gives points and XP, and your avatar celebrates on the parade. On Twitch the answer may come as a whisper."}},
+        {"pt": "!nivel", "en": "!level", "also": ["!nível", "!xp"], "who": "all",
+         "desc": {"pt": "Mostra o seu nível e quanto XP falta para o próximo.",
+                  "en": "Shows your level and how much XP the next one takes."}}
+      ]
+    },
+    {
       "title": {"pt": "Sorteio", "en": "Raffle"},
       "commands": [
         {"pt": "!sorteio <pontos> <minutos>", "en": "!raffle <points> <minutes>", "who": "owner",

@@ -41,8 +41,9 @@ public:
 	QString overlayUrl() const;
 	/* Puts the chat parade in the current scene (from the Overlays panel). */
 	void addBrowserSource();
-	/* The web panel's Parade tab: the look and the link; applyPanel takes
-	 * what the panel saved and answers the new state. */
+	/* The web panel's Parade tab: the look, the link and the quests;
+	 * applyPanel takes what the panel saved and answers the new state
+	 * (and "error" when the quests were refused). */
 	QJsonObject panelState() const;
 	QJsonObject applyPanel(const QJsonObject &panel);
 	/* The web panel's Chat bot tab: sounds with their price, the wait per
@@ -60,6 +61,10 @@ private:
 	void applyEnabled();
 	void onChat(const ChatMessage &msg);
 	void onReply(ChatPlatform platform, const QString &text);
+	/* A reply for one viewer: a Twitch whisper, or the chat when it fails. */
+	void onPrivateReply(ChatPlatform platform, const QString &userId, const QString &text);
+	/* The look and the quests to the parade again (after the panel changed them). */
+	void broadcastSnapshot();
 	void pollChatters();
 	void updateStreamerChannels();
 	void refreshStatus();
@@ -99,6 +104,8 @@ private:
 	int m_nameSize = 10;
 	bool m_enabled = true;
 	bool m_chattersDenied = false;
+	/* Why the last whisper failed (empty after one went out), for the panel. */
+	QString m_whisperError;
 	/* What the bot said lately: the same text coming back through the
 	 * chat (it is sent from the streamer's own account) is not a command. */
 	QHash<QString, qint64> m_recentReplies;

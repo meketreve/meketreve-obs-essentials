@@ -56,15 +56,131 @@ function changed() {
   saveTimer = setTimeout(save, 300);
 }
 
+async function post(body) {
+  return api("/api/tab/desfile", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+}
+
 async function save() {
   try {
     const { scale, speed, names, nameSize } = state;
-    state = await api("/api/tab/desfile", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scale, speed, names, nameSize }) });
+    const next = await post({ scale, speed, names, nameSize });
+    // The quests table keeps what is being typed in it.
+    state = { ...next, quests: state.quests };
     setSave("ok");
   } catch (e) {
     setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
   }
+}
+
+// --- Quests: the settings and the list go together, a moment after the
+// last change. New rows get their id from the answer, so the next save
+// keeps them (a quest that changes id starts over for everyone).
+let questTimer = null;
+function questsChanged() {
+  setSave("saving");
+  clearTimeout(questTimer);
+  questTimer = setTimeout(saveQuests, 400);
+}
+
+async function saveQuests() {
+  const q = state.quests;
+  try {
+    const next = await post({ quests: { enabled: q.enabled, perViewer: q.perViewer, whisper: q.whisper,
+      showLevel: q.showLevel, announce: q.announce, list: q.list } });
+    if (next.error) {
+      setSave("bad", next.error);
+      return;
+    }
+    next.quests.list.forEach((saved, i) => { if (q.list[i]) q.list[i].id = saved.id; });
+    q.whisperError = next.quests.whisperError;
+    setSave("ok");
+  } catch (e) {
+    setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
+  }
+}
+
+function questTitle(quest) {
+  return t((quest.goal === 1 ? "QuestOne." : "QuestMany.") + quest.kind, quest.goal);
+}
+
+function numberCtl(value, min, max, onChange) {
+  const input = el("input", { type: "number", class: "num", min, max, step: 1, value });
+  input.addEventListener("input", () => {
+    const v = Math.round(Number(input.value));
+    if (input.value === "" || !Number.isFinite(v)) return;
+    onChange(Math.min(max, Math.max(min, v)));
+  });
+  return input;
+}
+
+function questRow(quest, index) {
+  const q = state.quests;
+  const kind = el("select", {}, q.kinds.map((k) => {
+    const option = el("option", { value: k.id, text: t("QuestKindName." + k.id) });
+    option.selected = k.id === quest.kind;
+    return option;
+  }));
+  const title = el("input", { type: "text", value: quest.title || "", placeholder: questTitle(quest), maxlength: 60, spellcheck: "false" });
+  const refreshPlaceholder = () => { title.placeholder = questTitle(quest); };
+  kind.addEventListener("change", () => { quest.kind = kind.value; refreshPlaceholder(); questsChanged(); });
+  title.addEventListener("input", () => { quest.title = title.value; questsChanged(); });
+  const goal = numberCtl(quest.goal, 1, 100000, (v) => { quest.goal = v; refreshPlaceholder(); questsChanged(); });
+  const points = numberCtl(quest.points, 0, 100000, (v) => { quest.points = v; questsChanged(); });
+  const xp = numberCtl(quest.xp, 0, 10000, (v) => { quest.xp = v; questsChanged(); });
+  const remove = el("button", { type: "button", class: "btn small", text: t("QuestRemove") });
+  remove.addEventListener("click", () => { q.list.splice(index, 1); questsChanged(); renderForm(); });
+  // One quest per row; the fields wrap on a narrow panel.
+  const field = (label, control, cls) => el("label", { class: "quest-field " + (cls || "") }, el("span", { text: label }), control);
+  return el("div", { class: "quest-row" + (quest.enabled ? "" : " off") },
+    el("div", { class: "quest-on", title: t("QuestColOn") },
+      switchCtl(quest.enabled, (v) => { quest.enabled = v; questsChanged(); renderForm(); })),
+    field(t("QuestColKind"), kind, "kind"), field(t("QuestColGoal"), goal), field(t("QuestColPoints"), points),
+    field(t("QuestColXp"), xp), field(t("QuestColTitle"), title, "title"),
+    el("div", { class: "quest-actions" }, remove));
+}
+
+function questsCard() {
+  const q = state.quests;
+  const announce = el("select", {}, ["none", "level", "all"].map((id) => {
+    const option = el("option", { value: id, text: t("QuestsAnnounce" + id[0].toUpperCase() + id.slice(1)) });
+    option.selected = id === q.announce;
+    return option;
+  }));
+  announce.addEventListener("change", () => { q.announce = announce.value; questsChanged(); });
+
+  const add = el("button", { type: "button", class: "btn small primary", text: t("QuestAdd") });
+  add.disabled = q.list.length >= q.maxQuests;
+  add.addEventListener("click", () => {
+    q.list.push({ id: "", kind: "messages", goal: 10, points: 20, xp: 10, enabled: true, title: "" });
+    questsChanged();
+    renderForm();
+  });
+  const defaults = el("button", { type: "button", class: "btn small", text: t("QuestDefaults") });
+  defaults.addEventListener("click", async () => {
+    if (!confirm(t("QuestDefaultsConfirm"))) return;
+    clearTimeout(questTimer);
+    try {
+      const next = await post({ questDefaults: true });
+      state.quests = next.quests;
+      setSave("ok");
+      renderForm();
+    } catch (e) {
+      setSave("bad", t("SaveFailed", e.message));
+    }
+  });
+
+
+  return el("section", { class: "card" }, el("h3", { text: t("Quests") }),
+    el("p", { class: "hint", text: t("QuestsNote") }),
+    row(t("QuestsOn"), switchCtl(q.enabled, (v) => { q.enabled = v; questsChanged(); })),
+    row(t("QuestsPerViewer"), rangeCtl(1, q.maxPerViewer, 1, q.perViewer, "", (v) => { q.perViewer = v; questsChanged(); })),
+    row(t("QuestsShowLevel"), switchCtl(q.showLevel, (v) => { q.showLevel = v; questsChanged(); }), t("QuestsShowLevelNote")),
+    row(t("QuestsAnnounce"), announce),
+    row(t("QuestsWhisper"), switchCtl(q.whisper, (v) => { q.whisper = v; questsChanged(); }), t("QuestsWhisperNote")),
+    q.whisperError ? el("p", { class: "hint bad", text: t("QuestsWhisperError", q.whisperError) }) : null,
+    el("div", { class: "group-panel quest-panel" }, q.list.map(questRow),
+      el("div", { class: "group-head" }, add, defaults)));
 }
 
 function row(label, control, note) {
@@ -106,7 +222,8 @@ function renderForm() {
       row(t("Names"), switchCtl(state.names, (v) => { state.names = v; changed(); })),
       row(t("NameSize"), rangeCtl(6, 32, 1, state.nameSize, " px", (v) => { state.nameSize = v; changed(); }))),
     el("section", { class: "card" }, el("h3", { text: t("Link") }),
-      row(t("BrowserSource"), el("div", { class: "inline" }, el("code", { text: state.url }), copy), t("LinkNote"))));
+      row(t("BrowserSource"), el("div", { class: "inline" }, el("code", { text: state.url }), copy), t("LinkNote"))),
+    state.quests ? questsCard() : null);
 }
 
 async function init() {

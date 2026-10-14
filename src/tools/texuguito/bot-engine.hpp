@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 #include "bot-data.hpp"
+#include "quests.hpp"
 #include "sound-fetch.hpp"
 #include "sound-library.hpp"
 #include "../unified-chat/chat-connector.hpp"
@@ -38,7 +39,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 /* A chat line as the bot sees it, from any platform. */
 struct BotMessage {
 	ChatPlatform platform = ChatPlatform::Twitch;
-	QString user; /* display name */
+	QString user;   /* display name */
+	QString userId; /* platform user id: where a Twitch whisper goes */
 	QString text;
 	bool isMod = false;
 	bool isSub = false;
@@ -143,6 +145,10 @@ public:
 	void handleMessage(const BotMessage &msg);
 	/* Bits, Super Chats and Kick gifts make the viewer cheer on screen. */
 	void handleCheer(ChatPlatform platform, const QString &user);
+	/* A follow or a sub from the platform, for the bonus quests. */
+	void handleQuestEvent(ChatPlatform platform, const QString &user, Quests::Kind kind);
+	/* The stream is live (or not): a new live draws new quests. */
+	void setLive(bool live) { m_quests.setLive(live); }
 	/* Twitch viewer list (Helix chatters): who is watching even if quiet. */
 	void setTwitchChatters(const QSet<QString> &logins);
 	/* The streamer's own channels: their avatar never leaves the parade. */
@@ -156,6 +162,7 @@ public:
 	PointsStore &points() { return m_points; }
 	ViewerStore &viewers() { return m_viewers; }
 	CustomCommandStore &customCommands() { return m_custom; }
+	QuestBook &quests() { return m_quests; }
 	/* Creates or changes a chat-made command from the web panel, with the
 	 * same rules as "!comando add": empty when done, else the error. */
 	QString setCustomCommand(const QString &name, const QString &response);
@@ -165,6 +172,9 @@ public:
 
 signals:
 	void reply(ChatPlatform platform, const QString &text);
+	/* A reply for one viewer: on Twitch it can go as a whisper to userId;
+	 * whoever sends it falls back to reply() when it cannot. */
+	void privateReply(ChatPlatform platform, const QString &userId, const QString &text);
 	void overlayMessage(const QJsonObject &message);
 
 private:
@@ -180,6 +190,8 @@ private:
 		qint64 presentSince = 0; /* who got the avatar first among same-name viewers */
 		qint64 dancingUntil = 0;
 		qint64 cheerUntil = 0;
+		qint64 questUntil = 0; /* a quest just finished: the avatar celebrates */
+		QString questLabel;
 	};
 	using Handler = std::function<void(const BotMessage &, const QString &key, const QStringList &args)>;
 	struct Command {
@@ -210,10 +222,18 @@ private:
 	QString handleCustomCommand(const BotMessage &msg, const QString &name, const QStringList &args);
 	QString handleComando(const BotMessage &msg, const QStringList &args);
 	void playTts(const BotMessage &msg, const QString &key, const QStringList &args);
+	/* key did amount of kind: pays the quests it finished, celebrates on
+	 * screen and says so in the chat of platform (as the panel asks). */
+	void questProgress(const QString &key, ChatPlatform platform, Quests::Kind kind, qint64 amount = 1);
+	/* The quest's name as the chat reads it, in the command's language. */
+	QString questTitle(const QString &invoked, const QuestDef &quest) const;
+	QString questsReply(const BotMessage &msg, const QString &key);
+	void sayPrivate(const BotMessage &msg, const QString &text);
 
 	ViewerStore m_viewers;
 	PointsStore m_points;
 	CustomCommandStore m_custom;
+	QuestBook m_quests;
 	Raffle m_raffle;
 	QHash<QString, Status> m_status;
 	QSet<QString> m_drawn; /* keys the overlay currently shows */
@@ -245,6 +265,7 @@ private:
 	QSet<QString> m_lastTickPresent;
 	QTimer m_pointsTimer;
 	QTimer m_presenceTimer;
+	QTimer m_questSaveTimer;
 };
 
 namespace BotText {

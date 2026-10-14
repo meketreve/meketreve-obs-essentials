@@ -145,6 +145,7 @@ TexuguitoDock::TexuguitoDock(UnifiedChatDock *chat, QWidget *parent) : QWidget(p
 
 	connect(m_engine, &BotEngine::overlayMessage, m_server, &OverlayServer::broadcast);
 	connect(m_engine, &BotEngine::reply, this, &TexuguitoDock::onReply);
+	connect(m_engine, &BotEngine::privateReply, this, &TexuguitoDock::onPrivateReply);
 	connect(m_server, &OverlayServer::clientsChanged, this, [this](int n) {
 		m_engine->setOverlayListeners(n);
 		refreshStatus();
@@ -239,11 +240,36 @@ QJsonObject TexuguitoDock::panelState() const
 	QJsonObject state = lookJson();
 	state.insert(QStringLiteral("url"), overlayUrl());
 	state.insert(QStringLiteral("listening"), m_server->isListening());
+	QJsonObject quests = m_engine->quests().settingsJson();
+	QJsonArray kinds;
+	for (Quests::Kind k : Quests::allKinds())
+		kinds.append(QJsonObject{{QStringLiteral("id"), Quests::kindId(k)},
+					 {QStringLiteral("bonus"), Quests::isBonus(k)}});
+	quests.insert(QStringLiteral("kinds"), kinds);
+	quests.insert(QStringLiteral("whisperError"), m_whisperError);
+	quests.insert(QStringLiteral("maxQuests"), QuestBook::kMaxQuests);
+	quests.insert(QStringLiteral("maxPerViewer"), QuestBook::kMaxPerViewer);
+	state.insert(QStringLiteral("quests"), quests);
 	return state;
 }
 
 QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 {
+	/* The quests come on their own ({quests} or {questDefaults}), the look
+	 * on its own: each one leaves the other as it is. */
+	if (panel.contains(QStringLiteral("quests")) || panel.contains(QStringLiteral("questDefaults"))) {
+		QString error;
+		if (panel.value(QStringLiteral("questDefaults")).toBool())
+			m_engine->quests().restoreDefaults();
+		else
+			error = m_engine->quests().applySettings(panel.value(QStringLiteral("quests")).toObject());
+		/* The level above the heads follows "show the level". */
+		broadcastSnapshot();
+		QJsonObject state = panelState();
+		if (!error.isEmpty())
+			state.insert(QStringLiteral("error"), T(error.toUtf8().constData()));
+		return state;
+	}
 	m_scale = std::clamp(panel.value(QStringLiteral("scale")).toDouble(m_scale), 0.5, 4.0);
 	m_speed = std::clamp(panel.value(QStringLiteral("speed")).toDouble(m_speed), 0.25, 3.0);
 	m_names = panel.value(QStringLiteral("names")).toBool(m_names);
@@ -252,6 +278,13 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 	m_server->broadcast(
 		QJsonObject{{QStringLiteral("type"), QStringLiteral("look")}, {QStringLiteral("look"), lookJson()}});
 	return panelState();
+}
+
+void TexuguitoDock::broadcastSnapshot()
+{
+	QJsonObject snapshot = m_engine->snapshot();
+	snapshot.insert(QStringLiteral("look"), lookJson());
+	m_server->broadcast(snapshot);
 }
 
 QJsonObject TexuguitoDock::botPanelState() const
@@ -540,6 +573,7 @@ void TexuguitoDock::onChat(const ChatMessage &msg)
 		BotMessage bot;
 		bot.platform = msg.platform;
 		bot.user = msg.author;
+		bot.userId = msg.userId;
 		bot.text = msg.text;
 		bot.isMod = msg.isMod;
 		bot.isSub = msg.isSub;
@@ -549,6 +583,10 @@ void TexuguitoDock::onChat(const ChatMessage &msg)
 	}
 	if (msg.event == ChatEvent::Bits || msg.event == ChatEvent::Donation || msg.event == ChatEvent::Gift)
 		m_engine->handleCheer(msg.platform, msg.author);
+	if (msg.event == ChatEvent::Follow)
+		m_engine->handleQuestEvent(msg.platform, msg.author, Quests::Kind::Follow);
+	if (msg.event == ChatEvent::Sub || msg.event == ChatEvent::GiftSub || msg.event == ChatEvent::Membership)
+		m_engine->handleQuestEvent(msg.platform, msg.author, Quests::Kind::Sub);
 }
 
 void TexuguitoDock::onReply(ChatPlatform platform, const QString &text)
@@ -557,6 +595,23 @@ void TexuguitoDock::onReply(ChatPlatform platform, const QString &text)
 	if (!m_chat->sendAs(platform, text))
 		obs_log(LOG_INFO, "[texuguito] reply not sent (no login on that platform): %s",
 			text.toUtf8().constData());
+}
+
+void TexuguitoDock::onPrivateReply(ChatPlatform platform, const QString &userId, const QString &text)
+{
+	QPointer<TexuguitoDock> self = this;
+	m_chat->accounts()->sendWhisper(userId, text, [self, platform, text](const QString &error) {
+		if (!self)
+			return;
+		self->m_whisperError = error;
+		/* No scope yet (log in again), no verified phone, the daily limit
+		 * or a viewer who blocks whispers: the chat gets it instead. */
+		if (!error.isEmpty()) {
+			obs_log(LOG_INFO, "[texuguito] whisper not sent (%s), replying in chat",
+				error.toUtf8().constData());
+			self->onReply(platform, text);
+		}
+	});
 }
 
 QStringList TexuguitoDock::sendablePlatforms() const
@@ -602,8 +657,9 @@ void TexuguitoDock::timedTick()
 	if (!m_enabled)
 		return;
 	const qint64 now = QDateTime::currentMSecsSinceEpoch();
+	const bool live = streamLive();
+	m_engine->setLive(live);
 	if (m_timed->onlyLive()) {
-		const bool live = streamLive();
 		/* The clocks start with the stream, not with OBS. */
 		if (live && !m_wasLive)
 			m_timed->restart(now);

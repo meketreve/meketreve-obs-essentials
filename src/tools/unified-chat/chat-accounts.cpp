@@ -40,7 +40,7 @@ namespace {
 
 const char *const kTwitchScopes =
 	"user:read:chat user:write:chat moderator:manage:banned_users moderator:manage:chat_messages "
-	"moderator:read:followers moderator:read:chatters channel:manage:broadcast";
+	"moderator:read:followers moderator:read:chatters channel:manage:broadcast user:manage:whispers";
 const char *const kTwitchClientId = "r61r2wwuew4j0e8uohmwif5022r4bc";
 /* Kick has no public clients: the plugin's app keeps its secret on the
  * project's server (server/kick-oauth), which adds it to token requests. */
@@ -1229,6 +1229,20 @@ void ChatAccounts::twitchChatters(const QString &channel,
 			    done(logins, status, error);
 		    });
 	});
+}
+
+void ChatAccounts::sendWhisper(const QString &toUserId, const QString &text, ActionDone done)
+{
+	const ChatAccount &a = account(ChatPlatform::Twitch);
+	/* Twitch refuses a whisper to yourself. */
+	if (!a.loggedIn() || a.userId.isEmpty() || toUserId.isEmpty() || toUserId == a.userId) {
+		done(QStringLiteral("no whisper"));
+		return;
+	}
+	QUrl url(QStringLiteral("https://api.twitch.tv/helix/whispers"));
+	url.setQuery(QUrlQuery{{QStringLiteral("from_user_id"), a.userId}, {QStringLiteral("to_user_id"), toUserId}});
+	api(ChatPlatform::Twitch, "POST", url, QJsonObject{{QStringLiteral("message"), text.left(500)}},
+	    [done](int, const QJsonObject &, const QString &error) { done(error); });
 }
 
 void ChatAccounts::youtubePrepareBroadcast(const QString &streamKey,

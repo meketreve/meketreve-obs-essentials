@@ -140,6 +140,11 @@ public:
 	void twitchChatters(const QString &channel,
 			    std::function<void(const QSet<QString> &logins, int status, const QString &error)> done);
 
+	/* A whisper from the logged-in Twitch account to userId (Helix: needs
+	 * user:manage:whispers and a verified phone on the sender; at most 40
+	 * new people a day). done gets the error, empty when it went out. */
+	void sendWhisper(const QString &toUserId, const QString &text, ActionDone done);
+
 	/* Full lists for the viewers window. Chatters need a broadcaster or
 	 * moderator login; the ban list only the broadcaster's. Failures before
 	 * the request (unknown channel) come through actionFailed. */

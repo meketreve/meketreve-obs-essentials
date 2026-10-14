@@ -56,6 +56,20 @@ panel (**Chat parade → Add to scene**, or the URL
   `!apelido` and `!dança`. Bits, Super Chats and Kick gifts make them cheer.
 - **Points:** a point per minute in chat, spent on `!tocar <clip>` and
   `!falar <text>` (Google TTS, 200 points).
+- **Quests:** every stream, each viewer gets a few quests drawn from the
+  channel's list (send messages, stay a while, dance, change their look, play
+  a sound, spend points, join a raffle…) and checks them with `!missoes` /
+  `!quests`. Finishing one gives points and XP, the avatar celebrates on the
+  parade, and XP raises the level, shown from level 2 as a star before the
+  name (`!nivel` / `!level`). Bonus quests (follow, sub, support) are open to everyone. The
+  web panel's **Chat parade** tab turns quests on or off and edits the list
+  (kind, goal, points, XP, the name the chat reads), how many each viewer
+  gets, whether the level shows and when the chat is told. A stream that
+  drops and comes back within 30 minutes keeps its quests. On Twitch,
+  `!missoes` and `!nivel` answer with a whisper (log in to Twitch again once
+  for the new permission; the account needs a verified phone and Twitch
+  allows 40 different people a day); when a whisper fails, or on Kick and
+  YouTube, the answer goes to the chat.
 - **Sound groups:** the sounds are set up in the web panel's **Chat bot**
   tab, one panel per group. A group has a name, a price, a wait between two
   of its sounds and an on/off switch; changing the price changes it for every
@@ -94,8 +108,8 @@ broadcaster or a moderator, quiet viewers show up too (Twitch viewer list);
 elsewhere a viewer stays in the parade for 10 minutes after their last
 message. The streamer's own avatar (the Twitch and Kick channels set in
 Unified Chat, or whoever chats with the broadcaster badge) never leaves. The
-web panel's **Chat parade** tab sets the avatar size, walking speed and the
-names above the heads. Clips and TTS play through the Browser Source, so they
+web panel's **Chat parade** tab sets the avatar size, walking speed, the
+names above the heads and the quests. Clips and TTS play through the Browser Source, so they
 show up in the OBS mixer.
 
 ### Overlays

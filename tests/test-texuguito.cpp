@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "bot-engine.hpp"
 #include "overlay-server.hpp"
+#include "quests.hpp"
 #include "sound-fetch.hpp"
 #include "timed-messages.hpp"
 #include "tts-client.hpp"
@@ -237,6 +238,8 @@ private slots:
 		writeSoundGroups(dir.path(), {group("g1", 10, 10, {QStringLiteral("buzina alta")})});
 		BotEngine bot(dir.path(), audio);
 		bot.setText(locale("pt-BR.ini"));
+		/* Quests drawn at random could pay points back (see questsInTheBot). */
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
 		QCOMPARE(bot.clips().size(), size_t(1));
 		QCOMPARE(bot.clips().begin()->second.url, QStringLiteral("/audios/10/Buzina%20Alta.mp3"));
 		QCOMPARE(bot.soundLibrary().groupOf(QStringLiteral("buzina alta"))->price, 10);
@@ -403,6 +406,8 @@ private slots:
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
 		bot.setText(locale("pt-BR.ini"));
+		/* Quests drawn at random could pay points back (see questsInTheBot). */
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
 		bot.setOverlayListeners(1);
 		bot.points().add(QStringLiteral("ana"), 450);
 		QString spoken, voice;
@@ -1007,6 +1012,302 @@ private slots:
 		QTRY_VERIFY((got += ws.readAll()).contains("audio_stop"));
 		ws.abort();
 		QTRY_COMPARE(server.clientCount(), 0);
+	}
+
+	void questLevels()
+	{
+		QCOMPARE(Quests::xpForLevel(1), 0);
+		QCOMPARE(Quests::xpForLevel(2), 50);
+		QCOMPARE(Quests::xpForLevel(3), 150);
+		QCOMPARE(Quests::xpForLevel(4), 300);
+		QCOMPARE(Quests::levelFor(0), 1);
+		QCOMPARE(Quests::levelFor(49), 1);
+		QCOMPARE(Quests::levelFor(50), 2);
+		QCOMPARE(Quests::levelFor(149), 2);
+		QCOMPARE(Quests::levelFor(150), 3);
+		for (Quests::Kind k : Quests::allKinds())
+			QCOMPARE(Quests::kindFromId(Quests::kindId(k)).value(), k);
+		QVERIFY(!Quests::kindFromId(QStringLiteral("nope")));
+		QVERIFY(Quests::isBonus(Quests::Kind::Follow));
+		QVERIFY(!Quests::isBonus(Quests::Kind::Dance));
+	}
+
+	void questsDrawAndPay()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("quests.json"));
+		qint64 now = 1000000;
+		/* Always the first of what is left: chat10, chat30, stay15. */
+		QuestBook book(path, [](int) { return 0; }, [&now]() { return now; });
+		QCOMPARE(book.perViewer(), 3);
+
+		QList<QuestReward> got = book.progress(QStringLiteral("Ana"), Quests::Kind::Messages, 9);
+		QVERIFY(got.isEmpty());
+		got = book.progress(QStringLiteral("ana"), Quests::Kind::Messages);
+		QCOMPARE(got.size(), 1);
+		QCOMPARE(got[0].quest.id, QStringLiteral("chat10"));
+		QCOMPARE(got[0].key, QStringLiteral("ana"));
+		QCOMPARE(got[0].quest.points, 20);
+		QCOMPARE(got[0].xp, 10);
+		QVERIFY(!got[0].levelUp);
+		/* Done once: more messages only move chat30. */
+		got = book.progress(QStringLiteral("ana"), Quests::Kind::Messages, 20);
+		QCOMPARE(got.size(), 1);
+		QCOMPARE(got[0].quest.id, QStringLiteral("chat30"));
+		QCOMPARE(got[0].xp, 35);
+		QVERIFY(book.progress(QStringLiteral("ana"), Quests::Kind::Messages, 50).isEmpty());
+		/* Not drawn: dancing does nothing. Bonus: open to everyone. */
+		QVERIFY(book.progress(QStringLiteral("ana"), Quests::Kind::Dance, 5).isEmpty());
+		got = book.progress(QStringLiteral("ana"), Quests::Kind::Follow);
+		QCOMPARE(got.size(), 1);
+		QCOMPARE(got[0].quest.id, QStringLiteral("follow1"));
+		QCOMPARE(got[0].xp, 60);
+		QCOMPARE(got[0].level, 2);
+		QVERIFY(got[0].levelUp);
+		QCOMPARE(book.level(QStringLiteral("ANA")), 2);
+
+		const QList<QuestEntry> list = book.questsFor(QStringLiteral("ana"));
+		QCOMPARE(list.size(), 6); /* 3 drawn + support, follow, sub */
+		QCOMPARE(list[0].quest.id, QStringLiteral("chat10"));
+		QVERIFY(list[0].done);
+		QCOMPARE(list[2].quest.id, QStringLiteral("stay15"));
+		QCOMPARE(list[2].count, 0);
+		QVERIFY(!list[2].done);
+		QVERIFY(list[4].done); /* follow1 */
+
+		/* Read back from disk: the same progress. */
+		QuestBook again(path, [](int) { return 0; }, [&now]() { return now; });
+		QCOMPARE(again.xp(QStringLiteral("ana")), 60);
+		QVERIFY(again.progress(QStringLiteral("ana"), Quests::Kind::Messages, 5).isEmpty());
+		QCOMPARE(again.progress(QStringLiteral("ana"), Quests::Kind::Minutes, 15).size(), 1);
+
+		/* A count that finishes nothing waits for flush() to reach the disk. */
+		const auto countOnDisk = [&path]() {
+			return QJsonDocument::fromJson([&]() {
+				       QFile f(path);
+				       f.open(QIODevice::ReadOnly);
+				       return f.readAll();
+			       }())
+				.object()
+				.value(QStringLiteral("viewers"))
+				.toObject()
+				.value(QStringLiteral("beto"))
+				.toObject()
+				.value(QStringLiteral("counts"))
+				.toObject()
+				.value(QStringLiteral("chat10"))
+				.toInt();
+		};
+		book.progress(QStringLiteral("beto"), Quests::Kind::Messages, 3);
+		QCOMPARE(countOnDisk(), 0);
+		book.flush();
+		QCOMPARE(countOnDisk(), 3);
+	}
+
+	void questsRenewEachLive()
+	{
+		QTemporaryDir dir;
+		qint64 now = 1000000;
+		QuestBook book(
+			dir.filePath(QStringLiteral("quests.json")), [](int) { return 0; }, [&now]() { return now; });
+		book.setLive(true);
+		const QString first = book.session();
+		QCOMPARE(book.progress(QStringLiteral("ana"), Quests::Kind::Messages, 10).size(), 1);
+
+		/* Dropped and back in 10 minutes: the same live. */
+		now += 3600000;
+		book.setLive(false);
+		now += 10 * 60000;
+		book.setLive(true);
+		QCOMPARE(book.session(), first);
+		QVERIFY(book.questsFor(QStringLiteral("ana")).first().done);
+
+		/* A new live after 31 minutes: new quests, the XP stays. */
+		now += 60000;
+		book.setLive(false);
+		now += 31 * 60000;
+		book.setLive(true);
+		QVERIFY(book.session() != first);
+		const QList<QuestEntry> fresh = book.questsFor(QStringLiteral("ana"));
+		QCOMPARE(fresh[0].count, 0);
+		QVERIFY(!fresh[0].done);
+		QCOMPARE(book.xp(QStringLiteral("ana")), 10);
+
+		/* Off stream, quests renew after 12 hours. */
+		const QString second = book.session();
+		now += 60000;
+		book.setLive(false);
+		now += 11 * 3600000LL;
+		book.questsFor(QStringLiteral("ana"));
+		QCOMPARE(book.session(), second);
+		now += 2 * 3600000LL;
+		book.questsFor(QStringLiteral("ana"));
+		QVERIFY(book.session() != second);
+	}
+
+	void questSettings()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("quests.json"));
+		QuestBook book(path, [](int) { return 0; });
+		book.questsFor(QStringLiteral("ana")); /* chat10, chat30, stay15 */
+
+		QJsonArray tooMany;
+		for (int i = 0; i <= QuestBook::kMaxQuests; ++i)
+			tooMany.append(QuestBook::toJson(QuestBook::defaults().first()));
+		QCOMPARE(book.applySettings(QJsonObject{{QStringLiteral("list"), tooMany}}),
+			 QStringLiteral("Texuguito.Parade.QuestErrorTooMany"));
+		const QJsonArray bad{QJsonObject{{QStringLiteral("kind"), QStringLiteral("fly")}}};
+		QCOMPARE(book.applySettings(QJsonObject{{QStringLiteral("list"), bad}}),
+			 QStringLiteral("Texuguito.Parade.QuestErrorBad"));
+		QCOMPARE(book.list().size(), QuestBook::defaults().size());
+
+		/* chat30 off, a new row and a copy of an id: both get their own. */
+		QJsonArray list;
+		for (QuestDef def : QuestBook::defaults()) {
+			if (def.id == QLatin1String("chat30"))
+				def.enabled = false;
+			list.append(QuestBook::toJson(def));
+		}
+		list.append(QJsonObject{{QStringLiteral("kind"), QStringLiteral("dance")},
+					{QStringLiteral("goal"), 999999},
+					{QStringLiteral("points"), -5},
+					{QStringLiteral("title"), QStringLiteral("  Dance   party  ")}});
+		list.append(QuestBook::toJson(QuestBook::defaults().first()));
+		QCOMPARE(book.applySettings(QJsonObject{{QStringLiteral("list"), list},
+							{QStringLiteral("perViewer"), 9},
+							{QStringLiteral("announce"), QStringLiteral("all")},
+							{QStringLiteral("whisper"), false}}),
+			 QString());
+		QCOMPARE(book.perViewer(), QuestBook::kMaxPerViewer);
+		QCOMPARE(book.announce(), QuestBook::Announce::All);
+		QVERIFY(!book.whisper());
+		const QuestDef added = book.list().at(book.list().size() - 2);
+		QVERIFY(added.id.startsWith(QLatin1Char('q')));
+		QCOMPARE(added.goal, QuestBook::kMaxGoal);
+		QCOMPARE(added.points, 0);
+		QCOMPARE(added.title, QStringLiteral("Dance party"));
+		QVERIFY(book.list().last().id != QStringLiteral("chat10"));
+
+		/* The viewer loses the quest turned off and gets new ones. */
+		QStringList ids;
+		for (const QuestEntry &e : book.questsFor(QStringLiteral("ana")))
+			if (!Quests::isBonus(e.quest.kind))
+				ids.append(e.quest.id);
+		QCOMPARE(ids.size(), QuestBook::kMaxPerViewer);
+		QVERIFY(!ids.contains(QStringLiteral("chat30")));
+		QCOMPARE(ids.first(), QStringLiteral("chat10"));
+
+		QuestBook again(path);
+		QCOMPARE(again.list().size(), list.size());
+		QVERIFY(!again.whisper());
+		again.restoreDefaults();
+		QCOMPARE(again.list().size(), QuestBook::defaults().size());
+
+		/* Off: nothing moves. */
+		again.applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
+		QVERIFY(again.progress(QStringLiteral("ana"), Quests::Kind::Follow).isEmpty());
+	}
+
+	void questsInTheBot()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		bot.setText(locale("pt-BR.ini"));
+		/* Two quests, both drawn: 2 messages (a level at once) and a dance. */
+		const QJsonArray list{QJsonObject{{QStringLiteral("id"), QStringLiteral("talk")},
+						  {QStringLiteral("kind"), QStringLiteral("messages")},
+						  {QStringLiteral("goal"), 2},
+						  {QStringLiteral("points"), 7},
+						  {QStringLiteral("xp"), 50}},
+				      QJsonObject{{QStringLiteral("id"), QStringLiteral("move")},
+						  {QStringLiteral("kind"), QStringLiteral("dance")},
+						  {QStringLiteral("goal"), 1},
+						  {QStringLiteral("points"), 3},
+						  {QStringLiteral("xp"), 1}}};
+		QCOMPARE(bot.quests().applySettings(QJsonObject{{QStringLiteral("list"), list}}), QString());
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QSignalSpy whispered(&bot, &BotEngine::privateReply);
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("oi")));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!pontos")));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 0); /* a command is not a message */
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("tudo bem?")));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 7);
+		QCOMPARE(replies(said), QStringList{QStringLiteral("⭐ Ana subiu para o nível 2!")});
+		const QJsonObject viewer =
+			overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
+		QCOMPARE(viewer.value(QStringLiteral("level")).toInt(), 2);
+		QCOMPARE(viewer.value(QStringLiteral("quest_label")).toString(), QStringLiteral("+50 XP"));
+		QVERIFY(viewer.value(QStringLiteral("quest_remaining")).toDouble() > 4.0);
+
+		/* Kick: the list in the chat, in the command's language. */
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!missoes")));
+		QCOMPARE(replies(said).size(), 1);
+		/* In the order they were drawn. */
+		const QString drawn = replies(said).first();
+		QVERIFY(drawn.startsWith(QStringLiteral("📜 Ana · nível 2 (50/150 XP) | ")));
+		QVERIFY(drawn.contains(QStringLiteral("✅ Mandar 2 mensagens no chat")));
+		QVERIFY(drawn.contains(QStringLiteral("⬜ Dançar (!dança)")));
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!quests")));
+		QVERIFY(replies(said).first().contains(QStringLiteral("⬜ Dance (!dance)")));
+
+		/* Twitch with a user id: a whisper instead of the chat. */
+		said.clear();
+		BotMessage m = msg(QStringLiteral("Ana"), QStringLiteral("!nivel"));
+		m.userId = QStringLiteral("123");
+		bot.handleMessage(m);
+		QVERIFY(said.isEmpty());
+		QCOMPARE(whispered.size(), 1);
+		QCOMPARE(whispered.first().at(1).toString(), QStringLiteral("123"));
+		QVERIFY(whispered.first().at(2).toString().contains(QStringLiteral("nível 2")));
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("whisper"), false}});
+		bot.handleMessage(m);
+		QCOMPARE(whispered.size(), 1);
+		QCOMPARE(said.size(), 1);
+
+		/* Dancing finishes the other one; "all" also says each quest. */
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("announce"), QStringLiteral("all")}});
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!dança")));
+		QCOMPARE(replies(said),
+			 QStringList{QStringLiteral("🏆 Ana completou a quest \"Dançar (!dança)\" (+3 pts, +1 XP)!")});
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 10);
+
+		/* Minutes come from the points tick; follows from the platform. */
+		bot.quests().applySettings(
+			QJsonObject{{QStringLiteral("list"),
+				     QJsonArray{QJsonObject{{QStringLiteral("kind"), QStringLiteral("minutes")},
+							    {QStringLiteral("goal"), 1}},
+						QJsonObject{{QStringLiteral("kind"), QStringLiteral("follow")},
+							    {QStringLiteral("points"), 4}}}},
+				    {QStringLiteral("announce"), QStringLiteral("none")}});
+		const qint64 before = bot.points().get(QStringLiteral("ana"));
+		bot.pointsTick();
+		bot.pointsTick();
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), before + 1); /* the minute point, no quest yet */
+		QCOMPARE(bot.quests().questsFor(QStringLiteral("ana")).first().count, 1);
+		QVERIFY(bot.quests().questsFor(QStringLiteral("ana")).first().done);
+		bot.handleQuestEvent(ChatPlatform::Kick, QStringLiteral("Beto"), Quests::Kind::Follow);
+		QCOMPARE(bot.points().get(QStringLiteral("kick:beto")), 4);
+
+		/* Off: the commands say so, the parade shows no level. */
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!missoes")));
+		QCOMPARE(replies(said), QStringList{QStringLiteral("❌ As quests estão desligadas.")});
+		QVERIFY(overlay.last()
+				.at(0)
+				.toJsonObject()
+				.value(QStringLiteral("viewer"))
+				.toObject()
+				.value(QStringLiteral("level"))
+				.isNull());
 	}
 };
 

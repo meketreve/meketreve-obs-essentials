@@ -11,6 +11,9 @@ const IDLE_MAX_MS = 5000;
 const LOOK_MIN_MS = 1000;
 const LOOK_MAX_MS = 2500;
 const FACE_FRONT_CHANCE = 0.5;
+// A quest just finished: sparkles and the XP floating up for this long
+// (the server's kQuestMs).
+const QUEST_MS = 5000;
 
 // The look set in the web panel (Parade tab): avatar size, walking speed and
 // the names above the heads. It comes with the snapshot and on every change.
@@ -212,6 +215,7 @@ function upsertViewer(payload) {
     y: laneY(),
     danceUntil: now + (payload.dance_remaining || 0) * 1000,
     cheerUntil: now + (payload.cheer_remaining || 0) * 1000,
+    questUntil: now + (payload.quest_remaining || 0) * 1000,
   };
 
   if (existing) {
@@ -501,10 +505,59 @@ function drawBadges(viewer, yOffset) {
   }
 }
 
+// Gold sparkles around the avatar and its "+XP" rising above the head.
+function drawQuestCelebration(viewer, timestamp, yOffset) {
+  const left = viewer.questUntil - timestamp;
+  const progress = 1 - left / QUEST_MS;
+  const box = manifest.content_box;
+  const cx = viewer.x + frameWidth / 2;
+  const cy = yOffset + box.y + box.h / 2;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, left / 600);
+  ctx.fillStyle = "#ffd700";
+  ctx.textAlign = "center";
+  ctx.font = "10px sans-serif";
+  for (let i = 0; i < 6; i++) {
+    const angle = timestamp / 300 + (i * Math.PI) / 3;
+    const radius = box.h * 0.6 + Math.sin(timestamp / 150 + i) * 3;
+    ctx.fillText("✦", cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius * 0.6);
+  }
+  if (viewer.quest_label) {
+    ctx.font = `bold ${look.nameSize}px monospace`;
+    ctx.fillText(viewer.quest_label, cx, yOffset - 22 - progress * 24);
+  }
+  ctx.restore();
+}
+
+// The name, with the quest level as a gold star before it (from level 2:
+// everyone starts at 1); the level alone when names are hidden.
+function drawName(viewer, yOffset) {
+  const hasLevel = Number.isInteger(viewer.level) && viewer.level >= 2;
+  if (!look.names && !hasLevel) return;
+  ctx.font = `${look.nameSize}px monospace`;
+  ctx.textAlign = "left";
+  const star = hasLevel ? `★${viewer.level}` : "";
+  const name = look.names ? viewer.nick : "";
+  const gap = star && name ? " " : "";
+  const width = ctx.measureText(star + gap + name).width;
+  let x = viewer.x + frameWidth / 2 - width / 2;
+  const y = yOffset - 4;
+  if (star) {
+    ctx.fillStyle = "#ffd700";
+    ctx.fillText(star + gap, x, y);
+    x += ctx.measureText(star + gap).width;
+  }
+  if (name) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(name, x, y);
+  }
+}
+
 function drawViewer(viewer, timestamp) {
   const dancing = timestamp < viewer.danceUntil;
   const cheering = timestamp < viewer.cheerUntil;
-  const bounce = dancing ? Math.abs(Math.sin(timestamp / 120)) * 6 : 0;
+  const questing = timestamp < viewer.questUntil;
+  const bounce = dancing || questing ? Math.abs(Math.sin(timestamp / 120)) * 6 : 0;
   const yOffset = viewer.y - bounce;
 
   if (cheering) {
@@ -519,12 +572,8 @@ function drawViewer(viewer, timestamp) {
   drawCharacter(viewer, spritePose(viewer), viewer.x, yOffset);
 
   drawBadges(viewer, yOffset);
-
-  if (!look.names) return;
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `${look.nameSize}px monospace`;
-  ctx.textAlign = "center";
-  ctx.fillText(viewer.nick, viewer.x + frameWidth / 2, yOffset - 4);
+  drawName(viewer, yOffset);
+  if (questing) drawQuestCelebration(viewer, timestamp, yOffset);
 }
 
 let lastTimestamp = performance.now();

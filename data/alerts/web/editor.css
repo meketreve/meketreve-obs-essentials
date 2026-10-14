@@ -74,6 +74,18 @@ input.num { width: 90px; }
 .command-table td:nth-child(2), .command-table td:nth-child(3) { max-width: none; overflow: visible; }
 .command-table input[type=text] { width: 100%; }
 .command-table .new-row td { background: var(--panel-2); border-top: 1px solid var(--line); }
+/* Parade tab: one quest per row, its fields wrapping on a narrow panel. */
+.quest-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.quest-row:nth-child(even) { background: var(--panel); }
+.quest-row.off .quest-field { opacity: 0.55; }
+.quest-on { display: flex; align-self: center; }
+.quest-field { display: flex; flex-direction: column; gap: 3px; }
+.quest-field > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.quest-field input.num { width: 84px; }
+.quest-field.kind select { width: 170px; }
+.quest-field.title { flex: 1; min-width: 160px; }
+.quest-actions { margin-left: auto; align-self: center; }
+.hint.bad { color: var(--bad); }
 .empty-row td { color: var(--muted); text-align: center; padding: 14px; }
 /* Chat bot tab: automatic messages, one panel each. */
 .timer-opts { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; padding: 10px 14px; }

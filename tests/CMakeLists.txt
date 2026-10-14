@@ -119,6 +119,8 @@ add_executable(
   ${_texuguito}/bot-engine.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
+  ${_texuguito}/quests.cpp
+  ${_texuguito}/quests.hpp
   ${_texuguito}/sound-fetch.cpp
   ${_texuguito}/sound-fetch.hpp
   ${_texuguito}/sound-library.cpp
