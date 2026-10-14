@@ -236,6 +236,27 @@ private slots:
 		QCOMPARE(TwitchChat::normalizeChannel(QStringLiteral("#Foo")), QStringLiteral("foo"));
 	}
 
+	void twitchSubTier()
+	{
+		qRegisterMetaType<ChatMessage>();
+		TwitchChat chat(nullptr, nullptr);
+		QSignalSpy spy(&chat, &ChatConnector::messageReceived);
+		/* The sub badge's version: months, 2000 + months, 3000 + months. */
+		for (const char *badges : {"subscriber/3012,premium/1", "moderator/1,subscriber/2006", "subscriber/12",
+					   "founder/0", "premium/1"})
+			chat.handleLine(QByteArray("@badges=") + badges +
+					";display-name=Ana;id=x;user-id=1 :ana!ana@ana.tmi.twitch.tv PRIVMSG #xqc :oi");
+		const QList<ChatMessage> msgs = collect(spy);
+		QCOMPARE(msgs.size(), 5);
+		QCOMPARE(msgs[0].subTier, 3);
+		QCOMPARE(msgs[1].subTier, 2);
+		QCOMPARE(msgs[2].subTier, 1);
+		QCOMPARE(msgs[3].subTier, 1);
+		QVERIFY(msgs[3].isSub);
+		QCOMPARE(msgs[4].subTier, 0);
+		QVERIFY(!msgs[4].isSub);
+	}
+
 	void twitchEvents()
 	{
 		qRegisterMetaType<ChatMessage>();

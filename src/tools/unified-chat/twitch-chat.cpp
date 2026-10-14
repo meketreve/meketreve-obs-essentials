@@ -156,6 +156,16 @@ void TwitchChat::handleLine(const QByteArray &line)
 		msg.isMod = irc.tag("mod") == QLatin1String("1") || badges.contains(QLatin1String("moderator/"));
 		msg.isSub = irc.tag("subscriber") == QLatin1String("1") ||
 			    badges.contains(QLatin1String("subscriber/")) || badges.contains(QLatin1String("founder/"));
+		/* The sub badge's version says the tier: 2000+ months is tier 2,
+		 * 3000+ tier 3, plain months tier 1. */
+		for (const QString &badge : badges.split(QLatin1Char(','))) {
+			if (badge.startsWith(QLatin1String("subscriber/"))) {
+				const int version = badge.mid(11).toInt();
+				msg.subTier = version >= 3000 ? 3 : version >= 2000 ? 2 : 1;
+			}
+		}
+		if (msg.isSub && msg.subTier == 0)
+			msg.subTier = 1;
 		msg.isReply = irc.tags.contains("reply-parent-msg-id");
 		const int bits = irc.tag("bits").toInt();
 		if (bits > 0) {

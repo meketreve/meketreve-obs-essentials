@@ -356,6 +356,8 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 			   {QStringLiteral("acessorio"), optional(v.acessorio)},
 			   {QStringLiteral("is_mod"), status.isMod},
 			   {QStringLiteral("is_sub"), status.isSub},
+			   /* The parade's sub effect grows with the tier. */
+			   {QStringLiteral("sub_tier"), status.subTier},
 			   {QStringLiteral("is_broadcaster"), status.isBroadcaster || status.streamer},
 			   {QStringLiteral("platform"), QLatin1String(platforms[static_cast<int>(status.platform)])},
 			   /* Seconds left, not booleans: the overlay turns them into
@@ -542,6 +544,7 @@ void BotEngine::handleMessage(const BotMessage &msg)
 	s.platform = msg.platform;
 	s.isMod = msg.isMod;
 	s.isSub = msg.isSub;
+	s.subTier = msg.isSub ? std::clamp(msg.subTier, 1, 3) : 0;
 	s.isBroadcaster = msg.isBroadcaster;
 	s.lastSeen = std::max<qint64>(1, m_clock.elapsed());
 	if (!s.present)

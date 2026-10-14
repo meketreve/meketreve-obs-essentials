@@ -172,6 +172,33 @@ private slots:
 
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!color blue")));
 		QCOMPARE(bot.viewers().getOrCreate(QStringLiteral("ana")).cor, QStringLiteral("#0000ff"));
+		QCOMPARE(overlay.last()
+				 .at(0)
+				 .toJsonObject()
+				 .value(QStringLiteral("viewer"))
+				 .toObject()
+				 .value(QStringLiteral("sub_tier")),
+			 QJsonValue(0));
+		BotMessage sub = msg(QStringLiteral("Ana"), QStringLiteral("oi"));
+		sub.isSub = true;
+		sub.subTier = 3;
+		bot.handleMessage(sub);
+		QCOMPARE(overlay.last()
+				 .at(0)
+				 .toJsonObject()
+				 .value(QStringLiteral("viewer"))
+				 .toObject()
+				 .value(QStringLiteral("sub_tier")),
+			 QJsonValue(3));
+		sub.subTier = 0; /* Kick and YouTube: a sub without a tier */
+		bot.handleMessage(sub);
+		QCOMPARE(overlay.last()
+				 .at(0)
+				 .toJsonObject()
+				 .value(QStringLiteral("viewer"))
+				 .toObject()
+				 .value(QStringLiteral("sub_tier")),
+			 QJsonValue(1));
 		const QJsonObject last = overlay.last().at(0).toJsonObject();
 		QCOMPARE(last.value(QStringLiteral("type")).toString(), QStringLiteral("updated"));
 		QCOMPARE(last.value(QStringLiteral("viewer")).toObject().value(QStringLiteral("cor")).toString(),

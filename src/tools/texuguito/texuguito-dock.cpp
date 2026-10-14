@@ -577,6 +577,7 @@ void TexuguitoDock::onChat(const ChatMessage &msg)
 		bot.text = msg.text;
 		bot.isMod = msg.isMod;
 		bot.isSub = msg.isSub;
+		bot.subTier = msg.subTier;
 		bot.isBroadcaster = msg.isBroadcaster;
 		bot.isReply = msg.isReply;
 		m_engine->handleMessage(bot);

@@ -44,6 +44,7 @@ struct BotMessage {
 	QString text;
 	bool isMod = false;
 	bool isSub = false;
+	int subTier = 0; /* 1-3 on Twitch; a sub elsewhere counts as 1 */
 	bool isBroadcaster = false;
 	/* Twitch prepends "@user " to Reply messages; the bot skips it. */
 	bool isReply = false;
@@ -182,6 +183,7 @@ private:
 		ChatPlatform platform = ChatPlatform::Twitch;
 		bool isMod = false;
 		bool isSub = false;
+		int subTier = 0;
 		bool isBroadcaster = false;
 		bool present = false;
 		bool inChatters = false;

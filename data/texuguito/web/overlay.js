@@ -483,7 +483,7 @@ function drawCharacter(viewer, pose, x, y) {
 
 // --- Per-frame drawing ---
 
-// Sub border and cheer ring hug the character's actual drawn silhouette
+// Sub effects and the cheer ring hug the character's actual drawn silhouette
 // (manifest.content_box), not the full transparent 64x64 cell — the cell
 // has ~20px of empty margin on most sides, so decorations centered on the
 // full cell would float visibly away from the sprite they're decorating.
@@ -497,12 +497,57 @@ function drawBadges(viewer, yOffset) {
     ctx.textAlign = "center";
     ctx.fillText(label, viewer.x + frameWidth / 2, yOffset - 14);
   }
-  if (viewer.is_sub) {
-    const box = manifest.content_box;
-    ctx.strokeStyle = "#f6c90e";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(viewer.x + box.x - 1, yOffset + box.y - 1, box.w + 2, box.h + 2);
+}
+
+// Subs, by tier, each adding to the one below: tier 1 (and every sub on
+// Kick and YouTube) gets a gold name with a ♦, tier 2 sparks rising around
+// the avatar, tier 3 a gold aura behind it.
+const SUB_GOLD = "#ffd700";
+const SPARK_COUNT = 4;
+const SPARK_MS = 1600;
+
+function subTier(viewer) {
+  if (!viewer.is_sub) return 0;
+  return Math.min(3, Math.max(1, Number(viewer.sub_tier) || 1));
+}
+
+function drawSubAura(viewer, timestamp, yOffset) {
+  const box = manifest.content_box;
+  const cx = viewer.x + frameWidth / 2;
+  const cy = yOffset + box.y + box.h / 2;
+  const radius = box.h * 0.75;
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  glow.addColorStop(0, "rgba(255, 215, 0, 0.6)");
+  glow.addColorStop(0.55, "rgba(255, 190, 0, 0.25)");
+  glow.addColorStop(1, "rgba(255, 190, 0, 0)");
+  ctx.save();
+  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(timestamp / 400);
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, radius * 0.8, radius, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSubSparks(viewer, timestamp, yOffset) {
+  const box = manifest.content_box;
+  // Each viewer's sparks run on their own clock, so a crowd of subs does
+  // not flicker in step.
+  const offset = Math.abs(hashUsername(viewer.username)) % SPARK_MS;
+  ctx.save();
+  ctx.fillStyle = SUB_GOLD;
+  ctx.textAlign = "center";
+  ctx.font = "9px sans-serif";
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    const clock = timestamp + offset + (i * SPARK_MS) / SPARK_COUNT;
+    const progress = (clock % SPARK_MS) / SPARK_MS;
+    const cycle = Math.floor(clock / SPARK_MS);
+    // A new spot along the body on every rise.
+    const across = (Math.abs(hashUsername(`${viewer.username}${cycle}${i}`)) % 100) / 100;
+    ctx.globalAlpha = Math.sin(progress * Math.PI);
+    ctx.fillText("✦", viewer.x + box.x + across * box.w, yOffset + box.y + box.h - progress * (box.h + 8));
   }
+  ctx.restore();
 }
 
 // Gold sparkles around the avatar and its "+XP" rising above the head.
@@ -537,7 +582,8 @@ function drawName(viewer, yOffset) {
   ctx.font = `${look.nameSize}px monospace`;
   ctx.textAlign = "left";
   const star = hasLevel ? `★${viewer.level}` : "";
-  const name = look.names ? viewer.nick : "";
+  const sub = subTier(viewer) > 0;
+  const name = look.names ? (sub ? "♦" : "") + viewer.nick : "";
   const gap = star && name ? " " : "";
   const width = ctx.measureText(star + gap + name).width;
   let x = viewer.x + frameWidth / 2 - width / 2;
@@ -548,7 +594,7 @@ function drawName(viewer, yOffset) {
     x += ctx.measureText(star + gap).width;
   }
   if (name) {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = sub ? SUB_GOLD : "#ffffff";
     ctx.fillText(name, x, y);
   }
 }
@@ -569,8 +615,12 @@ function drawViewer(viewer, timestamp) {
     ctx.stroke();
   }
 
+  const tier = subTier(viewer);
+  if (tier >= 3) drawSubAura(viewer, timestamp, yOffset);
+
   drawCharacter(viewer, spritePose(viewer), viewer.x, yOffset);
 
+  if (tier >= 2) drawSubSparks(viewer, timestamp, yOffset);
   drawBadges(viewer, yOffset);
   drawName(viewer, yOffset);
   if (questing) drawQuestCelebration(viewer, timestamp, yOffset);

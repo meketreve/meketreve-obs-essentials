@@ -54,6 +54,9 @@ panel (**Chat parade → Add to scene**, or the URL
 - **Parade:** everyone chatting walks along the bottom of the stream with an
   LPC pixel-art avatar they customize with `!cor`, `!chapeu`, `!acessorio`,
   `!apelido` and `!dança`. Bits, Super Chats and Kick gifts make them cheer.
+  Subs stand out by tier: a gold name with a ♦ (tier 1, and every sub on
+  Kick and YouTube), plus sparks rising around them (tier 2), plus a gold
+  aura behind them (tier 3); Twitch tells the tier by the sub badge.
 - **Points:** a point per minute in chat, spent on `!tocar <clip>` and
   `!falar <text>` (Google TTS, 200 points).
 - **Quests:** every stream, each viewer gets a few quests drawn from the

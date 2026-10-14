@@ -50,6 +50,9 @@ struct ChatMessage {
 	QString userId; /* platform user id */
 	bool isMod = false;
 	bool isSub = false;
+	/* Twitch sub tier (1-3) from the badge; 0 when not a sub or on a
+	 * platform without tiers. */
+	int subTier = 0;
 	bool isBroadcaster = false;
 	bool isReply = false;    /* Twitch "Reply": the text starts with "@user " */
 	QList<ChatEmote> emotes; /* platform emotes, sorted by start */
