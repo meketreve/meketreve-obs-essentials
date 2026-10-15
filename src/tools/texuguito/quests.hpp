@@ -21,8 +21,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
  * the streamer's list every live (send messages, stay a while, dance...),
  * and finishing one gives points and XP; XP makes the avatar's level. Some
  * missions are bonus ones (follow, sub, support): open to everyone, never
- * drawn, since not everyone can do them. Saved in quests.json: the list,
- * the settings and each viewer's progress in the current live. No OBS
+ * drawn, since not everyone can do them. Adventures: a viewer pays points
+ * to send their avatar away for a few minutes, and it comes back with a
+ * prize drawn by weight. Saved in quests.json: the list, the settings, each
+ * viewer's progress in the current live and who is away. No OBS
  * dependency, so it runs in unit tests. */
 
 #include <QHash>
@@ -36,7 +38,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace Quests {
 
-enum class Kind { Messages, Minutes, Dance, Look, Sound, Tts, Spend, Raffle, Support, Follow, Sub };
+enum class Kind { Messages, Minutes, Dance, Look, Sound, Tts, Spend, Raffle, Adventure, Support, Follow, Sub };
 
 QString kindId(Kind kind);
 std::optional<Kind> kindFromId(const QString &id);
@@ -70,6 +72,26 @@ struct QuestReward {
 	bool levelUp = false;
 };
 
+/* A prize an adventure can bring back; the chance is weight over the sum
+ * of the weights. */
+struct AdventureOutcome {
+	QString id;
+	int weight = 1;
+	int points = 0;
+	int xp = 0;
+	QString title; /* empty = the default text of the id */
+};
+
+/* An adventure that ended just now. */
+struct AdventureResult {
+	QString key;
+	QString tag; /* what startAdventure got: where to say it */
+	AdventureOutcome outcome;
+	qint64 xp = 0; /* total after this one */
+	int level = 1;
+	bool levelUp = false;
+};
+
 /* One quest of a viewer, as !quests shows it. */
 struct QuestEntry {
 	QuestDef quest;
@@ -89,6 +111,9 @@ public:
 	static constexpr qint64 kRejoinMs = 30 * 60000LL;
 	/* Without lives (bot used off stream), the quests renew after this. */
 	static constexpr qint64 kOfflineSessionMs = 12 * 3600000LL;
+	static constexpr int kMaxOutcomes = 10;
+	static constexpr int kMaxWeight = 1000;
+	static constexpr int kMaxAdventureMinutes = 60;
 
 	enum class Announce { None, Level, All };
 
@@ -121,6 +146,28 @@ public:
 	QString applySettings(const QJsonObject &settings);
 	void restoreDefaults();
 
+	bool adventureEnabled() const { return m_adventureEnabled; }
+	int adventureCost() const { return m_adventureCost; }
+	int adventureMinutes() const { return m_adventureMinutes; }
+	const QList<AdventureOutcome> &outcomes() const { return m_outcomes; }
+	static QList<AdventureOutcome> defaultOutcomes();
+	/* The adventure settings, as the panel edits them; applyAdventure
+	 * works like applySettings. */
+	QJsonObject adventureJson() const;
+	QString applyAdventure(const QJsonObject &settings);
+	void restoreAdventureDefaults();
+	/* ms until key's avatar comes back; 0 = not away. */
+	qint64 awayFor(const QString &key) const;
+	/* Sends key away (the caller already took the cost); tag comes back
+	 * in the result. False when adventures are off or key is away. */
+	bool startAdventure(const QString &key, const QString &tag);
+	/* The adventures whose time is up: the prize drawn, the XP paid (the
+	 * points are the caller's). */
+	QList<AdventureResult> finishAdventures();
+
+	/* For tests: another clock. */
+	void setClock(Clock clock) { m_clock = std::move(clock); }
+
 	/* The stream went live or stopped: a new live gets new quests. */
 	void setLive(bool live);
 	QString session() const { return m_session; }
@@ -136,6 +183,8 @@ public:
 
 	static QJsonObject toJson(const QuestDef &def);
 	static std::optional<QuestDef> fromJson(const QJsonObject &obj);
+	static QJsonObject toJson(const AdventureOutcome &outcome);
+	static AdventureOutcome outcomeFromJson(const QJsonObject &obj);
 
 private:
 	struct Progress {
@@ -170,5 +219,14 @@ private:
 	 * the middle of a live does not start a new one). */
 	qint64 m_lastLive = 0;
 	QHash<QString, Progress> m_viewers;
+	bool m_adventureEnabled = true;
+	int m_adventureCost = 50;
+	int m_adventureMinutes = 3;
+	QList<AdventureOutcome> m_outcomes;
+	struct Away {
+		qint64 until = 0;
+		QString tag;
+	};
+	QHash<QString, Away> m_away;
 	mutable bool m_dirty = false;
 };

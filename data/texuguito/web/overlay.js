@@ -178,7 +178,30 @@ function lookAround(viewer, now) {
   viewer.nextLookAt = now + randomBetween(LOOK_MIN_MS, LOOK_MAX_MS);
 }
 
+// Off on an adventure: walk out by the nearest edge, a bit faster than a
+// stroll, and stay hidden until the server's deadline.
+function leaveParade(viewer) {
+  viewer.direction = viewer.x + frameWidth / 2 < canvas.width / 2 ? -1 : 1;
+  viewer.targetX = viewer.direction < 0 ? -frameWidth : canvas.width;
+  viewer.state = "leaving";
+  viewer.speed = randomSpeed() * 1.5;
+  viewer.distanceWalked = 0;
+  viewer.facingFront = false;
+}
+
+// Back from it: in by the same edge it left from.
+function returnToParade(viewer) {
+  viewer.x = viewer.direction < 0 ? -frameWidth : canvas.width;
+  startWalking(viewer);
+}
+
 function updateMovement(viewer, now, deltaSeconds) {
+  if (now < viewer.awayUntil) {
+    if (viewer.state !== "leaving" && viewer.state !== "away") leaveParade(viewer);
+  } else if (viewer.state === "away") {
+    returnToParade(viewer);
+  }
+  if (viewer.state === "away") return;
   if (viewer.state === "idle") {
     if (now >= viewer.idleUntil) {
       startWalking(viewer);
@@ -194,7 +217,8 @@ function updateMovement(viewer, now, deltaSeconds) {
   viewer.distanceWalked += travelled;
   if (Math.abs(viewer.targetX - viewer.x) < 0.5) {
     viewer.x = viewer.targetX;
-    startIdle(viewer, now);
+    if (viewer.state === "leaving") viewer.state = "away";
+    else startIdle(viewer, now);
   }
 }
 
@@ -216,6 +240,7 @@ function upsertViewer(payload) {
     danceUntil: now + (payload.dance_remaining || 0) * 1000,
     cheerUntil: now + (payload.cheer_remaining || 0) * 1000,
     questUntil: now + (payload.quest_remaining || 0) * 1000,
+    awayUntil: now + (payload.adventure_remaining || 0) * 1000,
   };
 
   if (existing) {
@@ -228,6 +253,8 @@ function upsertViewer(payload) {
     viewer.distanceWalked = 0;
     // Short random first pause so a batch of new arrivals doesn't set off in lockstep.
     startIdle(viewer, now, randomBetween(0, IDLE_MIN_MS));
+    // Already away when the overlay (re)loads: it shows up when it returns.
+    if (now < viewer.awayUntil) viewer.state = "away";
   }
   viewers.set(payload.username, viewer);
 }
@@ -341,7 +368,7 @@ function walkFrameColumn(distanceWalked) {
 // in side view or turned towards the camera (the "down" row). Only the
 // right-facing side row is used — left is drawn by mirroring it.
 function spritePose(viewer) {
-  if (viewer.state === "walking") {
+  if (viewer.state === "walking" || viewer.state === "leaving") {
     return {
       row: manifest.direction_row.right,
       column: walkFrameColumn(viewer.distanceWalked),
@@ -600,6 +627,7 @@ function drawName(viewer, yOffset) {
 }
 
 function drawViewer(viewer, timestamp) {
+  if (viewer.state === "away") return;
   const dancing = timestamp < viewer.danceUntil;
   const cheering = timestamp < viewer.cheerUntil;
   const questing = timestamp < viewer.questUntil;

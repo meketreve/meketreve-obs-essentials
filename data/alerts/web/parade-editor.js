@@ -65,8 +65,8 @@ async function save() {
   try {
     const { scale, speed, names, nameSize } = state;
     const next = await post({ scale, speed, names, nameSize });
-    // The quests table keeps what is being typed in it.
-    state = { ...next, quests: state.quests };
+    // The quests and prizes keep what is being typed in them.
+    state = { ...next, quests: state.quests, adventure: state.adventure };
     setSave("ok");
   } catch (e) {
     setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
@@ -183,6 +183,103 @@ function questsCard() {
       el("div", { class: "group-head" }, add, defaults)));
 }
 
+// --- Adventure: the same way as the quests, on its own key.
+let adventureTimer = null;
+function adventureChanged() {
+  setSave("saving");
+  clearTimeout(adventureTimer);
+  adventureTimer = setTimeout(saveAdventure, 400);
+}
+
+async function saveAdventure() {
+  const a = state.adventure;
+  try {
+    const next = await post({ adventure: { enabled: a.enabled, cost: a.cost, minutes: a.minutes, outcomes: a.outcomes } });
+    if (next.error) {
+      setSave("bad", next.error);
+      return;
+    }
+    next.adventure.outcomes.forEach((saved, i) => { if (a.outcomes[i]) a.outcomes[i].id = saved.id; });
+    setSave("ok");
+  } catch (e) {
+    setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
+  }
+}
+
+const KNOWN_OUTCOMES = ["nothing", "coins", "treasure", "legendary"];
+function outcomeTitle(outcome) {
+  return t("AdventureOutcome." + (KNOWN_OUTCOMES.includes(outcome.id) ? outcome.id : "custom"));
+}
+
+// The chance of each prize and the average a trip gives back, redrawn as
+// the weights change (without rebuilding the inputs being typed in).
+function refreshChances() {
+  const a = state.adventure;
+  const total = a.outcomes.reduce((sum, o) => sum + o.weight, 0);
+  document.querySelectorAll(".adventure-chance").forEach((node, i) => {
+    const o = a.outcomes[i];
+    node.textContent = total > 0 && o
+      ? ((o.weight / total) * 100).toLocaleString(document.documentElement.lang, { maximumFractionDigits: 1 }) + "%"
+      : "–";
+  });
+  const average = document.getElementById("adventureAverage");
+  if (!average) return;
+  const mean = (field) => (total > 0 ? a.outcomes.reduce((sum, o) => sum + o.weight * o[field], 0) / total : 0);
+  average.textContent = t("AdventureAverage", Math.round(mean("points")), Math.round(mean("xp")));
+}
+
+function outcomeRow(outcome, index) {
+  const a = state.adventure;
+  const title = el("input", { type: "text", value: outcome.title || "", placeholder: outcomeTitle(outcome), maxlength: 60, spellcheck: "false" });
+  title.addEventListener("input", () => { outcome.title = title.value; adventureChanged(); });
+  const weight = numberCtl(outcome.weight, 0, 1000, (v) => { outcome.weight = v; refreshChances(); adventureChanged(); });
+  const points = numberCtl(outcome.points, 0, 100000, (v) => { outcome.points = v; refreshChances(); adventureChanged(); });
+  const xp = numberCtl(outcome.xp, 0, 10000, (v) => { outcome.xp = v; refreshChances(); adventureChanged(); });
+  const remove = el("button", { type: "button", class: "btn small", text: t("QuestRemove") });
+  remove.disabled = a.outcomes.length <= 1;
+  remove.addEventListener("click", () => { a.outcomes.splice(index, 1); adventureChanged(); renderForm(); });
+  const field = (label, control, cls) => el("label", { class: "quest-field " + (cls || "") }, el("span", { text: label }), control);
+  return el("div", { class: "quest-row" },
+    field(t("AdventureColWeight"), weight),
+    field(t("AdventureColChance"), el("output", { class: "adventure-chance" })),
+    field(t("QuestColPoints"), points), field(t("QuestColXp"), xp),
+    field(t("AdventureColTitle"), title, "title"),
+    el("div", { class: "quest-actions" }, remove));
+}
+
+function adventureCard() {
+  const a = state.adventure;
+  const add = el("button", { type: "button", class: "btn small primary", text: t("AdventureAdd") });
+  add.disabled = a.outcomes.length >= a.maxOutcomes;
+  add.addEventListener("click", () => {
+    a.outcomes.push({ id: "", weight: 10, points: 50, xp: 10, title: "" });
+    adventureChanged();
+    renderForm();
+  });
+  const defaults = el("button", { type: "button", class: "btn small", text: t("AdventureDefaults") });
+  defaults.addEventListener("click", async () => {
+    if (!confirm(t("AdventureDefaultsConfirm"))) return;
+    clearTimeout(adventureTimer);
+    try {
+      const next = await post({ adventureDefaults: true });
+      state.adventure = next.adventure;
+      setSave("ok");
+      renderForm();
+    } catch (e) {
+      setSave("bad", t("SaveFailed", e.message));
+    }
+  });
+  const cost = numberCtl(a.cost, 0, 100000, (v) => { a.cost = v; adventureChanged(); });
+  return el("section", { class: "card" }, el("h3", { text: t("Adventure") }),
+    el("p", { class: "hint", text: t("AdventureNote") }),
+    row(t("AdventureOn"), switchCtl(a.enabled, (v) => { a.enabled = v; adventureChanged(); })),
+    row(t("AdventureCost"), cost),
+    row(t("AdventureMinutes"), rangeCtl(1, a.maxMinutes, 1, a.minutes, " min", (v) => { a.minutes = v; adventureChanged(); })),
+    el("div", { class: "group-panel quest-panel" }, a.outcomes.map(outcomeRow),
+      el("p", { class: "hint", id: "adventureAverage" }),
+      el("div", { class: "group-head" }, add, defaults)));
+}
+
 function row(label, control, note) {
   return el("div", { class: "row" }, el("label", { text: label }), control, note ? el("div", { class: "note", text: note }) : null);
 }
@@ -223,7 +320,9 @@ function renderForm() {
       row(t("NameSize"), rangeCtl(6, 32, 1, state.nameSize, " px", (v) => { state.nameSize = v; changed(); }))),
     el("section", { class: "card" }, el("h3", { text: t("Link") }),
       row(t("BrowserSource"), el("div", { class: "inline" }, el("code", { text: state.url }), copy), t("LinkNote"))),
-    state.quests ? questsCard() : null);
+    state.quests ? questsCard() : null,
+    state.adventure ? adventureCard() : null);
+  if (state.adventure) refreshChances();
 }
 
 async function init() {

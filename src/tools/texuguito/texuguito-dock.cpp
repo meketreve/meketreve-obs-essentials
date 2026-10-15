@@ -250,13 +250,18 @@ QJsonObject TexuguitoDock::panelState() const
 	quests.insert(QStringLiteral("maxQuests"), QuestBook::kMaxQuests);
 	quests.insert(QStringLiteral("maxPerViewer"), QuestBook::kMaxPerViewer);
 	state.insert(QStringLiteral("quests"), quests);
+	QJsonObject adventure = m_engine->quests().adventureJson();
+	adventure.insert(QStringLiteral("maxOutcomes"), QuestBook::kMaxOutcomes);
+	adventure.insert(QStringLiteral("maxMinutes"), QuestBook::kMaxAdventureMinutes);
+	state.insert(QStringLiteral("adventure"), adventure);
 	return state;
 }
 
 QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 {
-	/* The quests come on their own ({quests} or {questDefaults}), the look
-	 * on its own: each one leaves the other as it is. */
+	/* The quests come on their own ({quests} or {questDefaults}), the
+	 * adventure too ({adventure} or {adventureDefaults}), the look on its
+	 * own: each one leaves the others as they are. */
 	if (panel.contains(QStringLiteral("quests")) || panel.contains(QStringLiteral("questDefaults"))) {
 		QString error;
 		if (panel.value(QStringLiteral("questDefaults")).toBool())
@@ -265,6 +270,17 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 			error = m_engine->quests().applySettings(panel.value(QStringLiteral("quests")).toObject());
 		/* The level above the heads follows "show the level". */
 		broadcastSnapshot();
+		QJsonObject state = panelState();
+		if (!error.isEmpty())
+			state.insert(QStringLiteral("error"), T(error.toUtf8().constData()));
+		return state;
+	}
+	if (panel.contains(QStringLiteral("adventure")) || panel.contains(QStringLiteral("adventureDefaults"))) {
+		QString error;
+		if (panel.value(QStringLiteral("adventureDefaults")).toBool())
+			m_engine->quests().restoreAdventureDefaults();
+		else
+			error = m_engine->quests().applyAdventure(panel.value(QStringLiteral("adventure")).toObject());
 		QJsonObject state = panelState();
 		if (!error.isEmpty())
 			state.insert(QStringLiteral("error"), T(error.toUtf8().constData()));

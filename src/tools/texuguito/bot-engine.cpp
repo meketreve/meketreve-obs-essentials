@@ -54,7 +54,7 @@ const QSet<QString> kEnglishInvocations{
 	QStringLiteral("play"),      QStringLiteral("speak"),      QStringLiteral("sounds"),
 	QStringLiteral("stop"),      QStringLiteral("reload"),     QStringLiteral("raffle"),
 	QStringLiteral("join"),      QStringLiteral("addsound"),   QStringLiteral("quests"),
-	QStringLiteral("level"),
+	QStringLiteral("level"),     QStringLiteral("adventure"),
 };
 const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("cor"),
@@ -88,6 +88,7 @@ const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("missões"),
 	QStringLiteral("nivel"),
 	QStringLiteral("nível"),
+	QStringLiteral("aventura"),
 };
 
 } // namespace
@@ -163,6 +164,9 @@ BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *p
 	m_questSaveTimer.setInterval(10000);
 	connect(&m_questSaveTimer, &QTimer::timeout, this, [this]() { m_quests.flush(); });
 	m_questSaveTimer.start();
+	m_adventureTimer.setInterval(1000);
+	connect(&m_adventureTimer, &QTimer::timeout, this, &BotEngine::adventureTick);
+	m_adventureTimer.start();
 }
 
 QString BotEngine::keyFor(ChatPlatform platform, const QString &user)
@@ -332,8 +336,10 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 {
 	const Viewer &v = m_viewers.getOrCreate(key);
 	Status status = m_status.value(key);
+	qint64 away = m_quests.awayFor(key);
 	/* !dança or a gift from the same name on another platform animates this avatar. */
 	for (const QString &twin : presentTwins(baseName(key))) {
+		away = std::max(away, m_quests.awayFor(twin));
 		status.dancingUntil = std::max(status.dancingUntil, m_status.value(twin).dancingUntil);
 		status.cheerUntil = std::max(status.cheerUntil, m_status.value(twin).cheerUntil);
 		if (m_status.value(twin).questUntil > status.questUntil) {
@@ -366,6 +372,8 @@ QJsonObject BotEngine::viewerPayload(const QString &key)
 			   {QStringLiteral("cheer_remaining"), remaining(status.cheerUntil)},
 			   {QStringLiteral("quest_remaining"), remaining(status.questUntil)},
 			   {QStringLiteral("quest_label"), status.questLabel},
+			   /* On an adventure: the avatar walks off and comes back then. */
+			   {QStringLiteral("adventure_remaining"), static_cast<double>(away) / 1000.0},
 			   /* The avatar's quest level, when the panel shows it. */
 			   {QStringLiteral("level"), m_quests.enabled() && m_quests.showLevel()
 							     ? QJsonValue(m_quests.level(key))
@@ -838,6 +846,83 @@ void BotEngine::questProgress(const QString &key, ChatPlatform platform, Quests:
 	syncAvatar(key);
 }
 
+QString BotEngine::waitText(qint64 ms)
+{
+	const qint64 seconds = (ms + 999) / 1000;
+	return seconds >= 60 ? QStringLiteral("%1 min").arg((seconds + 59) / 60) : QStringLiteral("%1 s").arg(seconds);
+}
+
+QString BotEngine::outcomeTitle(const QString &invoked, const AdventureOutcome &outcome) const
+{
+	if (!outcome.title.isEmpty())
+		return outcome.title;
+	/* The default prizes have their own text; a new one without a title
+	 * gets a generic one. */
+	static const QSet<QString> known{QStringLiteral("nothing"), QStringLiteral("coins"), QStringLiteral("treasure"),
+					 QStringLiteral("legendary")};
+	const QByteArray key = QByteArrayLiteral("Texuguito.Parade.AdventureOutcome.") +
+			       (known.contains(outcome.id) ? outcome.id.toLatin1() : QByteArrayLiteral("custom"));
+	return tCmd(invoked, key.constData());
+}
+
+void BotEngine::startAdventure(const BotMessage &msg, const QString &key)
+{
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	if (!m_quests.adventureEnabled()) {
+		say(msg.platform, tCmd(invoked, "Texuguito.Bot.AdventureOff"));
+		return;
+	}
+	/* One that just ended comes back first, so it can go again. */
+	adventureTick();
+	if (const qint64 left = m_quests.awayFor(key); left > 0) {
+		say(msg.platform, tCmd(invoked, "Texuguito.Bot.AdventureAway").arg(msg.user, waitText(left)));
+		return;
+	}
+	const int cost = m_quests.adventureCost();
+	if (!m_points.spend(key, cost)) {
+		say(msg.platform,
+		    tCmd(invoked, "Texuguito.Bot.AdventureNoPoints").arg(msg.user).arg(cost).arg(m_points.get(key)));
+		return;
+	}
+	/* Where and in which language to tell how it went. */
+	m_quests.startAdventure(key, QStringLiteral("%1:%2").arg(static_cast<int>(msg.platform)).arg(invoked));
+	syncAvatar(key);
+	say(msg.platform,
+	    tCmd(invoked, "Texuguito.Bot.AdventureStart").arg(msg.user).arg(m_quests.adventureMinutes()).arg(cost));
+	questProgress(key, msg.platform, Quests::Kind::Spend, cost);
+}
+
+void BotEngine::adventureTick()
+{
+	for (const AdventureResult &r : m_quests.finishAdventures()) {
+		const qsizetype colon = r.tag.indexOf(QLatin1Char(':'));
+		const auto platform = static_cast<ChatPlatform>(std::clamp(r.tag.left(colon).toInt(), 0, 2));
+		const QString invoked = colon < 0 ? QString() : r.tag.mid(colon + 1);
+		m_points.add(r.key, r.outcome.points);
+		const QString name = displayName(r.key);
+		say(platform, tCmd(invoked, "Texuguito.Bot.AdventureBack")
+				      .arg(name, outcomeTitle(invoked, r.outcome))
+				      .arg(r.outcome.points)
+				      .arg(r.outcome.xp));
+		if (r.levelUp && m_quests.announce() != QuestBook::Announce::None)
+			say(platform, tCmd(invoked, "Texuguito.Bot.LevelUp").arg(name).arg(r.level));
+		if (!m_status.contains(r.key))
+			m_status[r.key].platform = platform;
+		m_status[r.key].questUntil = 0;
+		/* Coming back may finish an adventure quest: one label for both. */
+		questProgress(r.key, platform, Quests::Kind::Adventure);
+		Status &s = m_status[r.key];
+		QString label = QStringLiteral("+%1 XP").arg(r.outcome.xp);
+		if (r.outcome.points > 0)
+			label.prepend(QStringLiteral("+%1 pts ").arg(r.outcome.points));
+		if (s.questUntil > 0)
+			label += QLatin1Char(' ') + s.questLabel;
+		s.questUntil = m_clock.elapsed() + kQuestMs;
+		s.questLabel = label;
+		syncAvatar(r.key);
+	}
+}
+
 void BotEngine::registerCommands()
 {
 	const auto updated = [this](const QString &key) {
@@ -1188,6 +1273,11 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("missoes"), QStringLiteral("missões"), QStringLiteral("quest")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 sayPrivate(m, questsReply(m, key));
+		 }},
+		{QStringLiteral("aventura"),
+		 {QStringLiteral("adventure")},
+		 [this](const BotMessage &m, const QString &key, const QStringList &) {
+			 startAdventure(m, key);
 		 }},
 		{QStringLiteral("nivel"),
 		 {QStringLiteral("nível"), QStringLiteral("level"), QStringLiteral("xp")},

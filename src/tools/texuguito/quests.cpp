@@ -28,8 +28,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace {
 
-const char *const kKindIds[] = {"messages", "minutes", "dance",   "look",   "sound", "tts",
-				"spend",    "raffle",  "support", "follow", "sub"};
+const char *const kKindIds[] = {"messages", "minutes", "dance",     "look",    "sound",  "tts",
+				"spend",    "raffle",  "adventure", "support", "follow", "sub"};
 
 const char *announceId(QuestBook::Announce a)
 {
@@ -80,9 +80,9 @@ std::optional<Kind> kindFromId(const QString &id)
 
 const QList<Kind> &allKinds()
 {
-	static const QList<Kind> kinds{Kind::Messages, Kind::Minutes, Kind::Dance, Kind::Look,
-				       Kind::Sound,    Kind::Tts,     Kind::Spend, Kind::Raffle,
-				       Kind::Support,  Kind::Follow,  Kind::Sub};
+	static const QList<Kind> kinds{Kind::Messages,  Kind::Minutes, Kind::Dance,  Kind::Look,
+				       Kind::Sound,     Kind::Tts,     Kind::Spend,  Kind::Raffle,
+				       Kind::Adventure, Kind::Support, Kind::Follow, Kind::Sub};
 	return kinds;
 }
 
@@ -149,6 +149,7 @@ QList<QuestDef> QuestBook::defaults()
 		{QStringLiteral("sound1"), Kind::Sound, 1, 20, 10, true, QString()},
 		{QStringLiteral("spend100"), Kind::Spend, 100, 30, 15, true, QString()},
 		{QStringLiteral("raffle1"), Kind::Raffle, 1, 15, 10, true, QString()},
+		{QStringLiteral("adventure1"), Kind::Adventure, 1, 20, 10, true, QString()},
 		{QStringLiteral("support1"), Kind::Support, 1, 100, 50, true, QString()},
 		{QStringLiteral("follow1"), Kind::Follow, 1, 50, 25, true, QString()},
 		{QStringLiteral("sub1"), Kind::Sub, 1, 150, 75, true, QString()},
@@ -197,6 +198,30 @@ void QuestBook::load()
 	} else {
 		m_list = defaults();
 	}
+	const QJsonObject adventure = raw.value(QStringLiteral("adventure")).toObject();
+	m_adventureEnabled = adventure.value(QStringLiteral("enabled")).toBool(true);
+	m_adventureCost = clampInt(adventure.value(QStringLiteral("cost")), 50, 0, kMaxPoints);
+	m_adventureMinutes = clampInt(adventure.value(QStringLiteral("minutes")), 3, 1, kMaxAdventureMinutes);
+	m_outcomes.clear();
+	int weights = 0;
+	for (const QJsonValue v : adventure.value(QStringLiteral("outcomes")).toArray()) {
+		if (m_outcomes.size() >= kMaxOutcomes)
+			break;
+		const AdventureOutcome o = outcomeFromJson(v.toObject());
+		if (!o.id.isEmpty()) {
+			m_outcomes.append(o);
+			weights += o.weight;
+		}
+	}
+	if (weights <= 0)
+		m_outcomes = defaultOutcomes();
+	m_away.clear();
+	const QJsonObject away = raw.value(QStringLiteral("away")).toObject();
+	for (auto it = away.begin(); it != away.end(); ++it) {
+		const QJsonObject o = it.value().toObject();
+		m_away.insert(it.key().toLower(), {static_cast<qint64>(o.value(QStringLiteral("until")).toDouble()),
+						   o.value(QStringLiteral("tag")).toString()});
+	}
 	m_session = raw.value(QStringLiteral("session")).toString();
 	m_sessionStart = static_cast<qint64>(raw.value(QStringLiteral("sessionStart")).toDouble());
 	m_lastLive = static_cast<qint64>(raw.value(QStringLiteral("lastLive")).toDouble());
@@ -238,6 +263,12 @@ void QuestBook::save() const
 	root.insert(QStringLiteral("sessionStart"), static_cast<double>(m_sessionStart));
 	root.insert(QStringLiteral("lastLive"), static_cast<double>(m_lastLive));
 	root.insert(QStringLiteral("viewers"), viewers);
+	root.insert(QStringLiteral("adventure"), adventureJson());
+	QJsonObject away;
+	for (auto it = m_away.constBegin(); it != m_away.constEnd(); ++it)
+		away.insert(it.key(), QJsonObject{{QStringLiteral("until"), static_cast<double>(it->until)},
+						  {QStringLiteral("tag"), it->tag}});
+	root.insert(QStringLiteral("away"), away);
 	BotData::writeJsonFile(m_path, root);
 }
 
@@ -288,6 +319,138 @@ void QuestBook::restoreDefaults()
 {
 	m_list = defaults();
 	save();
+}
+
+QList<AdventureOutcome> QuestBook::defaultOutcomes()
+{
+	/* {id, weight, points, xp}: with the default cost of 50 a viewer gets
+	 * about the points back on average, and the XP on top. */
+	return {
+		{QStringLiteral("nothing"), 35, 0, 5, QString()},
+		{QStringLiteral("coins"), 40, 50, 10, QString()},
+		{QStringLiteral("treasure"), 20, 100, 15, QString()},
+		{QStringLiteral("legendary"), 5, 200, 30, QString()},
+	};
+}
+
+QJsonObject QuestBook::toJson(const AdventureOutcome &outcome)
+{
+	return QJsonObject{{QStringLiteral("id"), outcome.id},
+			   {QStringLiteral("weight"), outcome.weight},
+			   {QStringLiteral("points"), outcome.points},
+			   {QStringLiteral("xp"), outcome.xp},
+			   {QStringLiteral("title"), outcome.title}};
+}
+
+AdventureOutcome QuestBook::outcomeFromJson(const QJsonObject &obj)
+{
+	AdventureOutcome o;
+	o.id = obj.value(QStringLiteral("id")).toString().trimmed();
+	o.weight = clampInt(obj.value(QStringLiteral("weight")), 1, 0, kMaxWeight);
+	o.points = clampInt(obj.value(QStringLiteral("points")), 0, 0, kMaxPoints);
+	o.xp = clampInt(obj.value(QStringLiteral("xp")), 0, 0, kMaxXp);
+	o.title = obj.value(QStringLiteral("title")).toString().simplified().left(kMaxTitle);
+	return o;
+}
+
+QJsonObject QuestBook::adventureJson() const
+{
+	QJsonArray outcomes;
+	for (const AdventureOutcome &o : m_outcomes)
+		outcomes.append(toJson(o));
+	return QJsonObject{{QStringLiteral("enabled"), m_adventureEnabled},
+			   {QStringLiteral("cost"), m_adventureCost},
+			   {QStringLiteral("minutes"), m_adventureMinutes},
+			   {QStringLiteral("outcomes"), outcomes}};
+}
+
+QString QuestBook::applyAdventure(const QJsonObject &settings)
+{
+	QList<AdventureOutcome> outcomes = m_outcomes;
+	if (settings.contains(QStringLiteral("outcomes"))) {
+		const QJsonArray raw = settings.value(QStringLiteral("outcomes")).toArray();
+		if (raw.size() > kMaxOutcomes)
+			return QStringLiteral("Texuguito.Parade.AdventureErrorTooMany");
+		outcomes.clear();
+		QSet<QString> ids;
+		int weights = 0;
+		for (const QJsonValue v : raw) {
+			AdventureOutcome o = outcomeFromJson(v.toObject());
+			if (o.id.isEmpty() || ids.contains(o.id))
+				o.id = QStringLiteral("a") + QUuid::createUuid().toString(QUuid::Id128).left(8);
+			ids.insert(o.id);
+			weights += o.weight;
+			outcomes.append(o);
+		}
+		if (weights <= 0)
+			return QStringLiteral("Texuguito.Parade.AdventureErrorNoChance");
+	}
+	m_outcomes = outcomes;
+	m_adventureEnabled = settings.value(QStringLiteral("enabled")).toBool(m_adventureEnabled);
+	m_adventureCost = clampInt(settings.value(QStringLiteral("cost")), m_adventureCost, 0, kMaxPoints);
+	m_adventureMinutes =
+		clampInt(settings.value(QStringLiteral("minutes")), m_adventureMinutes, 1, kMaxAdventureMinutes);
+	save();
+	return QString();
+}
+
+void QuestBook::restoreAdventureDefaults()
+{
+	m_outcomes = defaultOutcomes();
+	m_adventureCost = 50;
+	m_adventureMinutes = 3;
+	save();
+}
+
+qint64 QuestBook::awayFor(const QString &key) const
+{
+	const auto it = m_away.constFind(key.toLower());
+	return it == m_away.constEnd() ? 0 : std::max<qint64>(0, it->until - m_clock());
+}
+
+bool QuestBook::startAdventure(const QString &key, const QString &tag)
+{
+	if (!m_adventureEnabled || key.isEmpty() || m_away.contains(key.toLower()))
+		return false;
+	m_away.insert(key.toLower(), {m_clock() + m_adventureMinutes * 60000LL, tag});
+	save();
+	return true;
+}
+
+QList<AdventureResult> QuestBook::finishAdventures()
+{
+	QList<AdventureResult> results;
+	const qint64 now = m_clock();
+	int weights = 0;
+	for (const AdventureOutcome &o : std::as_const(m_outcomes))
+		weights += o.weight;
+	for (auto it = m_away.begin(); it != m_away.end();) {
+		if (it->until > now) {
+			++it;
+			continue;
+		}
+		/* Turned off in the middle: they still come back with a prize. */
+		AdventureOutcome outcome;
+		if (weights > 0) {
+			int roll = std::clamp(m_choose(weights), 0, weights - 1);
+			for (const AdventureOutcome &o : std::as_const(m_outcomes)) {
+				if (roll < o.weight) {
+					outcome = o;
+					break;
+				}
+				roll -= o.weight;
+			}
+		}
+		Progress &p = m_viewers[it.key()];
+		const int before = Quests::levelFor(p.xp);
+		p.xp += outcome.xp;
+		const int after = Quests::levelFor(p.xp);
+		results.append({it.key(), it->tag, outcome, p.xp, after, after > before});
+		it = m_away.erase(it);
+	}
+	if (!results.isEmpty())
+		save();
+	return results;
 }
 
 void QuestBook::newSession()

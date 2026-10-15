@@ -1336,6 +1336,163 @@ private slots:
 				.value(QStringLiteral("level"))
 				.isNull());
 	}
+
+	void questAdventureBook()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("quests.json"));
+		qint64 now = 1000000;
+		int roll = 0;
+		QuestBook book(path, [&roll](int) { return roll; }, [&now]() { return now; });
+		QVERIFY(book.adventureEnabled());
+		QCOMPARE(book.adventureCost(), 50);
+		QCOMPARE(book.adventureMinutes(), 3);
+		QCOMPARE(book.outcomes().size(), QuestBook::defaultOutcomes().size());
+
+		QCOMPARE(book.awayFor(QStringLiteral("ana")), 0);
+		QVERIFY(book.startAdventure(QStringLiteral("Ana"), QStringLiteral("2:aventura")));
+		QVERIFY(!book.startAdventure(QStringLiteral("ana"), QString()));
+		QCOMPARE(book.awayFor(QStringLiteral("ANA")), 3 * 60000LL);
+		now += 60000;
+		QCOMPARE(book.awayFor(QStringLiteral("ana")), 2 * 60000LL);
+		QVERIFY(book.finishAdventures().isEmpty());
+
+		/* Away survives OBS closing; it ends when the time is up. Weights
+		 * 35/40/20/5: roll 99 is the last one, the legendary chest. */
+		QuestBook again(path, [&roll](int) { return roll; }, [&now]() { return now; });
+		QCOMPARE(again.awayFor(QStringLiteral("ana")), 2 * 60000LL);
+		now += 2 * 60000;
+		roll = 99;
+		QList<AdventureResult> back = again.finishAdventures();
+		QCOMPARE(back.size(), 1);
+		QCOMPARE(back[0].key, QStringLiteral("ana"));
+		QCOMPARE(back[0].tag, QStringLiteral("2:aventura"));
+		QCOMPARE(back[0].outcome.id, QStringLiteral("legendary"));
+		QCOMPARE(back[0].outcome.points, 200);
+		QCOMPARE(back[0].xp, 30);
+		QVERIFY(!back[0].levelUp);
+		QCOMPARE(again.xp(QStringLiteral("ana")), 30);
+		QCOMPARE(again.awayFor(QStringLiteral("ana")), 0);
+		QVERIFY(again.finishAdventures().isEmpty());
+		/* Roll 35 is the first of the coins (after 35 of nothing). */
+		roll = 35;
+		QVERIFY(again.startAdventure(QStringLiteral("ana"), QString()));
+		now += 3 * 60000;
+		back = again.finishAdventures();
+		QCOMPARE(back[0].outcome.id, QStringLiteral("coins"));
+		QCOMPARE(back[0].xp, 40);
+
+		/* Settings: limits, a new prize gets an id, all weights zero is refused. */
+		QJsonArray tooMany;
+		for (int i = 0; i <= QuestBook::kMaxOutcomes; ++i)
+			tooMany.append(QuestBook::toJson(QuestBook::defaultOutcomes().first()));
+		QCOMPARE(again.applyAdventure(QJsonObject{{QStringLiteral("outcomes"), tooMany}}),
+			 QStringLiteral("Texuguito.Parade.AdventureErrorTooMany"));
+		const QJsonArray zero{QJsonObject{{QStringLiteral("weight"), 0}, {QStringLiteral("points"), 5}}};
+		QCOMPARE(again.applyAdventure(QJsonObject{{QStringLiteral("outcomes"), zero}}),
+			 QStringLiteral("Texuguito.Parade.AdventureErrorNoChance"));
+		const QJsonArray one{QJsonObject{{QStringLiteral("weight"), 5000},
+						 {QStringLiteral("points"), -3},
+						 {QStringLiteral("xp"), 7},
+						 {QStringLiteral("title"), QStringLiteral("  um   bolo ")}}};
+		QCOMPARE(again.applyAdventure(QJsonObject{{QStringLiteral("outcomes"), one},
+							  {QStringLiteral("cost"), 10},
+							  {QStringLiteral("minutes"), 999}}),
+			 QString());
+		QCOMPARE(again.adventureCost(), 10);
+		QCOMPARE(again.adventureMinutes(), QuestBook::kMaxAdventureMinutes);
+		const AdventureOutcome cake = again.outcomes().first();
+		QVERIFY(cake.id.startsWith(QLatin1Char('a')));
+		QCOMPARE(cake.weight, QuestBook::kMaxWeight);
+		QCOMPARE(cake.points, 0);
+		QCOMPARE(cake.title, QStringLiteral("um bolo"));
+		QuestBook third(path);
+		QCOMPARE(third.outcomes().size(), 1);
+		QCOMPARE(third.adventureCost(), 10);
+		third.restoreAdventureDefaults();
+		QCOMPARE(third.outcomes().size(), QuestBook::defaultOutcomes().size());
+		QCOMPARE(third.adventureMinutes(), 3);
+
+		/* Off: nobody leaves. */
+		third.applyAdventure(QJsonObject{{QStringLiteral("enabled"), false}});
+		QVERIFY(!third.startAdventure(QStringLiteral("beto"), QString()));
+	}
+
+	void questAdventureInTheBot()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		bot.setText(locale("pt-BR.ini"));
+		qint64 now = 1000000;
+		bot.quests().setClock([&now]() { return now; });
+		/* One quest (come back once) and one prize: nothing left to chance. */
+		const QJsonArray list{QJsonObject{{QStringLiteral("id"), QStringLiteral("trip")},
+						  {QStringLiteral("kind"), QStringLiteral("adventure")},
+						  {QStringLiteral("points"), 4},
+						  {QStringLiteral("xp"), 2}}};
+		QCOMPARE(bot.quests().applySettings(QJsonObject{{QStringLiteral("list"), list}}), QString());
+		const QJsonArray prize{QJsonObject{{QStringLiteral("id"), QStringLiteral("treasure")},
+						   {QStringLiteral("weight"), 1},
+						   {QStringLiteral("points"), 80},
+						   {QStringLiteral("xp"), 60}}};
+		QCOMPARE(bot.quests().applyAdventure(QJsonObject{{QStringLiteral("outcomes"), prize}}), QString());
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+		const auto lastViewer = [&overlay]() {
+			return overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
+		};
+
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Ana, a aventura custa 50 pts (você tem 0)."));
+		bot.points().add(QStringLiteral("kick:ana"), 70);
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!adventure"), ChatPlatform::Kick));
+		QCOMPARE(replies(said),
+			 QStringList{QStringLiteral("🗺️ Ana set off on an adventure! Back in 3 min (-50 pts).")});
+		QCOMPARE(said.last().at(0).value<ChatPlatform>(), ChatPlatform::Kick);
+		QCOMPARE(bot.points().get(QStringLiteral("kick:ana")), 20);
+		QCOMPARE(lastViewer().value(QStringLiteral("adventure_remaining")).toDouble(), 180.0);
+
+		now += 2 * 60000 + 20000;
+		bot.adventureTick();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("🗺️ Ana, seu avatar ainda está na aventura. Volta em 40 s."));
+		QCOMPARE(bot.points().get(QStringLiteral("kick:ana")), 20);
+
+		/* Back, in the language it went in, on the platform it came from. */
+		now += 40000;
+		said.clear();
+		bot.adventureTick();
+		QCOMPARE(replies(said), (QStringList{QStringLiteral("🎒 Ana is back from the adventure with a hidden "
+								    "treasure 💰! +80 pts, +60 XP"),
+						     QStringLiteral("⭐ Ana reached level 2!")}));
+		QCOMPARE(said.last().at(0).value<ChatPlatform>(), ChatPlatform::Kick);
+		QCOMPARE(bot.points().get(QStringLiteral("kick:ana")), 104); /* 20 + 80 + the quest's 4 */
+		QCOMPARE(bot.quests().xp(QStringLiteral("kick:ana")), 62);
+		const QJsonObject back = lastViewer();
+		QCOMPARE(back.value(QStringLiteral("adventure_remaining")).toDouble(), 0.0);
+		QCOMPARE(back.value(QStringLiteral("quest_label")).toString(), QStringLiteral("+80 pts +60 XP +2 XP"));
+		QVERIFY(bot.quests().questsFor(QStringLiteral("kick:ana")).first().done);
+
+		/* A prize without points: no "+0 pts" over the head. */
+		const QJsonArray empty{QJsonObject{{QStringLiteral("id"), QStringLiteral("nothing")},
+						   {QStringLiteral("points"), 0},
+						   {QStringLiteral("xp"), 5}}};
+		bot.quests().applyAdventure(QJsonObject{{QStringLiteral("outcomes"), empty}});
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
+		now += 3 * 60000;
+		said.clear();
+		bot.adventureTick();
+		QCOMPARE(replies(said), QStringList{QStringLiteral("🎒 Ana voltou da aventura com as mãos vazias, só a "
+								   "experiência 🍂! +0 pts, +5 XP")});
+		QCOMPARE(lastViewer().value(QStringLiteral("quest_label")).toString(), QStringLiteral("+5 XP"));
+
+		bot.quests().applyAdventure(QJsonObject{{QStringLiteral("enabled"), false}});
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ As aventuras estão desligadas."));
+	}
 };
 
 QTEST_GUILESS_MAIN(TestTexuguito)

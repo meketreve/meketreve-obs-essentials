@@ -84,6 +84,7 @@ input.num { width: 90px; }
 .quest-field input.num { width: 84px; }
 .quest-field.kind select { width: 170px; }
 .quest-field.title { flex: 1; min-width: 160px; }
+.quest-field output.adventure-chance { min-width: 56px; padding: 7px 0; font-variant-numeric: tabular-nums; }
 .quest-actions { margin-left: auto; align-self: center; }
 .hint.bad { color: var(--bad); }
 .empty-row td { color: var(--muted); text-align: center; padding: 14px; }

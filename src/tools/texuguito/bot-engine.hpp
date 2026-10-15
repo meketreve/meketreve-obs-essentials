@@ -156,6 +156,9 @@ public:
 	void setStreamerChannels(const QList<QPair<ChatPlatform, QString>> &channels);
 	/* Runs the per-minute points tick now (the timer calls it too). */
 	void pointsTick();
+	/* Brings back the avatars whose adventure is over (a timer calls it
+	 * every second): pays the prize and says it in the chat. */
+	void adventureTick();
 	void refreshPresence();
 
 	QJsonObject snapshot();
@@ -230,6 +233,10 @@ private:
 	/* The quest's name as the chat reads it, in the command's language. */
 	QString questTitle(const QString &invoked, const QuestDef &quest) const;
 	QString questsReply(const BotMessage &msg, const QString &key);
+	void startAdventure(const BotMessage &msg, const QString &key);
+	QString outcomeTitle(const QString &invoked, const AdventureOutcome &outcome) const;
+	/* "3 min" or "40 s": how long until an avatar comes back. */
+	static QString waitText(qint64 ms);
 	void sayPrivate(const BotMessage &msg, const QString &text);
 
 	ViewerStore m_viewers;
@@ -268,6 +275,7 @@ private:
 	QTimer m_pointsTimer;
 	QTimer m_presenceTimer;
 	QTimer m_questSaveTimer;
+	QTimer m_adventureTimer;
 };
 
 namespace BotText {
