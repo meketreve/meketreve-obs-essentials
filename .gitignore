@@ -19,6 +19,12 @@
 !LICENSE
 !README.md
 
+# Only the cloud session hook from .claude (the rest stays local)
+!/.claude
+/.claude/*
+!/.claude/settings.json
+!/.claude/hooks
+
 # Exclude lock files
 *.lock.json
 
