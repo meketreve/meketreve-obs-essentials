@@ -60,7 +60,13 @@
                   "en": "Shows your level and how much XP the next one takes."}},
         {"pt": "!aventura", "en": "!adventure", "who": "all",
          "desc": {"pt": "Paga pontos (50 no padrão) e manda o seu avatar numa aventura: ele sai do desfile e volta em alguns minutos com um prêmio sorteado (pontos e XP), que o bot conta no chat. Uma aventura por vez.",
-                  "en": "Pays points (50 by default) to send your avatar on an adventure: it leaves the parade and comes back a few minutes later with a random prize (points and XP), which the bot tells the chat. One adventure at a time."}}
+                  "en": "Pays points (50 by default) to send your avatar on an adventure: it leaves the parade and comes back a few minutes later with a random prize (points and XP), which the bot tells the chat. One adventure at a time."}},
+        {"pt": "!atacar", "en": "!attack", "who": "all",
+         "desc": {"pt": "Bate no chefão que está no desfile (10 de dano, a cada 10 s). Conversar no chat também bate, e apoio, sub e follow batem forte. Se ele cair a tempo, todo mundo que bateu ganha pontos e XP, e quem bateu mais leva um bônus.",
+                  "en": "Hits the boss on the parade (10 damage, every 10 s). Chatting hits it too, and support, subs and follows hit hard. Beaten in time, everyone who hit it gets points and XP, and whoever hit hardest gets a bonus."}},
+        {"pt": "!chefao", "en": "!boss", "also": ["!chefão"], "who": "all",
+         "desc": {"pt": "Mostra a vida do chefão e quanto tempo falta para ele fugir. Mod ou streamer sem chefão no desfile: chama um.",
+                  "en": "Shows the boss's HP and how long until it gets away. A mod or the streamer with no boss on the parade: calls one."}}
       ]
     },
     {

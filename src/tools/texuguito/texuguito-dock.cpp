@@ -254,14 +254,23 @@ QJsonObject TexuguitoDock::panelState() const
 	adventure.insert(QStringLiteral("maxOutcomes"), QuestBook::kMaxOutcomes);
 	adventure.insert(QStringLiteral("maxMinutes"), QuestBook::kMaxAdventureMinutes);
 	state.insert(QStringLiteral("adventure"), adventure);
+	const BossFight &fight = m_engine->boss();
+	QJsonObject boss = fight.settingsJson();
+	boss.insert(QStringLiteral("active"), fight.active());
+	boss.insert(QStringLiteral("hp"), fight.hp());
+	boss.insert(QStringLiteral("maxHp"), fight.maxHp());
+	boss.insert(QStringLiteral("maxMinutes"), BossFight::kMaxMinutes);
+	boss.insert(QStringLiteral("maxAutoMinutes"), BossFight::kMaxAutoMinutes);
+	state.insert(QStringLiteral("boss"), boss);
 	return state;
 }
 
 QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 {
 	/* The quests come on their own ({quests} or {questDefaults}), the
-	 * adventure too ({adventure} or {adventureDefaults}), the look on its
-	 * own: each one leaves the others as they are. */
+	 * adventure too ({adventure} or {adventureDefaults}), the boss
+	 * ({boss}, {bossDefaults} or {bossCall}), the look on its own: each
+	 * one leaves the others as they are. */
 	if (panel.contains(QStringLiteral("quests")) || panel.contains(QStringLiteral("questDefaults"))) {
 		QString error;
 		if (panel.value(QStringLiteral("questDefaults")).toBool())
@@ -284,6 +293,20 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 		QJsonObject state = panelState();
 		if (!error.isEmpty())
 			state.insert(QStringLiteral("error"), T(error.toUtf8().constData()));
+		return state;
+	}
+	if (panel.contains(QStringLiteral("boss")) || panel.contains(QStringLiteral("bossDefaults")) ||
+	    panel.contains(QStringLiteral("bossCall"))) {
+		QString error;
+		if (panel.value(QStringLiteral("bossDefaults")).toBool())
+			m_engine->boss().restoreDefaults();
+		else if (panel.value(QStringLiteral("bossCall")).toBool())
+			error = m_engine->startBoss() ? QString() : T("Texuguito.Parade.BossErrorCall");
+		else
+			m_engine->boss().applySettings(panel.value(QStringLiteral("boss")).toObject());
+		QJsonObject state = panelState();
+		if (!error.isEmpty())
+			state.insert(QStringLiteral("error"), error);
 		return state;
 	}
 	m_scale = std::clamp(panel.value(QStringLiteral("scale")).toDouble(m_scale), 0.5, 4.0);

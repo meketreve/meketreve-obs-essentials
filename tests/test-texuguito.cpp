@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
+#include "boss.hpp"
 #include "bot-engine.hpp"
 #include "overlay-server.hpp"
 #include "quests.hpp"
@@ -1094,13 +1095,13 @@ private slots:
 		QCOMPARE(book.level(QStringLiteral("ANA")), 2);
 
 		const QList<QuestEntry> list = book.questsFor(QStringLiteral("ana"));
-		QCOMPARE(list.size(), 6); /* 3 drawn + support, follow, sub */
+		QCOMPARE(list.size(), 7); /* 3 drawn + boss, support, follow, sub */
 		QCOMPARE(list[0].quest.id, QStringLiteral("chat10"));
 		QVERIFY(list[0].done);
 		QCOMPARE(list[2].quest.id, QStringLiteral("stay15"));
 		QCOMPARE(list[2].count, 0);
 		QVERIFY(!list[2].done);
-		QVERIFY(list[4].done); /* follow1 */
+		QVERIFY(list[5].done); /* follow1 */
 
 		/* Read back from disk: the same progress. */
 		QuestBook again(path, [](int) { return 0; }, [&now]() { return now; });
@@ -1492,6 +1493,189 @@ private slots:
 		bot.quests().applyAdventure(QJsonObject{{QStringLiteral("enabled"), false}});
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ As aventuras estão desligadas."));
+	}
+
+	void bossFight()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("boss.json"));
+		qint64 now = 1000000;
+		BossFight fight(path, [&now]() { return now; });
+		QVERIFY(fight.enabled());
+		QVERIFY(!fight.active());
+		QCOMPARE(fight.hit(QStringLiteral("ana"), BossFight::Hit::Attack), 0);
+		QVERIFY(!fight.finish());
+
+		/* 100 + 30 per viewer; a second one cannot start. */
+		QVERIFY(fight.start(4));
+		QVERIFY(!fight.start(4));
+		QCOMPARE(fight.maxHp(), 220);
+		QCOMPARE(fight.remainingMs(), 5 * 60000LL);
+
+		/* Chat lines every 5 s, !attack every 10 s, each kind on its own. */
+		QCOMPARE(fight.hit(QStringLiteral("Ana"), BossFight::Hit::Message), 2);
+		QCOMPARE(fight.hit(QStringLiteral("ana"), BossFight::Hit::Message), 0);
+		QCOMPARE(fight.hit(QStringLiteral("ana"), BossFight::Hit::Attack), 10);
+		now += 5000;
+		QCOMPARE(fight.hit(QStringLiteral("ana"), BossFight::Hit::Message), 2);
+		QCOMPARE(fight.hit(QStringLiteral("ana"), BossFight::Hit::Attack), 0);
+		QCOMPARE(fight.hit(QStringLiteral("beto"), BossFight::Hit::Support), 100);
+		QCOMPARE(fight.hit(QStringLiteral("beto"), BossFight::Hit::Support), 100);
+		QCOMPARE(fight.hp(), 6);
+		QVERIFY(!fight.finish());
+		/* The last hit only takes what is left. */
+		QCOMPARE(fight.hit(QStringLiteral("caio"), BossFight::Hit::Follow), 6);
+		QCOMPARE(fight.hit(QStringLiteral("caio"), BossFight::Hit::Sub), 0);
+		std::optional<BossFight::Result> r = fight.finish();
+		QVERIFY(r);
+		QVERIFY(r->defeated);
+		QCOMPARE(r->damage.size(), 3);
+		QCOMPARE(r->damage[0], qMakePair(QStringLiteral("beto"), 200));
+		QCOMPARE(r->damage[1], qMakePair(QStringLiteral("ana"), 14));
+		QCOMPARE(r->damage[2], qMakePair(QStringLiteral("caio"), 6));
+		QVERIFY(!fight.active());
+		QVERIFY(!fight.finish());
+
+		/* Not beaten in time: it gets away. */
+		QVERIFY(fight.start(0));
+		QCOMPARE(fight.maxHp(), 100);
+		fight.hit(QStringLiteral("ana"), BossFight::Hit::Attack);
+		now += 5 * 60000;
+		QCOMPARE(fight.hit(QStringLiteral("beto"), BossFight::Hit::Attack), 0);
+		r = fight.finish();
+		QVERIFY(r && !r->defeated);
+		QCOMPARE(r->hpLeft, 90);
+
+		/* On its own: only live, every autoMinutes from the live or the last fight. */
+		fight.applySettings(QJsonObject{{QStringLiteral("autoMinutes"), 20},
+						{QStringLiteral("baseHp"), 0},
+						{QStringLiteral("name"), QStringLiteral("  Rei   Rato ")},
+						{QStringLiteral("minutes"), 99}});
+		QCOMPARE(fight.baseHp(), 1);
+		QCOMPARE(fight.minutes(), BossFight::kMaxMinutes);
+		QCOMPARE(fight.name(), QStringLiteral("Rei Rato"));
+		QVERIFY(!fight.autoDue(false));
+		QVERIFY(!fight.autoDue(true));
+		now += 19 * 60000;
+		QVERIFY(!fight.autoDue(true));
+		now += 60000;
+		QVERIFY(fight.autoDue(true));
+		QVERIFY(fight.start(0));
+		QVERIFY(!fight.autoDue(true));
+		now += BossFight::kMaxMinutes * 60000LL;
+		QVERIFY(fight.finish());
+		QVERIFY(!fight.autoDue(true));
+		now += 20 * 60000;
+		QVERIFY(fight.autoDue(true));
+		QVERIFY(!fight.autoDue(false)); /* off stream: counts again from the next live */
+		QVERIFY(!fight.autoDue(true));
+
+		BossFight again(path);
+		QCOMPARE(again.name(), QStringLiteral("Rei Rato"));
+		QCOMPARE(again.autoMinutes(), 20);
+		again.restoreDefaults();
+		QCOMPARE(again.autoMinutes(), 0);
+		QCOMPARE(again.name(), QString());
+		again.applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
+		QVERIFY(!again.start(3));
+	}
+
+	void bossInTheBot()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		bot.setText(locale("pt-BR.ini"));
+		/* Only the boss quest, so nothing else pays points. */
+		const QJsonArray list{QJsonObject{{QStringLiteral("id"), QStringLiteral("b")},
+						  {QStringLiteral("kind"), QStringLiteral("boss")},
+						  {QStringLiteral("points"), 5},
+						  {QStringLiteral("xp"), 1}}};
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("list"), list}});
+		bot.boss().applySettings(
+			QJsonObject{{QStringLiteral("baseHp"), 10}, {QStringLiteral("hpPerViewer"), 1}});
+		qint64 now = 1000000;
+		bot.boss().setClock([&now]() { return now; });
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+		const auto lastBoss = [&overlay]() {
+			for (qsizetype i = overlay.size() - 1; i >= 0; --i) {
+				const QJsonObject m = overlay.at(i).at(0).toJsonObject();
+				if (m.value(QStringLiteral("type")).toString() == QLatin1String("boss"))
+					return m.value(QStringLiteral("boss")).toObject();
+			}
+			return QJsonObject();
+		};
+
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!atacar")));
+		QCOMPARE(replies(said).last(), QStringLiteral("Ana, não tem chefão agora."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!chefao")));
+		QCOMPARE(replies(said).last(), QStringLiteral("Ana, não tem chefão agora."));
+
+		/* A mod on Kick calls it: Ana (Twitch), Beto and the mod (Kick) are here. */
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("oi"), ChatPlatform::Kick));
+		BotMessage mod = msg(QStringLiteral("Mod"), QStringLiteral("!boss"), ChatPlatform::Kick);
+		mod.isMod = true;
+		said.clear();
+		bot.handleMessage(mod);
+		QVERIFY(bot.boss().active());
+		QCOMPARE(bot.boss().maxHp(), 13);
+		QCOMPARE(said.size(), 2); /* both chats */
+		QCOMPARE(replies(said).first(),
+			 QStringLiteral("⚔️ Um chefão apareceu: Texugão Sombrio, com 13 de vida! "
+					"Ataquem com !atacar e conversando no chat; vocês têm 5 min."));
+		QCOMPARE(lastBoss().value(QStringLiteral("max_hp")).toInt(), 13);
+		QVERIFY(lastBoss().value(QStringLiteral("active")).toBool());
+		QVERIFY(bot.snapshot().value(QStringLiteral("boss")).toObject().value(QStringLiteral("active")).toBool());
+
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!attack")));
+		QVERIFY(said.isEmpty());
+		QCOMPARE(lastBoss().value(QStringLiteral("hp")).toInt(), 3);
+		const QJsonObject hit = lastBoss().value(QStringLiteral("hit")).toObject();
+		QCOMPARE(hit.value(QStringLiteral("nick")).toString(), QStringLiteral("Ana"));
+		QCOMPARE(hit.value(QStringLiteral("damage")).toInt(), 10);
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("!chefao"), ChatPlatform::Kick));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("⚔️ Texugão Sombrio: 3/13 de vida, foge em 5 min. Ataquem com !atacar!"));
+
+		/* Beto's line takes 2, a gift the last 1: beaten at once. */
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("vai!"), ChatPlatform::Kick));
+		bot.handleCheer(ChatPlatform::Kick, QStringLiteral("Beto"));
+		QVERIFY(!bot.boss().active());
+		QCOMPARE(lastBoss().value(QStringLiteral("result")).toString(), QStringLiteral("defeated"));
+		QCOMPARE(replies(said).first(),
+			 QStringLiteral("🏆 Texugão Sombrio caiu! 2 pessoas ganharam 100 pts e 30 XP. "
+					"MVP: Ana (10 de dano, +50 pts)."));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 155); /* 100 + MVP 50 + quest 5 */
+		QCOMPARE(bot.points().get(QStringLiteral("kick:beto")), 105);
+		QCOMPARE(bot.quests().xp(QStringLiteral("kick:beto")), 31);
+		QVERIFY(bot.quests().questsFor(QStringLiteral("ana")).first().done);
+		/* Over the head: the boss's reward, then the quest it finished. */
+		const QJsonObject beto = overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
+		QCOMPARE(beto.value(QStringLiteral("username")).toString(), QStringLiteral("kick:beto"));
+		QCOMPARE(beto.value(QStringLiteral("quest_label")).toString(), QStringLiteral("+100 pts +30 XP +1 XP"));
+
+		/* Off: a mod cannot call it. */
+		bot.boss().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
+		bot.handleMessage(mod);
+		/* !boss is English: so is the answer. */
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("❌ The boss is turned off (it can be turned on in the panel's Parade tab)."));
+		QVERIFY(!bot.startBoss());
+
+		/* Time is up: it gets away, nobody is paid. */
+		bot.boss().applySettings(QJsonObject{{QStringLiteral("enabled"), true}});
+		QVERIFY(bot.startBoss());
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!atacar")));
+		now += 5 * 60000;
+		said.clear();
+		bot.bossTick();
+		QVERIFY(!bot.boss().active());
+		QCOMPARE(lastBoss().value(QStringLiteral("result")).toString(), QStringLiteral("escaped"));
+		QCOMPARE(replies(said).first(), QStringLiteral("💨 Texugão Sombrio fugiu! Faltaram 3 de vida."));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 155);
 	}
 };
 

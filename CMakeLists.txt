@@ -147,6 +147,8 @@ target_sources(
     src/tools/pngtuber/pngtuber-logic.hpp
     src/tools/pngtuber/pngtuber-source.cpp
     src/tools/pngtuber/pngtuber.h
+    src/tools/texuguito/boss.cpp
+    src/tools/texuguito/boss.hpp
     src/tools/texuguito/bot-colors.cpp
     src/tools/texuguito/bot-colors.hpp
     src/tools/texuguito/bot-data.cpp

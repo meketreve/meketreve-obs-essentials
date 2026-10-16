@@ -113,6 +113,8 @@ set(_texuguito "${CMAKE_SOURCE_DIR}/src/tools/texuguito")
 add_executable(
   test-texuguito
   test-texuguito.cpp
+  ${_texuguito}/boss.cpp
+  ${_texuguito}/boss.hpp
   ${_texuguito}/bot-colors.cpp
   ${_texuguito}/bot-data.cpp
   ${_texuguito}/bot-engine.cpp

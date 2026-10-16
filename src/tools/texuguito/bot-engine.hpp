@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 #pragma once
 
+#include "boss.hpp"
 #include "bot-data.hpp"
 #include "quests.hpp"
 #include "sound-fetch.hpp"
@@ -148,8 +149,13 @@ public:
 	void handleCheer(ChatPlatform platform, const QString &user);
 	/* A follow or a sub from the platform, for the bonus quests. */
 	void handleQuestEvent(ChatPlatform platform, const QString &user, Quests::Kind kind);
-	/* The stream is live (or not): a new live draws new quests. */
-	void setLive(bool live) { m_quests.setLive(live); }
+	/* The stream is live (or not): a new live draws new quests, and the
+	 * boss can come on its own. */
+	void setLive(bool live)
+	{
+		m_live = live;
+		m_quests.setLive(live);
+	}
 	/* Twitch viewer list (Helix chatters): who is watching even if quiet. */
 	void setTwitchChatters(const QSet<QString> &logins);
 	/* The streamer's own channels: their avatar never leaves the parade. */
@@ -159,6 +165,12 @@ public:
 	/* Brings back the avatars whose adventure is over (a timer calls it
 	 * every second): pays the prize and says it in the chat. */
 	void adventureTick();
+	/* Calls the boss now (the web panel's button, !boss): false when
+	 * bosses are off or one is already on. */
+	bool startBoss();
+	/* Ends the fight when the boss is beaten or the time is up, and calls
+	 * one on its own when it is time (a timer calls it every second). */
+	void bossTick();
 	void refreshPresence();
 
 	QJsonObject snapshot();
@@ -167,6 +179,7 @@ public:
 	ViewerStore &viewers() { return m_viewers; }
 	CustomCommandStore &customCommands() { return m_custom; }
 	QuestBook &quests() { return m_quests; }
+	BossFight &boss() { return m_boss; }
 	/* Creates or changes a chat-made command from the web panel, with the
 	 * same rules as "!comando add": empty when done, else the error. */
 	QString setCustomCommand(const QString &name, const QString &response);
@@ -235,6 +248,14 @@ private:
 	QString questsReply(const BotMessage &msg, const QString &key);
 	void startAdventure(const BotMessage &msg, const QString &key);
 	QString outcomeTitle(const QString &invoked, const AdventureOutcome &outcome) const;
+	void bossHit(const QString &key, BossFight::Hit hit);
+	void endBoss(const BossFight::Result &result);
+	/* The boss as the overlay draws it. */
+	QJsonObject bossJson() const;
+	QString bossName() const;
+	/* Says text in every chat someone is talking in now (the boss is
+	 * everyone's), and in also's. */
+	void sayEverywhere(const QString &text, std::optional<ChatPlatform> also = std::nullopt);
 	/* "3 min" or "40 s": how long until an avatar comes back. */
 	static QString waitText(qint64 ms);
 	void sayPrivate(const BotMessage &msg, const QString &text);
@@ -243,6 +264,8 @@ private:
 	PointsStore m_points;
 	CustomCommandStore m_custom;
 	QuestBook m_quests;
+	BossFight m_boss;
+	bool m_live = false;
 	Raffle m_raffle;
 	QHash<QString, Status> m_status;
 	QSet<QString> m_drawn; /* keys the overlay currently shows */

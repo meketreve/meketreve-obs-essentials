@@ -28,8 +28,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace {
 
-const char *const kKindIds[] = {"messages", "minutes", "dance",     "look",    "sound",  "tts",
-				"spend",    "raffle",  "adventure", "support", "follow", "sub"};
+const char *const kKindIds[] = {"messages", "minutes",   "dance", "look",    "sound",  "tts", "spend",
+				"raffle",   "adventure", "boss",  "support", "follow", "sub"};
 
 const char *announceId(QuestBook::Announce a)
 {
@@ -80,15 +80,15 @@ std::optional<Kind> kindFromId(const QString &id)
 
 const QList<Kind> &allKinds()
 {
-	static const QList<Kind> kinds{Kind::Messages,  Kind::Minutes, Kind::Dance,  Kind::Look,
-				       Kind::Sound,     Kind::Tts,     Kind::Spend,  Kind::Raffle,
-				       Kind::Adventure, Kind::Support, Kind::Follow, Kind::Sub};
+	static const QList<Kind> kinds{Kind::Messages, Kind::Minutes, Kind::Dance,  Kind::Look,      Kind::Sound,
+				       Kind::Tts,      Kind::Spend,   Kind::Raffle, Kind::Adventure, Kind::Boss,
+				       Kind::Support,  Kind::Follow,  Kind::Sub};
 	return kinds;
 }
 
 bool isBonus(Kind kind)
 {
-	return kind == Kind::Support || kind == Kind::Follow || kind == Kind::Sub;
+	return kind == Kind::Boss || kind == Kind::Support || kind == Kind::Follow || kind == Kind::Sub;
 }
 
 qint64 xpForLevel(int level)
@@ -150,6 +150,7 @@ QList<QuestDef> QuestBook::defaults()
 		{QStringLiteral("spend100"), Kind::Spend, 100, 30, 15, true, QString()},
 		{QStringLiteral("raffle1"), Kind::Raffle, 1, 15, 10, true, QString()},
 		{QStringLiteral("adventure1"), Kind::Adventure, 1, 20, 10, true, QString()},
+		{QStringLiteral("boss1"), Kind::Boss, 1, 50, 25, true, QString()},
 		{QStringLiteral("support1"), Kind::Support, 1, 100, 50, true, QString()},
 		{QStringLiteral("follow1"), Kind::Follow, 1, 50, 25, true, QString()},
 		{QStringLiteral("sub1"), Kind::Sub, 1, 150, 75, true, QString()},
@@ -441,11 +442,8 @@ QList<AdventureResult> QuestBook::finishAdventures()
 				roll -= o.weight;
 			}
 		}
-		Progress &p = m_viewers[it.key()];
-		const int before = Quests::levelFor(p.xp);
-		p.xp += outcome.xp;
-		const int after = Quests::levelFor(p.xp);
-		results.append({it.key(), it->tag, outcome, p.xp, after, after > before});
+		const XpGain gain = addXp(it.key(), outcome.xp);
+		results.append({it.key(), it->tag, outcome, gain.xp, gain.level, gain.levelUp});
 		it = m_away.erase(it);
 	}
 	if (!results.isEmpty())
@@ -583,6 +581,16 @@ QList<QuestEntry> QuestBook::questsFor(const QString &key)
 			entries.append({def, p.counts.value(def.id), p.done.contains(def.id)});
 	}
 	return entries;
+}
+
+QuestBook::XpGain QuestBook::addXp(const QString &key, int xp)
+{
+	Progress &p = m_viewers[key.toLower()];
+	const int before = Quests::levelFor(p.xp);
+	p.xp += std::max(0, xp);
+	m_dirty = true;
+	const int after = Quests::levelFor(p.xp);
+	return {p.xp, after, after > before};
 }
 
 qint64 QuestBook::xp(const QString &key) const

@@ -54,7 +54,8 @@ const QSet<QString> kEnglishInvocations{
 	QStringLiteral("play"),      QStringLiteral("speak"),      QStringLiteral("sounds"),
 	QStringLiteral("stop"),      QStringLiteral("reload"),     QStringLiteral("raffle"),
 	QStringLiteral("join"),      QStringLiteral("addsound"),   QStringLiteral("quests"),
-	QStringLiteral("level"),     QStringLiteral("adventure"),
+	QStringLiteral("level"),     QStringLiteral("adventure"),  QStringLiteral("attack"),
+	QStringLiteral("boss"),
 };
 const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("cor"),
@@ -89,6 +90,9 @@ const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("nivel"),
 	QStringLiteral("nível"),
 	QStringLiteral("aventura"),
+	QStringLiteral("atacar"),
+	QStringLiteral("chefao"),
+	QStringLiteral("chefão"),
 };
 
 } // namespace
@@ -148,6 +152,7 @@ BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *p
 	  m_points(dataDir + QStringLiteral("/points.json")),
 	  m_custom(dataDir + QStringLiteral("/custom_commands.json")),
 	  m_quests(dataDir + QStringLiteral("/quests.json")),
+	  m_boss(dataDir + QStringLiteral("/boss.json")),
 	  m_audioDir(audioDir),
 	  m_library(dataDir + QStringLiteral("/sound-groups.json"))
 {
@@ -165,7 +170,10 @@ BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *p
 	connect(&m_questSaveTimer, &QTimer::timeout, this, [this]() { m_quests.flush(); });
 	m_questSaveTimer.start();
 	m_adventureTimer.setInterval(1000);
-	connect(&m_adventureTimer, &QTimer::timeout, this, &BotEngine::adventureTick);
+	connect(&m_adventureTimer, &QTimer::timeout, this, [this]() {
+		adventureTick();
+		bossTick();
+	});
 	m_adventureTimer.start();
 }
 
@@ -450,7 +458,9 @@ QJsonObject BotEngine::snapshot()
 	QJsonArray present;
 	for (const QString &key : std::as_const(m_drawn))
 		present.append(viewerPayload(key));
-	return QJsonObject{{QStringLiteral("type"), QStringLiteral("snapshot")}, {QStringLiteral("viewers"), present}};
+	return QJsonObject{{QStringLiteral("type"), QStringLiteral("snapshot")},
+			   {QStringLiteral("viewers"), present},
+			   {QStringLiteral("boss"), bossJson()}};
 }
 
 void BotEngine::refreshPresence()
@@ -529,6 +539,7 @@ void BotEngine::handleCheer(ChatPlatform platform, const QString &user)
 	s.cheerUntil = m_clock.elapsed() + kCheerMs;
 	syncAvatar(key);
 	questProgress(key, platform, Quests::Kind::Support);
+	bossHit(key, BossFight::Hit::Support);
 }
 
 void BotEngine::handleQuestEvent(ChatPlatform platform, const QString &user, Quests::Kind kind)
@@ -540,6 +551,8 @@ void BotEngine::handleQuestEvent(ChatPlatform platform, const QString &user, Que
 	if (!m_status.contains(key))
 		m_status[key].platform = platform;
 	questProgress(key, platform, kind);
+	if (kind == Quests::Kind::Follow || kind == Quests::Kind::Sub)
+		bossHit(key, kind == Quests::Kind::Sub ? BossFight::Hit::Sub : BossFight::Hit::Follow);
 }
 
 void BotEngine::handleMessage(const BotMessage &msg)
@@ -563,8 +576,10 @@ void BotEngine::handleMessage(const BotMessage &msg)
 	const auto [name, args] = BotText::parseInvocation(msg.text, msg.isReply);
 	if (name.isEmpty()) {
 		/* A chat line, not a command: a step of the "messages" quests. */
-		if (!msg.text.trimmed().isEmpty())
+		if (!msg.text.trimmed().isEmpty()) {
 			questProgress(key, msg.platform, Quests::Kind::Messages);
+			bossHit(key, BossFight::Hit::Message);
+		}
 		return;
 	}
 
@@ -923,6 +938,123 @@ void BotEngine::adventureTick()
 	}
 }
 
+QString BotEngine::bossName() const
+{
+	return m_boss.name().isEmpty() ? tCmd(QString(), "Texuguito.Parade.BossDefaultName") : m_boss.name();
+}
+
+QJsonObject BotEngine::bossJson() const
+{
+	return QJsonObject{{QStringLiteral("active"), m_boss.active()},
+			   {QStringLiteral("name"), bossName()},
+			   {QStringLiteral("hp"), m_boss.hp()},
+			   {QStringLiteral("max_hp"), m_boss.maxHp()},
+			   {QStringLiteral("remaining"), static_cast<double>(m_boss.remainingMs()) / 1000.0}};
+}
+
+void BotEngine::sayEverywhere(const QString &text, std::optional<ChatPlatform> also)
+{
+	QSet<int> platforms;
+	if (also)
+		platforms.insert(static_cast<int>(*also));
+	for (auto it = m_status.constBegin(); it != m_status.constEnd(); ++it) {
+		if (it->present && !it->streamer)
+			platforms.insert(static_cast<int>(it->platform));
+	}
+	for (const ChatPlatform p : {ChatPlatform::Twitch, ChatPlatform::YouTube, ChatPlatform::Kick}) {
+		if (platforms.contains(static_cast<int>(p)))
+			say(p, text);
+	}
+}
+
+bool BotEngine::startBoss()
+{
+	int present = 0;
+	for (auto it = m_status.constBegin(); it != m_status.constEnd(); ++it) {
+		if (it->present && !it->streamer && !it->isBroadcaster)
+			++present;
+	}
+	if (!m_boss.start(present))
+		return false;
+	emit overlayMessage(
+		QJsonObject{{QStringLiteral("type"), QStringLiteral("boss")}, {QStringLiteral("boss"), bossJson()}});
+	sayEverywhere(
+		tCmd(QString(), "Texuguito.Bot.BossStart").arg(bossName()).arg(m_boss.maxHp()).arg(m_boss.minutes()));
+	return true;
+}
+
+void BotEngine::bossHit(const QString &key, BossFight::Hit hit)
+{
+	const int damage = m_boss.hit(key, hit);
+	if (damage <= 0)
+		return;
+	QJsonObject boss = bossJson();
+	boss.insert(QStringLiteral("hit"), QJsonObject{{QStringLiteral("username"), key},
+						       {QStringLiteral("nick"), displayName(key)},
+						       {QStringLiteral("damage"), damage}});
+	emit overlayMessage(
+		QJsonObject{{QStringLiteral("type"), QStringLiteral("boss")}, {QStringLiteral("boss"), boss}});
+	/* The last hit ends it at once. */
+	if (m_boss.hp() <= 0)
+		bossTick();
+}
+
+void BotEngine::bossTick()
+{
+	if (const std::optional<BossFight::Result> result = m_boss.finish())
+		endBoss(*result);
+	else if (m_boss.autoDue(m_live))
+		startBoss();
+}
+
+void BotEngine::endBoss(const BossFight::Result &result)
+{
+	QJsonObject boss = bossJson();
+	boss.insert(QStringLiteral("result"), result.defeated ? QStringLiteral("defeated") : QStringLiteral("escaped"));
+	emit overlayMessage(
+		QJsonObject{{QStringLiteral("type"), QStringLiteral("boss")}, {QStringLiteral("boss"), boss}});
+	if (!result.defeated) {
+		sayEverywhere(tCmd(QString(), "Texuguito.Bot.BossEscaped").arg(bossName()).arg(result.hpLeft));
+		return;
+	}
+	const int points = m_boss.points();
+	const int xp = m_boss.xp();
+	QStringList levelUps;
+	for (qsizetype i = 0; i < result.damage.size(); ++i) {
+		const QString &key = result.damage[i].first;
+		const int bonus = i == 0 ? m_boss.mvpPoints() : 0;
+		m_points.add(key, points + bonus);
+		const QuestBook::XpGain gain = m_quests.addXp(key, xp);
+		if (gain.levelUp)
+			levelUps.append(tCmd(QString(), "Texuguito.Bot.LevelUp").arg(displayName(key)).arg(gain.level));
+		if (!m_status.contains(key))
+			m_status[key].platform = ChatPlatform::Twitch;
+		const ChatPlatform platform = m_status.value(key).platform;
+		m_status[key].questUntil = 0;
+		questProgress(key, platform, Quests::Kind::Boss);
+		Status &s = m_status[key];
+		QString label = QStringLiteral("+%1 pts +%2 XP").arg(points + bonus).arg(xp);
+		if (s.questUntil > 0)
+			label += QLatin1Char(' ') + s.questLabel;
+		s.questUntil = m_clock.elapsed() + kQuestMs;
+		s.questLabel = label;
+		syncAvatar(key);
+	}
+	m_quests.flush();
+	const QPair<QString, int> mvp = result.damage.value(0);
+	sayEverywhere(BotText::truncate(tCmd(QString(), "Texuguito.Bot.BossDefeated")
+						.arg(bossName())
+						.arg(result.damage.size())
+						.arg(points)
+						.arg(xp)
+						.arg(mvp.first.isEmpty() ? QStringLiteral("-") : displayName(mvp.first))
+						.arg(mvp.second)
+						.arg(m_boss.mvpPoints())));
+	if (m_quests.announce() != QuestBook::Announce::None)
+		for (const QString &line : std::as_const(levelUps))
+			sayEverywhere(line);
+}
+
 void BotEngine::registerCommands()
 {
 	const auto updated = [this](const QString &key) {
@@ -1278,6 +1410,36 @@ void BotEngine::registerCommands()
 		 {QStringLiteral("adventure")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 startAdventure(m, key);
+		 }},
+		{QStringLiteral("atacar"),
+		 {QStringLiteral("attack")},
+		 [this](const BotMessage &m, const QString &key, const QStringList &) {
+			 if (!m_boss.active()) {
+				 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
+				 say(m.platform, tCmd(invoked, "Texuguito.Bot.BossNone").arg(m.user));
+				 return;
+			 }
+			 /* Silent: the damage shows on the boss, not in the chat. */
+			 bossHit(key, BossFight::Hit::Attack);
+		 }},
+		{QStringLiteral("chefao"),
+		 {QStringLiteral("chefão"), QStringLiteral("boss")},
+		 [this](const BotMessage &m, const QString &, const QStringList &) {
+			 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
+			 if (m_boss.active()) {
+				 say(m.platform, tCmd(invoked, "Texuguito.Bot.BossStatus")
+							 .arg(bossName())
+							 .arg(m_boss.hp())
+							 .arg(m_boss.maxHp())
+							 .arg(waitText(m_boss.remainingMs())));
+				 return;
+			 }
+			 if (!privileged(m)) {
+				 say(m.platform, tCmd(invoked, "Texuguito.Bot.BossNone").arg(m.user));
+				 return;
+			 }
+			 if (!startBoss())
+				 say(m.platform, tCmd(invoked, "Texuguito.Bot.BossOff"));
 		 }},
 		{QStringLiteral("nivel"),
 		 {QStringLiteral("nível"), QStringLiteral("level"), QStringLiteral("xp")},

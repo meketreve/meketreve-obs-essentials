@@ -24,6 +24,14 @@ const ctx = canvas.getContext("2d");
 
 const viewers = new Map();
 
+// The collective quest's boss: a giant horned badger in the middle of the
+// parade with a life bar. The server sends its state on every change; the
+// countdown runs here from the seconds left.
+const BOSS_LOOK = { cor: "#4b1f6f", chapeu: "chifres", acessorio: "asasmorcego" };
+const BOSS_FADE_MS = 1500;
+const BOSS_HIT_MS = 1100;
+const boss = { active: false, name: "", hp: 0, maxHp: 1, until: 0, shownAt: 0, endedAt: 0, result: "", hits: [] };
+
 let manifest = null;
 // Fallback until manifest.json loads; matches the real sprite size (64x64),
 // so layout math run before the fetch resolves is already correct.
@@ -263,7 +271,32 @@ function removeViewer(username) {
   viewers.delete(username);
 }
 
+function applyBoss(next, fromSnapshot) {
+  if (!next) return;
+  const now = performance.now();
+  if (next.active) {
+    if (!boss.active) {
+      boss.shownAt = now;
+      boss.hits = [];
+    }
+    boss.active = true;
+    boss.result = "";
+    boss.name = next.name || "";
+    boss.hp = next.hp;
+    boss.maxHp = Math.max(1, next.max_hp);
+    boss.until = now + (next.remaining || 0) * 1000;
+  } else if (boss.active) {
+    boss.active = false;
+    // A reconnect while it ends just hides it; a real end fades it out.
+    boss.result = fromSnapshot ? "" : next.result || "escaped";
+    boss.endedAt = now;
+    if (boss.result === "defeated") boss.hp = 0;
+  }
+  if (next.hit) boss.hits.push({ text: "-" + next.hit.damage, at: now, dx: (Math.random() - 0.5) * 40 });
+}
+
 function applySnapshot(snapshot) {
+  applyBoss(snapshot.boss, true);
   viewers.clear();
   for (const viewer of snapshot.viewers) {
     upsertViewer(viewer);
@@ -343,6 +376,8 @@ function connect() {
       enqueueAudio(message.url, message.volume);
     } else if (message.type === "audio_stop") {
       stopCurrentAudio();
+    } else if (message.type === "boss") {
+      applyBoss(message.boss, false);
     } else if (message.type === "left") {
       removeViewer(message.username);
     } else {
@@ -654,6 +689,78 @@ function drawViewer(viewer, timestamp) {
   if (questing) drawQuestCelebration(viewer, timestamp, yOffset);
 }
 
+// Twice an avatar's size when the overlay is tall enough, standing on the
+// lane in the middle, facing the camera; it shakes when hit, and fades out
+// at the end (with sparkles when beaten).
+function drawBoss(timestamp) {
+  const ending = !boss.active && boss.result && timestamp - boss.endedAt < BOSS_FADE_MS;
+  if (!boss.active && !ending) return;
+  const scale = Math.min(2, Math.max(1, (canvas.height - 40) / frameHeight));
+  const width = frameWidth * scale;
+  const height = frameHeight * scale;
+  const lastHit = boss.hits.length ? boss.hits[boss.hits.length - 1].at : -Infinity;
+  const shake = timestamp - lastHit < 150 ? Math.sin(timestamp / 15) * 3 : 0;
+  const x = canvas.width / 2 - width / 2 + shake;
+  const y = canvas.height - 10 - height + Math.sin(timestamp / 500) * 2;
+  const box = manifest.content_box;
+  const top = y + box.y * scale;
+  const cx = canvas.width / 2;
+
+  ctx.save();
+  ctx.globalAlpha = ending
+    ? 1 - (timestamp - boss.endedAt) / BOSS_FADE_MS
+    : Math.min(1, (timestamp - boss.shownAt) / 500);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  const pose = { row: manifest.direction_row.down, column: manifest.idle_frame_column ?? 0, mirrored: false };
+  drawCharacter(BOSS_LOOK, pose, 0, 0);
+  ctx.restore();
+
+  // The life bar, the name and the time left above the head.
+  const barWidth = Math.max(80, box.w * scale * 1.8);
+  const barY = top - 12;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(cx - barWidth / 2 - 1, barY - 1, barWidth + 2, 8);
+  ctx.fillStyle = "#c0392b";
+  ctx.fillRect(cx - barWidth / 2, barY, (barWidth * Math.max(0, boss.hp)) / boss.maxHp, 6);
+  ctx.font = `bold ${look.nameSize}px monospace`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  let label = boss.name;
+  if (boss.active) {
+    const seconds = Math.max(0, Math.ceil((boss.until - timestamp) / 1000));
+    label += ` ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+  ctx.fillText(label, cx, barY - 4);
+
+  // The damage of each hit, floating up from the head.
+  ctx.fillStyle = "#ff5050";
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+  ctx.lineWidth = 3;
+  boss.hits = boss.hits.filter((h) => timestamp - h.at < BOSS_HIT_MS);
+  for (const h of boss.hits) {
+    const t = (timestamp - h.at) / BOSS_HIT_MS;
+    ctx.globalAlpha = 1 - t;
+    ctx.strokeText(h.text, cx + h.dx, top + 12 - t * 24);
+    ctx.fillText(h.text, cx + h.dx, top + 12 - t * 24);
+  }
+
+  if (ending && boss.result === "defeated") {
+    const t = (timestamp - boss.endedAt) / BOSS_FADE_MS;
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "14px sans-serif";
+    const cy = y + (box.y + box.h / 2) * scale;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI) / 5 + t;
+      const radius = box.h * scale * (0.3 + t * 0.6);
+      ctx.fillText("✦", cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius * 0.7);
+    }
+  }
+  ctx.restore();
+}
+
 let lastTimestamp = performance.now();
 
 function tick(timestamp) {
@@ -663,6 +770,7 @@ function tick(timestamp) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (assetsReady()) {
+    drawBoss(timestamp);
     for (const viewer of viewers.values()) {
       updateMovement(viewer, timestamp, deltaSeconds);
       drawViewer(viewer, timestamp);

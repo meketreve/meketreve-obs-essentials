@@ -38,12 +38,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace Quests {
 
-enum class Kind { Messages, Minutes, Dance, Look, Sound, Tts, Spend, Raffle, Adventure, Support, Follow, Sub };
+enum class Kind { Messages, Minutes, Dance, Look, Sound, Tts, Spend, Raffle, Adventure, Boss, Support, Follow, Sub };
 
 QString kindId(Kind kind);
 std::optional<Kind> kindFromId(const QString &id);
 const QList<Kind> &allKinds();
-/* Follow, sub and support: open to everyone, never drawn. */
+/* Boss, follow, sub and support: open to everyone, never drawn (a boss
+ * only comes when the streamer calls it). */
 bool isBonus(Kind kind);
 
 /* Total XP that reaches a level (level 1 = 0, 2 = 50, 3 = 150, 4 = 300...):
@@ -164,6 +165,15 @@ public:
 	/* The adventures whose time is up: the prize drawn, the XP paid (the
 	 * points are the caller's). */
 	QList<AdventureResult> finishAdventures();
+
+	/* Adds XP outside the quests (the boss): the total and the level after
+	 * it, and if it went up. Saved with the next flush(). */
+	struct XpGain {
+		qint64 xp = 0;
+		int level = 1;
+		bool levelUp = false;
+	};
+	XpGain addXp(const QString &key, int xp);
 
 	/* For tests: another clock. */
 	void setClock(Clock clock) { m_clock = std::move(clock); }

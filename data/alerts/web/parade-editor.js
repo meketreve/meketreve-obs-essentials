@@ -66,7 +66,7 @@ async function save() {
     const { scale, speed, names, nameSize } = state;
     const next = await post({ scale, speed, names, nameSize });
     // The quests and prizes keep what is being typed in them.
-    state = { ...next, quests: state.quests, adventure: state.adventure };
+    state = { ...next, quests: state.quests, adventure: state.adventure, boss: state.boss };
     setSave("ok");
   } catch (e) {
     setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
@@ -280,6 +280,73 @@ function adventureCard() {
       el("div", { class: "group-head" }, add, defaults)));
 }
 
+// --- Boss: settings on their own key; the button calls one now.
+let bossTimer = null;
+function bossChanged() {
+  setSave("saving");
+  clearTimeout(bossTimer);
+  bossTimer = setTimeout(saveBoss, 400);
+}
+
+const BOSS_FIELDS = ["enabled", "name", "baseHp", "hpPerViewer", "minutes", "autoMinutes", "points", "xp", "mvpPoints"];
+async function saveBoss() {
+  const b = state.boss;
+  try {
+    const next = await post({ boss: Object.fromEntries(BOSS_FIELDS.map((k) => [k, b[k]])) });
+    Object.assign(b, { active: next.boss.active, hp: next.boss.hp, maxHp: next.boss.maxHp });
+    setSave("ok");
+  } catch (e) {
+    setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
+  }
+}
+
+function bossCard() {
+  const b = state.boss;
+  const name = el("input", { type: "text", value: b.name || "", placeholder: t("BossDefaultName"), maxlength: 40, spellcheck: "false" });
+  name.addEventListener("input", () => { b.name = name.value; bossChanged(); });
+  const num = (key, min, max) => numberCtl(b[key], min, max, (v) => { b[key] = v; bossChanged(); });
+  const call = el("button", { type: "button", class: "btn small primary", text: t("BossCall") });
+  call.disabled = b.active || !b.enabled;
+  call.addEventListener("click", async () => {
+    clearTimeout(bossTimer);
+    try {
+      const next = await post({ bossCall: true });
+      state.boss = next.boss;
+      if (next.error) setSave("bad", next.error);
+      else setSave("ok");
+      renderForm();
+    } catch (e) {
+      setSave("bad", t("SaveFailed", e.message));
+    }
+  });
+  const defaults = el("button", { type: "button", class: "btn small", text: t("BossDefaults") });
+  defaults.addEventListener("click", async () => {
+    if (!confirm(t("BossDefaultsConfirm"))) return;
+    clearTimeout(bossTimer);
+    try {
+      const next = await post({ bossDefaults: true });
+      state.boss = next.boss;
+      setSave("ok");
+      renderForm();
+    } catch (e) {
+      setSave("bad", t("SaveFailed", e.message));
+    }
+  });
+  return el("section", { class: "card" }, el("h3", { text: t("Boss") }),
+    el("p", { class: "hint", text: t("BossNote") }),
+    row(t("BossOn"), switchCtl(b.enabled, (v) => { b.enabled = v; bossChanged(); renderForm(); })),
+    row(t("BossName"), name),
+    row(t("BossHp"), num("baseHp", 1, 1000000)),
+    row(t("BossHpPerViewer"), num("hpPerViewer", 0, 1000000)),
+    row(t("BossMinutes"), rangeCtl(1, b.maxMinutes, 1, b.minutes, " min", (v) => { b.minutes = v; bossChanged(); })),
+    row(t("BossAuto"), el("div", { class: "inline" }, num("autoMinutes", 0, b.maxAutoMinutes), el("span", { class: "value", text: "min" })), t("BossAutoNote")),
+    row(t("BossPoints"), num("points", 0, 100000)),
+    row(t("BossXp"), num("xp", 0, 10000)),
+    row(t("BossMvp"), num("mvpPoints", 0, 100000)),
+    b.active ? el("p", { class: "hint", text: t("BossRunning", b.hp, b.maxHp) }) : null,
+    el("div", { class: "group-head" }, call, defaults));
+}
+
 function row(label, control, note) {
   return el("div", { class: "row" }, el("label", { text: label }), control, note ? el("div", { class: "note", text: note }) : null);
 }
@@ -321,7 +388,8 @@ function renderForm() {
     el("section", { class: "card" }, el("h3", { text: t("Link") }),
       row(t("BrowserSource"), el("div", { class: "inline" }, el("code", { text: state.url }), copy), t("LinkNote"))),
     state.quests ? questsCard() : null,
-    state.adventure ? adventureCard() : null);
+    state.adventure ? adventureCard() : null,
+    state.boss ? bossCard() : null);
   if (state.adventure) refreshChances();
 }
 
