@@ -55,7 +55,9 @@ const QSet<QString> kEnglishInvocations{
 	QStringLiteral("stop"),      QStringLiteral("reload"),     QStringLiteral("raffle"),
 	QStringLiteral("join"),      QStringLiteral("addsound"),   QStringLiteral("quests"),
 	QStringLiteral("level"),     QStringLiteral("adventure"),  QStringLiteral("attack"),
-	QStringLiteral("boss"),
+	QStringLiteral("boss"),      QStringLiteral("quest"),      QStringLiteral("missions"),
+	QStringLiteral("lvl"),       QStringLiteral("colour"),     QStringLiteral("resetcolour"),
+	QStringLiteral("enter"),
 };
 const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("cor"),
@@ -611,6 +613,11 @@ const BotEngine::Command *BotEngine::findCommand(const QString &name) const
 	return nullptr;
 }
 
+QStringList BotEngine::commandNames() const
+{
+	return reservedNames().values();
+}
+
 QSet<QString> BotEngine::reservedNames() const
 {
 	QSet<QString> names;
@@ -1068,7 +1075,7 @@ void BotEngine::registerCommands()
 
 	m_commands = {
 		{QStringLiteral("cor"),
-		 {QStringLiteral("color")},
+		 {QStringLiteral("color"), QStringLiteral("colour")},
 		 [this, restyled](const BotMessage &m, const QString &key, const QStringList &args) {
 			 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
 			 if (args.isEmpty()) {
@@ -1085,7 +1092,7 @@ void BotEngine::registerCommands()
 			 restyled(m, key);
 		 }},
 		{QStringLiteral("resetcor"),
-		 {QStringLiteral("resetcolor")},
+		 {QStringLiteral("resetcolor"), QStringLiteral("resetcolour")},
 		 [this, restyled](const BotMessage &m, const QString &key, const QStringList &) {
 			 for (const QString &k : lookKeys(key))
 				 m_viewers.resetColor(k);
@@ -1395,14 +1402,15 @@ void BotEngine::registerCommands()
 			 });
 		 }},
 		{QStringLiteral("entrar"),
-		 {QStringLiteral("join")},
+		 {QStringLiteral("join"), QStringLiteral("enter")},
 		 /* Silent on purpose: a reply per participant would flood the chat. */
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 if (m_raffle.join(key))
 				 questProgress(key, m.platform, Quests::Kind::Raffle);
 		 }},
 		{QStringLiteral("quests"),
-		 {QStringLiteral("missoes"), QStringLiteral("missões"), QStringLiteral("quest")},
+		 {QStringLiteral("missoes"), QStringLiteral("missões"), QStringLiteral("quest"),
+		  QStringLiteral("missions")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 sayPrivate(m, questsReply(m, key));
 		 }},
@@ -1442,7 +1450,7 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.BossOff"));
 		 }},
 		{QStringLiteral("nivel"),
-		 {QStringLiteral("nível"), QStringLiteral("level"), QStringLiteral("xp")},
+		 {QStringLiteral("nível"), QStringLiteral("level"), QStringLiteral("lvl"), QStringLiteral("xp")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 const QString invoked = BotText::parseInvocation(m.text, m.isReply).first;
 			 if (!m_quests.enabled()) {

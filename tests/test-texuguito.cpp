@@ -731,6 +731,15 @@ private slots:
 
 		QTemporaryDir dir;
 		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		/* Every command has a language, but for the few that are the same
+		 * word in both: a new one must be put in one of the lists. */
+		const QSet<QString> neutral{QStringLiteral("cmd"),    QStringLiteral("ping"), QStringLiteral("pts"),
+					    QStringLiteral("p"),      QStringLiteral("tts"),  QStringLiteral("audio"),
+					    QStringLiteral("status"), QStringLiteral("xp")};
+		for (const QString &name : bot.commandNames()) {
+			if (!neutral.contains(name) && !BotEngine::commandEnglish(name).has_value())
+				QFAIL(qPrintable(QStringLiteral("!%1 has no language").arg(name)));
+		}
 		/* OBS in Portuguese, but English commands answer in English. */
 		bot.setText(locale("pt-BR.ini"));
 		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
@@ -758,6 +767,16 @@ private slots:
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ Usage: !speak <message>"));
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!falar")));
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ Use: !falar <mensagem>"));
+
+		/* The other English spellings. */
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!colour")));
+		QCOMPARE(replies(said).last(), QStringLiteral("@Viewer usage: !color <name or hex>"));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!lvl")));
+		QVERIFY(replies(said).last().contains(QStringLiteral("is level 1")));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!missions")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("📜 Viewer · level 1")));
+		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!boss")));
+		QCOMPARE(replies(said).last(), QStringLiteral("Viewer, there is no boss right now."));
 
 		bot.handleMessage(msg(QStringLiteral("Viewer"), QStringLiteral("!help")));
 		QVERIFY(replies(said).last().endsWith(QStringLiteral("/commands.html")));

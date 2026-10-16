@@ -137,6 +137,8 @@ public:
 	/* True for an English command, false for Portuguese, empty for a
 	 * neutral one (ping, status, pts, p, tts, cmd, audio). */
 	static std::optional<bool> commandEnglish(const QString &invoked);
+	/* Every built-in command and alias, without the "!". */
+	QStringList commandNames() const;
 	void setVolume(double volume) { m_volume = volume; }
 	void setOverlayListeners(int count) { m_listeners = count; }
 	void setAudioDir(const QString &dir);

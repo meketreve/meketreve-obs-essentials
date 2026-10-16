@@ -3,10 +3,10 @@
     {
       "title": {"pt": "Avatar no desfile", "en": "Parade avatar"},
       "commands": [
-        {"pt": "!cor <cor>", "en": "!color <color>", "who": "all",
+        {"pt": "!cor <cor>", "en": "!color <color>", "also": ["!colour"], "who": "all",
          "desc": {"pt": "Muda a cor do seu avatar: nome de cor em português ou inglês (<code>azul</code>, <code>verde limão</code>, <code>hotpink</code>) ou hex (<code>#ff8800</code>).",
                   "en": "Changes your avatar's color: a color name in English or Portuguese (<code>blue</code>, <code>hotpink</code>, <code>azul</code>) or hex (<code>#ff8800</code>)."}},
-        {"pt": "!resetcor", "en": "!resetcolor", "who": "all",
+        {"pt": "!resetcor", "en": "!resetcolor", "also": ["!resetcolour"], "who": "all",
          "desc": {"pt": "Volta para a cor que o bot escolheu para você.", "en": "Goes back to the color the bot picked for you."}},
         {"pt": "!chapeu <opção>", "en": "!hat <option>", "who": "all",
          "desc": {"pt": "Põe um chapéu: boné, coroa, chifres, tricornio, bicorne, cartola, tiara, coco, natalino, mago, viking, elmo, legionario, bandana, capuz, faixa ou nenhum.",
@@ -52,10 +52,10 @@
     {
       "title": {"pt": "Quests e nível", "en": "Quests and level"},
       "commands": [
-        {"pt": "!missoes", "en": "!quests", "also": ["!missões", "!quest"], "who": "all",
+        {"pt": "!missoes", "en": "!quests", "also": ["!missões", "!quest", "!missions"], "who": "all",
          "desc": {"pt": "Mostra as suas quests desta live (sorteadas da lista do canal), o andamento de cada uma, o seu nível e o XP. Completar uma quest dá pontos e XP, e o avatar comemora no desfile. Na Twitch a resposta pode vir por sussurro.",
                   "en": "Shows your quests for this stream (drawn from the channel's list), how each one is going, your level and XP. Finishing a quest gives points and XP, and your avatar celebrates on the parade. On Twitch the answer may come as a whisper."}},
-        {"pt": "!nivel", "en": "!level", "also": ["!nível", "!xp"], "who": "all",
+        {"pt": "!nivel", "en": "!level", "also": ["!nível", "!lvl", "!xp"], "who": "all",
          "desc": {"pt": "Mostra o seu nível e quanto XP falta para o próximo.",
                   "en": "Shows your level and how much XP the next one takes."}},
         {"pt": "!aventura", "en": "!adventure", "who": "all",
@@ -75,7 +75,7 @@
         {"pt": "!sorteio <pontos> <minutos>", "en": "!raffle <points> <minutes>", "who": "owner",
          "desc": {"pt": "Abre um sorteio de pontos. No fim do tempo, uma pessoa entre as que entraram leva o prêmio.",
                   "en": "Starts a points raffle. When the time is up, one of the people who joined wins the prize."}},
-        {"pt": "!entrar", "en": "!join", "who": "all",
+        {"pt": "!entrar", "en": "!join", "also": ["!enter"], "who": "all",
          "desc": {"pt": "Entra no sorteio aberto.", "en": "Joins the running raffle."}}
       ]
     },
