@@ -68,8 +68,14 @@
          "desc": {"pt": "Mostra a vida do chefão e quanto tempo falta para ele fugir. Mod ou streamer sem chefão no desfile: chama um.",
                   "en": "Shows the boss's HP and how long until it gets away. A mod or the streamer with no boss on the parade: calls one."}},
         {"pt": "!itens", "en": "!items", "also": ["!inventario", "!inventário", "!inventory"], "who": "all",
-         "desc": {"pt": "Mostra os seus itens exclusivos do desfile (chapéus, capas e asas que só aparecem em quem ganhou) e como ganhar os outros: chegando num nível, com sorte numa aventura, ajudando a derrotar um chefão ou sendo o MVP dele. Vista com !chapeu ou !acessorio. Na Twitch a resposta pode vir por sussurro.",
-                  "en": "Shows your exclusive parade items (hats, capes and wings that only show up on whoever earned them) and how to earn the others: by reaching a level, with luck on an adventure, by helping to beat a boss or by being its MVP. Wear them with !hat or !accessory. On Twitch the answer may come as a whisper."}}
+         "desc": {"pt": "Mostra os seus itens exclusivos do desfile (chapéus, capas e asas que só aparecem em quem ganhou) e como ganhar os outros: chegando num nível, com sorte numa aventura, ajudando a derrotar um chefão, sendo o MVP dele ou comprando na !loja. Vista com !chapeu ou !acessorio. Na Twitch a resposta pode vir por sussurro.",
+                  "en": "Shows your exclusive parade items (hats, capes and wings that only show up on whoever earned them) and how to earn the others: by reaching a level, with luck on an adventure, by helping to beat a boss, by being its MVP or by buying it in the !shop. Wear them with !hat or !accessory. On Twitch the answer may come as a whisper."}},
+        {"pt": "!loja", "en": "!shop", "also": ["!store"], "who": "all",
+         "desc": {"pt": "Mostra os itens exclusivos à venda, com o preço em pontos (os que você já tem aparecem com ✓) e o seu saldo. !loja <item> já compra. Na Twitch a resposta pode vir por sussurro.",
+                  "en": "Shows the exclusive items for sale, with their price in points (the ones you already have show a ✓) and your balance. !shop <item> buys it right away. On Twitch the answer may come as a whisper."}},
+        {"pt": "!comprar <item>", "en": "!buy <item>", "who": "all",
+         "desc": {"pt": "Compra um item exclusivo da loja com os seus pontos; o bot anuncia no chat e o avatar mostra o 🎁. Depois é só vestir com !chapeu ou !acessorio.",
+                  "en": "Buys an exclusive item from the shop with your points; the bot tells the chat and the avatar shows a 🎁. Then wear it with !hat or !accessory."}}
       ]
     },
     {

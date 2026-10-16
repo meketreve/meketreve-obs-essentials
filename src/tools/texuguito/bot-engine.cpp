@@ -58,6 +58,7 @@ const QSet<QString> kEnglishInvocations{
 	QStringLiteral("boss"),      QStringLiteral("quest"),      QStringLiteral("missions"),
 	QStringLiteral("lvl"),       QStringLiteral("colour"),     QStringLiteral("resetcolour"),
 	QStringLiteral("enter"),     QStringLiteral("items"),      QStringLiteral("inventory"),
+	QStringLiteral("shop"),      QStringLiteral("store"),      QStringLiteral("buy"),
 };
 const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("cor"),
@@ -98,6 +99,8 @@ const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("itens"),
 	QStringLiteral("inventario"),
 	QStringLiteral("inventário"),
+	QStringLiteral("loja"),
+	QStringLiteral("comprar"),
 };
 
 } // namespace
@@ -908,6 +911,8 @@ QString BotEngine::itemHow(const QString &invoked, const QString &id) const
 		return tCmd(invoked, "Texuguito.Bot.ItemHowBoss");
 	case Items::Rule::Mvp:
 		return tCmd(invoked, "Texuguito.Bot.ItemHowMvp");
+	case Items::Rule::Shop:
+		return tCmd(invoked, "Texuguito.Bot.ItemHowShop").arg(m_items.value(id));
 	case Items::Rule::Off:
 		break;
 	}
@@ -937,11 +942,16 @@ QString BotEngine::itemsReply(const BotMessage &msg, const QString &key)
 	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
 	QStringList mine;
 	QStringList next;
+	int forSale = 0;
 	for (const Items::Item &item : Items::catalog()) {
+		const Items::Rule rule = m_items.rule(item.id);
 		if (m_items.owns(baseName(key), item.id))
 			mine.append(
 				QStringLiteral("%1 (%2)").arg(itemName(invoked, item.id), en ? item.english : item.id));
-		else if (m_items.rule(item.id) != Items::Rule::Off)
+		else if (rule == Items::Rule::Shop)
+			/* The shop lists them itself, with the prices. */
+			++forSale;
+		else if (rule != Items::Rule::Off)
 			next.append(
 				QStringLiteral("%1: %2").arg(itemName(invoked, item.id), itemHow(invoked, item.id)));
 	}
@@ -950,7 +960,65 @@ QString BotEngine::itemsReply(const BotMessage &msg, const QString &key)
 			       : tCmd(invoked, "Texuguito.Bot.Items").arg(msg.user, mine.join(QStringLiteral(", ")));
 	if (!next.isEmpty())
 		text += tCmd(invoked, "Texuguito.Bot.ItemsNext").arg(next.join(QStringLiteral(", ")));
+	if (forSale > 0)
+		text += tCmd(invoked, "Texuguito.Bot.ItemsShop").arg(forSale);
 	return BotText::truncate(text);
+}
+
+QString BotEngine::shopReply(const BotMessage &msg, const QString &key)
+{
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	const QStringList ids = m_items.forSale();
+	if (ids.isEmpty())
+		return tCmd(invoked, "Texuguito.Bot.ShopClosed");
+	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
+	QStringList offers;
+	for (const QString &id : ids) {
+		const Items::Item *item = Items::find(id);
+		const QString name =
+			QStringLiteral("%1 (%2)").arg(itemName(invoked, id), en ? item->english : item->id);
+		offers.append(m_items.owns(baseName(key), id)
+				      ? name + QStringLiteral(" ✓")
+				      : QStringLiteral("%1 %2 pts").arg(name).arg(m_items.value(id)));
+	}
+	return BotText::truncate(
+		tCmd(invoked, "Texuguito.Bot.Shop").arg(offers.join(QStringLiteral(", "))).arg(m_points.get(key)));
+}
+
+void BotEngine::buyItem(const BotMessage &msg, const QString &key, const QString &raw)
+{
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	const QString id = Items::resolve(raw);
+	if (id.isEmpty() || m_items.rule(id) != Items::Rule::Shop) {
+		say(msg.platform, tCmd(invoked, "Texuguito.Bot.ShopUnknown").arg(msg.user));
+		return;
+	}
+	const QString name = itemName(invoked, id);
+	if (m_items.owns(baseName(key), id)) {
+		say(msg.platform, tCmd(invoked, "Texuguito.Bot.ShopOwned").arg(msg.user, name));
+		return;
+	}
+	const int price = m_items.value(id);
+	if (!m_points.spend(key, price)) {
+		say(msg.platform,
+		    tCmd(invoked, "Texuguito.Bot.ShopNoPoints").arg(msg.user, name).arg(price).arg(m_points.get(key)));
+		return;
+	}
+	m_items.unlock(baseName(key), id);
+	const Items::Item *item = Items::find(id);
+	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
+	const char *text = item->slot == Items::Slot::Hat ? "Texuguito.Bot.ShopBoughtHat"
+							  : "Texuguito.Bot.ShopBoughtAccessory";
+	/* Always told, like an item earned: the rest of the chat sees the shop works. */
+	say(msg.platform, tCmd(invoked, text).arg(displayName(key), name, en ? item->english : id).arg(price));
+	questProgress(key, msg.platform, Quests::Kind::Spend, price);
+	/* Next to a quest just done, if spending finished one. */
+	Status &s = m_status[key];
+	const qint64 now = m_clock.elapsed();
+	const QString label = QStringLiteral("🎁 ") + name;
+	s.questLabel = s.questUntil > now ? s.questLabel + QLatin1Char(' ') + label : label;
+	s.questUntil = now + kQuestMs;
+	syncAvatar(key);
 }
 
 QString BotEngine::waitText(qint64 ms)
@@ -1580,6 +1648,23 @@ void BotEngine::registerCommands()
 		  QStringLiteral("inventory")},
 		 [this](const BotMessage &m, const QString &key, const QStringList &) {
 			 sayPrivate(m, itemsReply(m, key));
+		 }},
+		{QStringLiteral("loja"),
+		 {QStringLiteral("shop"), QStringLiteral("store")},
+		 [this](const BotMessage &m, const QString &key, const QStringList &args) {
+			 /* !loja <item> buys it too. */
+			 if (args.isEmpty())
+				 sayPrivate(m, shopReply(m, key));
+			 else
+				 buyItem(m, key, args.join(QLatin1Char(' ')));
+		 }},
+		{QStringLiteral("comprar"),
+		 {QStringLiteral("buy")},
+		 [this](const BotMessage &m, const QString &key, const QStringList &args) {
+			 if (args.isEmpty())
+				 sayPrivate(m, shopReply(m, key));
+			 else
+				 buyItem(m, key, args.join(QLatin1Char(' ')));
 		 }},
 	};
 }

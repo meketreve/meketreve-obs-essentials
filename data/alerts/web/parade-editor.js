@@ -348,7 +348,7 @@ function bossCard() {
 }
 
 // --- Exclusive items: how each one is earned. Whoever earned one keeps it.
-const ITEM_RULES = ["off", "level", "adventure", "boss", "mvp"];
+const ITEM_RULES = ["off", "level", "adventure", "boss", "mvp", "shop"];
 let itemsTimer = null;
 function itemsChanged() {
   setSave("saving");
@@ -377,17 +377,19 @@ function itemRow(item) {
     option.selected = r === item.rule;
     return option;
   }));
-  const max = item.rule === "adventure" ? 100 : it.maxLevel;
+  // A level, a chance or a price needs a number, up to its own limit.
+  const limit = (r) => (r === "adventure" ? 100 : r === "shop" ? it.maxPrice : it.maxLevel);
+  const numbered = (r) => r === "level" || r === "adventure" || r === "shop";
   rule.addEventListener("change", () => {
     item.rule = rule.value;
-    // A level or a chance needs a number: keep the one there, if it fits.
-    if (item.rule === "level" || item.rule === "adventure")
-      item.value = Math.min(item.rule === "adventure" ? 100 : it.maxLevel, Math.max(1, item.value || 10));
+    // Keep the number there, if it fits; a price starts at 500.
+    if (numbered(item.rule))
+      item.value = Math.min(limit(item.rule), Math.max(1, item.value || (item.rule === "shop" ? 500 : 10)));
     itemsChanged();
     renderForm();
   });
-  const value = item.rule === "level" || item.rule === "adventure"
-    ? numberCtl(item.value, 1, max, (v) => { item.value = v; itemsChanged(); })
+  const value = numbered(item.rule)
+    ? numberCtl(item.value, 1, limit(item.rule), (v) => { item.value = v; itemsChanged(); })
     : null;
   const wear = (item.hat ? "!chapeu " + item.id + " · !hat " : "!acessorio " + item.id + " · !accessory ") + item.english;
   return el("div", { class: "row item-row" },

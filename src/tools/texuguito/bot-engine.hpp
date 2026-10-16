@@ -263,6 +263,10 @@ private:
 	/* How id is earned now, as "level 5". */
 	QString itemHow(const QString &invoked, const QString &id) const;
 	QString itemsReply(const BotMessage &msg, const QString &key);
+	/* What the shop sells, with prices and key's points (!loja). */
+	QString shopReply(const BotMessage &msg, const QString &key);
+	/* Buys the item raw names (an id or English name) with key's points. */
+	void buyItem(const BotMessage &msg, const QString &key, const QString &raw);
 	void bossHit(const QString &key, BossFight::Hit hit);
 	void endBoss(const BossFight::Result &result);
 	/* The boss as the overlay draws it. */

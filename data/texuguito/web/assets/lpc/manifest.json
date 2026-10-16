@@ -32,7 +32,10 @@
     "coroarubi": "excl_coroarubi.png",
     "chifresdourados": "excl_chifresdourados.png",
     "magoestelar": "excl_magoestelar.png",
-    "elmosombrio": "excl_elmosombrio.png"
+    "elmosombrio": "excl_elmosombrio.png",
+    "cartolaesmeralda": "excl_cartolaesmeralda.png",
+    "tiaracristal": "excl_tiaracristal.png",
+    "vikingglacial": "excl_vikingglacial.png"
   },
   "accessories": {
     "óculos": "oculos_walk.png",
@@ -43,7 +46,8 @@
     "tapaolho": "acc_tapaolho.png",
     "oculosescuros": "acc_oculosescuros.png",
     "monoculo": "acc_monoculo.png",
-    "capareal": "excl_capareal.png"
+    "capareal": "excl_capareal.png",
+    "oculosneon": "excl_oculosneon.png"
   },
   "wings": {
     "asas": {"bg": "asas_bg_walk.png", "fg": "asas_fg_walk.png"},
@@ -51,7 +55,8 @@
     "asasborboleta": {"bg": "asas_borboleta_bg.png", "fg": "asas_borboleta_fg.png"},
     "asaslibelula": {"bg": "asas_libelula_bg.png", "fg": "asas_libelula_fg.png"},
     "asasdouradas": {"bg": "excl_asasdouradas_bg.png", "fg": "excl_asasdouradas_fg.png"},
-    "asaschefao": {"bg": "excl_asaschefao_bg.png", "fg": "excl_asaschefao_fg.png"}
+    "asaschefao": {"bg": "excl_asaschefao_bg.png", "fg": "excl_asaschefao_fg.png"},
+    "asasfada": {"bg": "excl_asasfada_bg.png", "fg": "excl_asasfada_fg.png"}
   },
   "content_box": {
     "x": 14,

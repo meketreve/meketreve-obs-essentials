@@ -99,3 +99,12 @@ same authors as the source sprite.
   bluecarrot16).
 - `excl_asaschefao_{bg,fg}.png` — de `asas_morcego_{bg,fg}.png`
   (`body/wings/bat`, ElizaWy, JaidynReiman).
+- `excl_oculosneon.png` — de `acc_oculosescuros.png` (`facial/glasses/sunglasses`,
+  bigbeargames, pennomi, laetissima).
+- `excl_cartolaesmeralda.png` — de `hat_cartola.png` (`hat/formal/tophat`,
+  bluecarrot16).
+- `excl_tiaracristal.png` — de `hat_tiara.png` (`hat/formal/tiara`, Luke Mehl).
+- `excl_vikingglacial.png` — de `hat_viking.png` (`hat/helmet/barbarian_viking`,
+  bluecarrot16, JaidynReiman, Napsio).
+- `excl_asasfada_{bg,fg}.png` — de `asas_borboleta_{bg,fg}.png`
+  (`body/wings/monarch`, The Foreman).

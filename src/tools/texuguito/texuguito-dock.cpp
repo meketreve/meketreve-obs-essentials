@@ -274,8 +274,9 @@ QJsonObject TexuguitoDock::panelState() const
 		item.insert(QStringLiteral("owners"), book.owners(def->id));
 		items.append(item);
 	}
-	state.insert(QStringLiteral("items"),
-		     QJsonObject{{QStringLiteral("rules"), items}, {QStringLiteral("maxLevel"), ItemBook::kMaxLevel}});
+	state.insert(QStringLiteral("items"), QJsonObject{{QStringLiteral("rules"), items},
+							  {QStringLiteral("maxLevel"), ItemBook::kMaxLevel},
+							  {QStringLiteral("maxPrice"), ItemBook::kMaxPrice}});
 	return state;
 }
 

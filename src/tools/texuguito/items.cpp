@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace {
 
-const char *const kRuleIds[] = {"off", "level", "adventure", "boss", "mvp"};
+const char *const kRuleIds[] = {"off", "level", "adventure", "boss", "mvp", "shop"};
 
 } // namespace
 
@@ -49,6 +49,17 @@ const QList<Item> &catalog()
 		 QStringLiteral("excl_elmosombrio.png"), Rule::Boss, 0},
 		{QStringLiteral("asaschefao"), QStringLiteral("bosswings"), Slot::Accessory,
 		 QStringLiteral("excl_asaschefao_bg.png"), Rule::Mvp, 0},
+		/* Sold in the shop, for points. */
+		{QStringLiteral("oculosneon"), QStringLiteral("neonglasses"), Slot::Accessory,
+		 QStringLiteral("excl_oculosneon.png"), Rule::Shop, 200},
+		{QStringLiteral("cartolaesmeralda"), QStringLiteral("emeraldtophat"), Slot::Hat,
+		 QStringLiteral("excl_cartolaesmeralda.png"), Rule::Shop, 300},
+		{QStringLiteral("tiaracristal"), QStringLiteral("crystaltiara"), Slot::Hat,
+		 QStringLiteral("excl_tiaracristal.png"), Rule::Shop, 400},
+		{QStringLiteral("vikingglacial"), QStringLiteral("frostviking"), Slot::Hat,
+		 QStringLiteral("excl_vikingglacial.png"), Rule::Shop, 500},
+		{QStringLiteral("asasfada"), QStringLiteral("fairywings"), Slot::Accessory,
+		 QStringLiteral("excl_asasfada_bg.png"), Rule::Shop, 800},
 	};
 	return items;
 }
@@ -62,15 +73,29 @@ const Item *find(const QString &id)
 	return nullptr;
 }
 
-QString resolve(const QString &raw, Slot slot)
+namespace {
+
+QString resolveIn(const QString &raw, std::optional<Slot> slot)
 {
 	QString value = raw.trimmed().toLower();
 	value.remove(QLatin1Char(' '));
 	for (const Item &item : catalog()) {
-		if (item.slot == slot && (item.id == value || item.english == value))
+		if ((!slot || item.slot == *slot) && (item.id == value || item.english == value))
 			return item.id;
 	}
 	return QString();
+}
+
+} // namespace
+
+QString resolve(const QString &raw, Slot slot)
+{
+	return resolveIn(raw, slot);
+}
+
+QString resolve(const QString &raw)
+{
+	return resolveIn(raw, std::nullopt);
 }
 
 QString ruleId(Rule rule)
@@ -109,7 +134,7 @@ void ItemBook::load()
 		const QString id = o.value(QStringLiteral("id")).toString();
 		const std::optional<Items::Rule> rule = Items::ruleFromId(o.value(QStringLiteral("rule")).toString());
 		if (Items::find(id) && rule)
-			m_rules.insert(id, {*rule, std::clamp(o.value(QStringLiteral("value")).toInt(), 0, kMaxLevel)});
+			m_rules.insert(id, {*rule, clampValue(*rule, o.value(QStringLiteral("value")).toInt())});
 	}
 	const QJsonObject owned = raw.value(QStringLiteral("owned")).toObject();
 	for (auto it = owned.begin(); it != owned.end(); ++it) {
@@ -169,12 +194,27 @@ void ItemBook::applySettings(const QJsonObject &settings)
 		const std::optional<Items::Rule> r = Items::ruleFromId(o.value(QStringLiteral("rule")).toString());
 		if (!Items::find(id) || !r)
 			continue;
-		/* A chance is a percentage; a level, up to kMaxLevel. */
-		const int high = *r == Items::Rule::Adventure ? 100 : kMaxLevel;
-		const int low = *r == Items::Rule::Level || *r == Items::Rule::Adventure ? 1 : 0;
-		m_rules.insert(id, {*r, std::clamp(o.value(QStringLiteral("value")).toInt(value(id)), low, high)});
+		m_rules.insert(id, {*r, clampValue(*r, o.value(QStringLiteral("value")).toInt(value(id)))});
 	}
 	save();
+}
+
+int ItemBook::clampValue(Items::Rule rule, int value)
+{
+	/* A chance is a percentage; a level, up to kMaxLevel; a price, at least a point. */
+	switch (rule) {
+	case Items::Rule::Level:
+		return std::clamp(value, 1, kMaxLevel);
+	case Items::Rule::Adventure:
+		return std::clamp(value, 1, 100);
+	case Items::Rule::Shop:
+		return std::clamp(value, 1, kMaxPrice);
+	case Items::Rule::Off:
+	case Items::Rule::Boss:
+	case Items::Rule::Mvp:
+		break;
+	}
+	return std::clamp(value, 0, kMaxPrice);
 }
 
 void ItemBook::restoreDefaults()
@@ -249,4 +289,14 @@ QStringList ItemBook::onBoss(const QString &key, bool mvp)
 	return earn(key, [mvp](const Items::Item &, const Setting &s) {
 		return s.rule == Items::Rule::Boss || (mvp && s.rule == Items::Rule::Mvp);
 	});
+}
+
+QStringList ItemBook::forSale() const
+{
+	QStringList ids;
+	for (const Items::Item &item : Items::catalog()) {
+		if (rule(item.id) == Items::Rule::Shop)
+			ids.append(item.id);
+	}
+	return ids;
 }

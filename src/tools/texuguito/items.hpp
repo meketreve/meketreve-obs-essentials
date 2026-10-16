@@ -19,7 +19,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 /* Exclusive items for the parade: hats, capes and wings that only show up
  * on whoever earned them, by reaching a level, coming back from an
- * adventure with luck, or helping to beat a boss (or being its MVP). The
+ * adventure with luck, helping to beat a boss (or being its MVP), or
+ * buying it in the shop (!loja) with points. The
  * streamer picks how each one is earned; an item once earned stays. Worn
  * with !hat/!accessory like any other. Saved in items.json. No OBS
  * dependency, so it runs in unit tests. */
@@ -36,7 +37,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace Items {
 
 enum class Slot { Hat, Accessory };
-enum class Rule { Off, Level, Adventure, Boss, Mvp };
+enum class Rule { Off, Level, Adventure, Boss, Mvp, Shop };
 
 struct Item {
 	QString id;      /* also the sprite key in manifest.json */
@@ -44,7 +45,7 @@ struct Item {
 	Slot slot = Slot::Hat;
 	QString preview; /* a sprite sheet to show it in the panel */
 	Rule rule = Rule::Off;
-	int value = 0; /* the level, or the chance per adventure in % */
+	int value = 0; /* the level, the chance per adventure in %, or the price */
 };
 
 /* Every exclusive item, with the default way to earn it. */
@@ -52,6 +53,8 @@ const QList<Item> &catalog();
 const Item *find(const QString &id);
 /* An id or English name of an item of that slot, as typed; empty if none. */
 QString resolve(const QString &raw, Slot slot);
+/* The same, of either slot. */
+QString resolve(const QString &raw);
 QString ruleId(Rule rule);
 std::optional<Rule> ruleFromId(const QString &id);
 
@@ -60,6 +63,7 @@ std::optional<Rule> ruleFromId(const QString &id);
 class ItemBook {
 public:
 	static constexpr int kMaxLevel = 1000;
+	static constexpr int kMaxPrice = 100000;
 
 	/* Random index in [0, n), for the adventure chance; tests pass their own. */
 	using Chooser = std::function<int(int n)>;
@@ -89,12 +93,15 @@ public:
 	QStringList onLevel(const QString &key, int level);
 	QStringList onAdventure(const QString &key);
 	QStringList onBoss(const QString &key, bool mvp);
+	/* What the shop sells now, in catalog order. */
+	QStringList forSale() const;
 
 private:
 	struct Setting {
 		Items::Rule rule = Items::Rule::Off;
 		int value = 0;
 	};
+	static int clampValue(Items::Rule rule, int value);
 	QStringList earn(const QString &key, const std::function<bool(const Items::Item &, const Setting &)> &earned);
 
 	QString m_path;

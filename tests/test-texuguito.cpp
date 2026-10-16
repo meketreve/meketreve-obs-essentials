@@ -1588,6 +1588,119 @@ private slots:
 		again.restoreDefaults();
 		QCOMPARE(again.rule(QStringLiteral("coroarubi")), Items::Rule::Level);
 		QCOMPARE(ItemBook(path).owners(QStringLiteral("magoestelar")), 1);
+
+		/* The shop: its own items by default, any other on the streamer's say. */
+		QCOMPARE(again.forSale(), (QStringList{QStringLiteral("oculosneon"), QStringLiteral("cartolaesmeralda"),
+						       QStringLiteral("tiaracristal"), QStringLiteral("vikingglacial"),
+						       QStringLiteral("asasfada")}));
+		QCOMPARE(again.value(QStringLiteral("asasfada")), 800);
+		QCOMPARE(Items::resolve(QStringLiteral("Fairy Wings")), QStringLiteral("asasfada"));
+		QCOMPARE(Items::resolve(QStringLiteral("crystaltiara")), QStringLiteral("tiaracristal"));
+		QCOMPARE(Items::resolve(QStringLiteral("tiara")), QString());
+		/* Shop items are earned by buying only. */
+		QCOMPARE(again.onLevel(QStringLiteral("eva"), ItemBook::kMaxLevel).size(), 4);
+		QCOMPARE(again.onBoss(QStringLiteral("eva"), true).size(), 2);
+		QVERIFY(!again.owns(QStringLiteral("eva"), QStringLiteral("oculosneon")));
+		const QJsonArray prices{
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("capareal")},
+				    {QStringLiteral("rule"), QStringLiteral("shop")},
+				    {QStringLiteral("value"), 0}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("asasfada")},
+				    {QStringLiteral("rule"), QStringLiteral("shop")},
+				    {QStringLiteral("value"), 999999}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("oculosneon")},
+				    {QStringLiteral("rule"), QStringLiteral("off")}},
+		};
+		again.applySettings(QJsonObject{{QStringLiteral("rules"), prices}});
+		QCOMPARE(again.value(QStringLiteral("capareal")), 1);
+		QCOMPARE(again.value(QStringLiteral("asasfada")), ItemBook::kMaxPrice);
+		QCOMPARE(again.forSale(), (QStringList{QStringLiteral("capareal"), QStringLiteral("cartolaesmeralda"),
+						       QStringLiteral("tiaracristal"), QStringLiteral("vikingglacial"),
+						       QStringLiteral("asasfada")}));
+		/* A price above a level's limit survives the reload. */
+		QCOMPARE(ItemBook(path).value(QStringLiteral("asasfada")), ItemBook::kMaxPrice);
+	}
+
+	void shopInTheBot()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		bot.setText(locale("pt-BR.ini"));
+		/* No quests: they would pay points of their own. */
+		bot.quests().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+		const auto lastViewer = [&overlay]() {
+			return overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
+		};
+
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!loja")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral(
+				 "🛒 Loja: Óculos Neon (oculosneon) 200 pts, Cartola Esmeralda (cartolaesmeralda) "
+				 "300 pts, Tiara de Cristal (tiaracristal) 400 pts, Viking Glacial (vikingglacial) "
+				 "500 pts, Asas de Fada (asasfada) 800 pts. Compre com !comprar <item>. Você tem 0 "
+				 "pts."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!comprar oculosneon")));
+		QCOMPARE(replies(said).last(), QStringLiteral("❌ Ana, Óculos Neon custa 200 pts (você tem 0)."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!comprar capareal")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🛒 Ana, esse item não está à venda. Veja a !loja."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!comprar nada")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🛒 Ana, esse item não está à venda. Veja a !loja."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!acessorio oculosneon")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🔒 Ana, Óculos Neon é um item exclusivo (200 pts na "
+							      "!loja). Veja os seus com !itens."));
+
+		bot.points().add(QStringLiteral("ana"), 250);
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!comprar Neon Glasses")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("🛍️ Ana comprou o item exclusivo Óculos Neon por 200 pts! Use com !acessorio "
+					"oculosneon"));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 50);
+		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("oculosneon")));
+		QCOMPARE(lastViewer().value(QStringLiteral("quest_label")).toString(),
+			 QStringLiteral("🎁 Óculos Neon"));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!buy neonglasses")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🛒 Ana, you already have Neon Glasses."));
+		QCOMPARE(bot.points().get(QStringLiteral("ana")), 50);
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!shop")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral(
+				 "🛒 Shop: Neon Glasses (neonglasses) ✓, Emerald Top Hat (emeraldtophat) 300 pts, "
+				 "Crystal Tiara (crystaltiara) 400 pts, Frost Viking (frostviking) 500 pts, Fairy "
+				 "Wings (fairywings) 800 pts. Buy with !buy <item>. You have 50 pts."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!acessorio oculosneon")));
+		QCOMPARE(lastViewer().value(QStringLiteral("acessorio")).toString(), QStringLiteral("oculosneon"));
+		/* Bought on Twitch, worn on Kick: items go by name. */
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!acessorio nenhum"), ChatPlatform::Kick));
+		bot.handleMessage(
+			msg(QStringLiteral("Ana"), QStringLiteral("!acessorio oculosneon"), ChatPlatform::Kick));
+		QCOMPARE(lastViewer().value(QStringLiteral("acessorio")).toString(), QStringLiteral("oculosneon"));
+
+		/* !loja <item> buys too, in English. */
+		bot.points().add(QStringLiteral("beto"), 1000);
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("!shop crystal tiara")));
+		QCOMPARE(
+			replies(said).last(),
+			QStringLiteral(
+				"🛍️ Beto bought the exclusive hat Crystal Tiara for 400 pts! Wear it with !hat crystaltiara"));
+		QCOMPARE(bot.points().get(QStringLiteral("beto")), 600);
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("!items")));
+		QVERIFY(replies(said).last().startsWith(
+			QStringLiteral("🎒 Beto, your exclusive items: Crystal Tiara (crystaltiara).")));
+		QVERIFY(replies(said).last().endsWith(QStringLiteral(" 4 more in the !shop.")));
+
+		/* Nothing for sale: the shop is closed. */
+		QJsonArray off;
+		for (const QString &id : bot.items().forSale())
+			off.append(QJsonObject{{QStringLiteral("id"), id},
+					       {QStringLiteral("rule"), QStringLiteral("off")}});
+		bot.items().applySettings(QJsonObject{{QStringLiteral("rules"), off}});
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!loja")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🛒 A loja está fechada no momento."));
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!comprar")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🛒 A loja está fechada no momento."));
 	}
 
 	void itemsInTheBot()
@@ -1655,7 +1768,7 @@ private slots:
 				 "🎒 Beto, seus itens exclusivos: Capa Real (capareal), Coroa de Rubi (coroarubi). "
 				 "Para ganhar: Chifres Dourados: nível 10, Asas Douradas: nível 15, "
 				 "Chapéu Estelar: 10% de chance a cada aventura, Elmo Sombrio: ajudar a derrotar "
-				 "um chefão, Asas do Chefão: ser o MVP de um chefão."));
+				 "um chefão, Asas do Chefão: ser o MVP de um chefão. Mais 5 na !loja."));
 		/* Off items are not offered. */
 		bot.items().applySettings(
 			QJsonObject{{QStringLiteral("rules"),

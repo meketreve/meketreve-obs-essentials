@@ -53,6 +53,13 @@ ITEMS = [
     ("hat_elmo.png", "excl_elmosombrio.png", hexes("#0c0614", "#2a1640", "#5a3a80", "#c0a0e8"), 1.0),
     ("asas_morcego_bg.png", "excl_asaschefao_bg.png", hexes("#12051f", "#3a0f5a", "#7a2aa0", "#ff6ad0"), 1.0),
     ("asas_morcego_fg.png", "excl_asaschefao_fg.png", hexes("#12051f", "#3a0f5a", "#7a2aa0", "#ff6ad0"), 1.0),
+    # Sold in the shop (!loja).
+    ("acc_oculosescuros.png", "excl_oculosneon.png", hexes("#0c8a3a", "#30f070", "#a0ffc0", "#ffffff"), 0.7),
+    ("hat_cartola.png", "excl_cartolaesmeralda.png", hexes("#04200f", "#0c5a30", "#1fa860", "#a8f0c8"), 1.0),
+    ("hat_tiara.png", "excl_tiaracristal.png", hexes("#103048", "#2a7ab0", "#7ad8f8", "#ffffff"), 1.0),
+    ("hat_viking.png", "excl_vikingglacial.png", hexes("#0a1a30", "#2a5a90", "#8ac8f0", "#f0faff"), 1.0),
+    ("asas_borboleta_bg.png", "excl_asasfada_bg.png", hexes("#3a0a40", "#a02a90", "#ff70c8", "#fff0fa"), 1.0),
+    ("asas_borboleta_fg.png", "excl_asasfada_fg.png", hexes("#3a0a40", "#a02a90", "#ff70c8", "#fff0fa"), 1.0),
 ]
 for src, out, colors, gamma in ITEMS:
     recolor(src, out, colors, gamma)
