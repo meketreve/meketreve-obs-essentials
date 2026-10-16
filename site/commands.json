@@ -9,11 +9,11 @@
         {"pt": "!resetcor", "en": "!resetcolor", "also": ["!resetcolour"], "who": "all",
          "desc": {"pt": "Volta para a cor que o bot escolheu para você.", "en": "Goes back to the color the bot picked for you."}},
         {"pt": "!chapeu <opção>", "en": "!hat <option>", "who": "all",
-         "desc": {"pt": "Põe um chapéu: boné, coroa, chifres, tricornio, bicorne, cartola, tiara, coco, natalino, mago, viking, elmo, legionario, bandana, capuz, faixa ou nenhum.",
-                  "en": "Puts on a hat: cap, crown, horns, tricorne, bicorn, tophat, tiara, coconut, santa, wizard, viking, helmet, legionary, bandana, hood, headband or none."}},
+         "desc": {"pt": "Põe um chapéu: boné, coroa, chifres, tricornio, bicorne, cartola, tiara, coco, natalino, mago, viking, elmo, legionario, bandana, capuz, faixa, nenhum ou um item exclusivo que você ganhou (!itens).",
+                  "en": "Puts on a hat: cap, crown, horns, tricorne, bicorn, tophat, tiara, coconut, santa, wizard, viking, helmet, legionary, bandana, hood, headband, none, or an exclusive item you earned (!items)."}},
         {"pt": "!acessorio <opção>", "en": "!accessory <option>", "who": "all",
-         "desc": {"pt": "Põe um acessório: óculos, capa, asas, colar, cachecol, laco, tapaolho, oculosescuros, monoculo, asasmorcego, asasborboleta, asaslibelula ou nenhum.",
-                  "en": "Adds an accessory: glasses, cape, wings, necklace, scarf, bow, eyepatch, sunglasses, monocle, batwings, butterflywings, dragonflywings or none."}},
+         "desc": {"pt": "Põe um acessório: óculos, capa, asas, colar, cachecol, laco, tapaolho, oculosescuros, monoculo, asasmorcego, asasborboleta, asaslibelula, nenhum ou um item exclusivo que você ganhou (!itens).",
+                  "en": "Adds an accessory: glasses, cape, wings, necklace, scarf, bow, eyepatch, sunglasses, monocle, batwings, butterflywings, dragonflywings, none, or an exclusive item you earned (!items)."}},
         {"pt": "!apelido <nome>", "en": "!nick <name>", "also": ["!nickname"], "who": "all",
          "desc": {"pt": "Nome que aparece em cima do avatar (até 16 letras).", "en": "The name shown above your avatar (up to 16 letters)."}},
         {"pt": "!dança", "en": "!dance", "also": ["!danca"], "who": "all",
@@ -66,7 +66,10 @@
                   "en": "Hits the boss on the parade (10 damage, every 10 s). Chatting hits it too, and support, subs and follows hit hard. Beaten in time, everyone who hit it gets points and XP, and whoever hit hardest gets a bonus."}},
         {"pt": "!chefao", "en": "!boss", "also": ["!chefão"], "who": "all",
          "desc": {"pt": "Mostra a vida do chefão e quanto tempo falta para ele fugir. Mod ou streamer sem chefão no desfile: chama um.",
-                  "en": "Shows the boss's HP and how long until it gets away. A mod or the streamer with no boss on the parade: calls one."}}
+                  "en": "Shows the boss's HP and how long until it gets away. A mod or the streamer with no boss on the parade: calls one."}},
+        {"pt": "!itens", "en": "!items", "also": ["!inventario", "!inventário", "!inventory"], "who": "all",
+         "desc": {"pt": "Mostra os seus itens exclusivos do desfile (chapéus, capas e asas que só aparecem em quem ganhou) e como ganhar os outros: chegando num nível, com sorte numa aventura, ajudando a derrotar um chefão ou sendo o MVP dele. Vista com !chapeu ou !acessorio. Na Twitch a resposta pode vir por sussurro.",
+                  "en": "Shows your exclusive parade items (hats, capes and wings that only show up on whoever earned them) and how to earn the others: by reaching a level, with luck on an adventure, by helping to beat a boss or by being its MVP. Wear them with !hat or !accessory. On Twitch the answer may come as a whisper."}}
       ]
     },
     {

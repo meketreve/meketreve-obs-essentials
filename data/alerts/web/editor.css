@@ -141,6 +141,11 @@ input.num { width: 90px; }
 .row > label:first-child { color: var(--muted); }
 .row .inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .row .note { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: -4px; }
+.item-name { display: flex; align-items: center; gap: 8px; }
+/* One 64px frame of a 9x4 LPC sheet at 48px, the row facing the viewer. */
+.item-sprite { width: 48px; height: 48px; flex: none; background-size: 432px 192px; background-position: 0 -96px;
+  background-repeat: no-repeat; image-rendering: pixelated; }
+.item-row .inline select { width: auto; flex: 1; }
 input[type="text"], input[type="number"], input[type="url"], input[type="search"], select {
   width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
 }

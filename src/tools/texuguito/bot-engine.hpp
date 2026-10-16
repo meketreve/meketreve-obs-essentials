@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "boss.hpp"
 #include "bot-data.hpp"
+#include "items.hpp"
 #include "quests.hpp"
 #include "sound-fetch.hpp"
 #include "sound-library.hpp"
@@ -182,6 +183,7 @@ public:
 	CustomCommandStore &customCommands() { return m_custom; }
 	QuestBook &quests() { return m_quests; }
 	BossFight &boss() { return m_boss; }
+	ItemBook &items() { return m_items; }
 	/* Creates or changes a chat-made command from the web panel, with the
 	 * same rules as "!comando add": empty when done, else the error. */
 	QString setCustomCommand(const QString &name, const QString &response);
@@ -250,6 +252,17 @@ private:
 	QString questsReply(const BotMessage &msg, const QString &key);
 	void startAdventure(const BotMessage &msg, const QString &key);
 	QString outcomeTitle(const QString &invoked, const AdventureOutcome &outcome) const;
+	/* The exclusive items key just earned (fresh, plus those of the level
+	 * it is at now): the chat lines that tell it, in the language of
+	 * invoked, and a label for over the head. */
+	QStringList earnItems(const QString &key, const QString &invoked, QStringList fresh, QStringList &labels);
+	/* Whether key has the exclusive item id (!hat, !accessory); says why
+	 * not when it does not. */
+	bool mayWear(const BotMessage &msg, const QString &key, const QString &id);
+	QString itemName(const QString &invoked, const QString &id) const;
+	/* How id is earned now, as "level 5". */
+	QString itemHow(const QString &invoked, const QString &id) const;
+	QString itemsReply(const BotMessage &msg, const QString &key);
 	void bossHit(const QString &key, BossFight::Hit hit);
 	void endBoss(const BossFight::Result &result);
 	/* The boss as the overlay draws it. */
@@ -267,6 +280,7 @@ private:
 	CustomCommandStore m_custom;
 	QuestBook m_quests;
 	BossFight m_boss;
+	ItemBook m_items;
 	bool m_live = false;
 	Raffle m_raffle;
 	QHash<QString, Status> m_status;

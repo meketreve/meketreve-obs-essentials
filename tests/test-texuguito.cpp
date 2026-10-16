@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "boss.hpp"
 #include "bot-engine.hpp"
+#include "items.hpp"
 #include "overlay-server.hpp"
 #include "quests.hpp"
 #include "sound-fetch.hpp"
@@ -1457,6 +1458,8 @@ private slots:
 						   {QStringLiteral("points"), 80},
 						   {QStringLiteral("xp"), 60}}};
 		QCOMPARE(bot.quests().applyAdventure(QJsonObject{{QStringLiteral("outcomes"), prize}}), QString());
+		/* No luck with the items either. */
+		bot.items().setChooser([](int n) { return n - 1; });
 		QSignalSpy said(&bot, &BotEngine::reply);
 		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
 		const auto lastViewer = [&overlay]() {
@@ -1512,6 +1515,174 @@ private slots:
 		bot.quests().applyAdventure(QJsonObject{{QStringLiteral("enabled"), false}});
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!aventura"), ChatPlatform::Kick));
 		QCOMPARE(replies(said).last(), QStringLiteral("❌ As aventuras estão desligadas."));
+	}
+
+	void itemBook()
+	{
+		QTemporaryDir dir;
+		const QString path = dir.filePath(QStringLiteral("items.json"));
+		int roll = 50;
+		ItemBook book(path, [&roll](int) { return roll; });
+
+		QCOMPARE(Items::resolve(QStringLiteral(" Ruby Crown "), Items::Slot::Hat), QStringLiteral("coroarubi"));
+		QCOMPARE(Items::resolve(QStringLiteral("coroarubi"), Items::Slot::Hat), QStringLiteral("coroarubi"));
+		QCOMPARE(Items::resolve(QStringLiteral("rubycrown"), Items::Slot::Accessory), QString());
+		QCOMPARE(Items::resolve(QStringLiteral("goldenwings"), Items::Slot::Accessory),
+			 QStringLiteral("asasdouradas"));
+		QCOMPARE(Items::resolve(QStringLiteral("coroa"), Items::Slot::Hat), QString());
+
+		/* The defaults: levels 3, 5, 10 and 15, one at a time. */
+		QCOMPARE(book.rule(QStringLiteral("coroarubi")), Items::Rule::Level);
+		QCOMPARE(book.value(QStringLiteral("coroarubi")), 5);
+		QCOMPARE(book.onLevel(QStringLiteral("Ana"), 2), QStringList());
+		QCOMPARE(book.onLevel(QStringLiteral("Ana"), 5),
+			 (QStringList{QStringLiteral("capareal"), QStringLiteral("coroarubi")}));
+		QCOMPARE(book.onLevel(QStringLiteral("ana"), 5), QStringList());
+		QCOMPARE(book.onLevel(QStringLiteral("ana"), 20),
+			 (QStringList{QStringLiteral("chifresdourados"), QStringLiteral("asasdouradas")}));
+		QVERIFY(book.owns(QStringLiteral("ANA"), QStringLiteral("coroarubi")));
+
+		/* 10% per adventure: a roll under 10 wins it. */
+		QCOMPARE(book.onAdventure(QStringLiteral("beto")), QStringList());
+		roll = 9;
+		QCOMPARE(book.onAdventure(QStringLiteral("beto")), QStringList{QStringLiteral("magoestelar")});
+		QCOMPARE(book.onAdventure(QStringLiteral("beto")), QStringList());
+
+		QCOMPARE(book.onBoss(QStringLiteral("caio"), false), QStringList{QStringLiteral("elmosombrio")});
+		QCOMPARE(book.onBoss(QStringLiteral("caio"), true), QStringList{QStringLiteral("asaschefao")});
+		QCOMPARE(book.owners(QStringLiteral("elmosombrio")), 1);
+		QVERIFY(!book.unlock(QStringLiteral("caio"), QStringLiteral("elmosombrio")));
+		QVERIFY(!book.unlock(QStringLiteral("caio"), QStringLiteral("nada")));
+		QVERIFY(!book.unlock(QString(), QStringLiteral("capareal")));
+
+		/* The streamer's rules: clamped, unknown ones ignored, the rest kept. */
+		const QJsonArray rules{
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("coroarubi")},
+				    {QStringLiteral("rule"), QStringLiteral("adventure")},
+				    {QStringLiteral("value"), 500}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("capareal")},
+				    {QStringLiteral("rule"), QStringLiteral("level")},
+				    {QStringLiteral("value"), 0}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("elmosombrio")},
+				    {QStringLiteral("rule"), QStringLiteral("off")}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("nada")},
+				    {QStringLiteral("rule"), QStringLiteral("off")}},
+			QJsonObject{{QStringLiteral("id"), QStringLiteral("magoestelar")},
+				    {QStringLiteral("rule"), QStringLiteral("x")}},
+		};
+		book.applySettings(QJsonObject{{QStringLiteral("rules"), rules}});
+		QCOMPARE(book.rule(QStringLiteral("coroarubi")), Items::Rule::Adventure);
+		QCOMPARE(book.value(QStringLiteral("coroarubi")), 100);
+		QCOMPARE(book.value(QStringLiteral("capareal")), 1);
+		QCOMPARE(book.rule(QStringLiteral("elmosombrio")), Items::Rule::Off);
+		QCOMPARE(book.rule(QStringLiteral("magoestelar")), Items::Rule::Adventure);
+		QCOMPARE(book.onBoss(QStringLiteral("davi"), false), QStringList());
+		QCOMPARE(book.settingsJson().value(QStringLiteral("rules")).toArray().size(), Items::catalog().size());
+
+		/* Saved; the defaults come back, but an item once earned stays. */
+		ItemBook again(path);
+		QCOMPARE(again.rule(QStringLiteral("coroarubi")), Items::Rule::Adventure);
+		QCOMPARE(again.owned(QStringLiteral("ana")),
+			 (QStringList{QStringLiteral("capareal"), QStringLiteral("coroarubi"),
+				      QStringLiteral("chifresdourados"), QStringLiteral("asasdouradas")}));
+		again.restoreDefaults();
+		QCOMPARE(again.rule(QStringLiteral("coroarubi")), Items::Rule::Level);
+		QCOMPARE(ItemBook(path).owners(QStringLiteral("magoestelar")), 1);
+	}
+
+	void itemsInTheBot()
+	{
+		QTemporaryDir dir;
+		BotEngine bot(dir.path(), dir.filePath(QStringLiteral("audios")));
+		bot.setCommandTexts(readLocale("en-US.ini"), readLocale("pt-BR.ini"));
+		bot.setText(locale("pt-BR.ini"));
+		/* One quest that pays enough XP for level 3. */
+		const QJsonArray list{QJsonObject{{QStringLiteral("id"), QStringLiteral("look")},
+						  {QStringLiteral("kind"), QStringLiteral("look")},
+						  {QStringLiteral("points"), 0},
+						  {QStringLiteral("xp"), static_cast<int>(Quests::xpForLevel(3))}}};
+		QCOMPARE(bot.quests().applySettings(QJsonObject{{QStringLiteral("list"), list}}), QString());
+		QSignalSpy said(&bot, &BotEngine::reply);
+		QSignalSpy overlay(&bot, &BotEngine::overlayMessage);
+		const auto lastViewer = [&overlay]() {
+			return overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
+		};
+
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!acessorio capareal")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🔒 Ana, Capa Real é um item exclusivo (nível 3). "
+							      "Veja os seus com !itens."));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!hat ruby crown")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("🔒 Ana, Ruby Crown is an exclusive item (level 5). See yours with !items."));
+		/* Not an item of that slot: still the list of options. */
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!chapeu capareal")));
+		QVERIFY(replies(said).last().startsWith(QStringLiteral("@Ana chapéu inválido.")));
+
+		/* Changing the look finishes the quest: level 3, the cape. */
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!cor azul")));
+		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("capareal")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("🎁 Ana ganhou o item exclusivo Capa Real! Use com !acessorio capareal"));
+		QVERIFY(lastViewer()
+				.value(QStringLiteral("quest_label"))
+				.toString()
+				.endsWith(QStringLiteral("🎁 Capa Real")));
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!accessory royal cape")));
+		QCOMPARE(lastViewer().value(QStringLiteral("acessorio")).toString(), QStringLiteral("capareal"));
+
+		/* A level reached before the items existed also counts. */
+		bot.quests().addXp(QStringLiteral("beto"), static_cast<int>(Quests::xpForLevel(5)));
+		said.clear();
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("!hat rubycrown")));
+		QCOMPARE(
+			replies(said),
+			(QStringList{
+				QStringLiteral(
+					"🎁 Beto earned the exclusive item Royal Cape! Wear it with !accessory royalcape"),
+				QStringLiteral(
+					"🎁 Beto earned the exclusive hat Ruby Crown! Wear it with !hat rubycrown")}));
+		QCOMPARE(lastViewer().value(QStringLiteral("chapeu")).toString(), QStringLiteral("coroarubi"));
+
+		bot.handleMessage(msg(QStringLiteral("Beto"), QStringLiteral("!itens")));
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral(
+				 "🎒 Beto, seus itens exclusivos: Capa Real (capareal), Coroa de Rubi (coroarubi). "
+				 "Para ganhar: Chifres Dourados: nível 10, Asas Douradas: nível 15, "
+				 "Chapéu Estelar: 10% de chance a cada aventura, Elmo Sombrio: ajudar a derrotar "
+				 "um chefão, Asas do Chefão: ser o MVP de um chefão."));
+		/* Off items are not offered. */
+		bot.items().applySettings(
+			QJsonObject{{QStringLiteral("rules"),
+				     QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("magoestelar")},
+							    {QStringLiteral("rule"), QStringLiteral("adventure")},
+							    {QStringLiteral("value"), 100}},
+						QJsonObject{{QStringLiteral("id"), QStringLiteral("elmosombrio")},
+							    {QStringLiteral("rule"), QStringLiteral("off")}}}}});
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!items")));
+		QVERIFY(replies(said).last().startsWith(
+			QStringLiteral("🎒 Caio, you have no exclusive items yet. To earn: ")));
+		QVERIFY(!replies(said).last().contains(QStringLiteral("Dark Helm")));
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!chapeu elmosombrio")));
+		QCOMPARE(replies(said).last(), QStringLiteral("🔒 Caio, Elmo Sombrio é um item exclusivo (desligado no "
+							      "momento). Veja os seus com !itens."));
+
+		/* Coming back from an adventure, at 100%: the star hat. */
+		qint64 now = 1000000;
+		bot.quests().setClock([&now]() { return now; });
+		bot.points().add(QStringLiteral("caio"), 50);
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!adventure")));
+		now += 3 * 60000;
+		said.clear();
+		bot.adventureTick();
+		QCOMPARE(replies(said).last(),
+			 QStringLiteral("🎁 Caio earned the exclusive hat Star Hat! Wear it with !hat starhat"));
+		QVERIFY(lastViewer()
+				.value(QStringLiteral("quest_label"))
+				.toString()
+				.endsWith(QStringLiteral("🎁 Star Hat")));
+		bot.handleMessage(msg(QStringLiteral("Caio"), QStringLiteral("!chapeu magoestelar")));
+		QCOMPARE(lastViewer().value(QStringLiteral("chapeu")).toString(), QStringLiteral("magoestelar"));
 	}
 
 	void bossFight()
@@ -1674,7 +1845,17 @@ private slots:
 		/* Over the head: the boss's reward, then the quest it finished. */
 		const QJsonObject beto = overlay.last().at(0).toJsonObject().value(QStringLiteral("viewer")).toObject();
 		QCOMPARE(beto.value(QStringLiteral("username")).toString(), QStringLiteral("kick:beto"));
-		QCOMPARE(beto.value(QStringLiteral("quest_label")).toString(), QStringLiteral("+100 pts +30 XP +1 XP"));
+		QCOMPARE(beto.value(QStringLiteral("quest_label")).toString(),
+			 QStringLiteral("+100 pts +30 XP +1 XP 🎁 Elmo Sombrio"));
+		/* Everyone who hit gets the helm, the MVP the wings too, each in their own chat. */
+		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("elmosombrio")));
+		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("asaschefao")));
+		QVERIFY(bot.items().owns(QStringLiteral("kick:beto"), QStringLiteral("elmosombrio")));
+		QVERIFY(!bot.items().owns(QStringLiteral("kick:beto"), QStringLiteral("asaschefao")));
+		QVERIFY(replies(said).contains(QStringLiteral(
+			"🎁 Ana ganhou o item exclusivo Asas do Chefão! Use com !acessorio asaschefao")));
+		QVERIFY(replies(said).contains(QStringLiteral(
+			"🎁 Beto ganhou o chapéu exclusivo Elmo Sombrio! Vista com !chapeu elmosombrio")));
 
 		/* Off: a mod cannot call it. */
 		bot.boss().applySettings(QJsonObject{{QStringLiteral("enabled"), false}});

@@ -119,6 +119,8 @@ add_executable(
   ${_texuguito}/bot-data.cpp
   ${_texuguito}/bot-engine.cpp
   ${_texuguito}/bot-engine.hpp
+  ${_texuguito}/items.cpp
+  ${_texuguito}/items.hpp
   ${_texuguito}/overlay-server.cpp
   ${_texuguito}/overlay-server.hpp
   ${_texuguito}/quests.cpp

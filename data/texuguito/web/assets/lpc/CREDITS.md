@@ -76,3 +76,26 @@ Os avatares usam sprites do [Liberated Pixel Cup](https://lpc.opengameart.org)
 - `body/wings/monarch/base/{bg,fg}/walk/monarch.png` — "In dedication to my
   grandmother, Sharon Rowe". Autor: The Foreman.
 
+
+## Itens exclusivos / Exclusive items
+
+Os `excl_*.png` são recolorações dos sprites acima (mapa de gradiente pela
+luminância, `build-aux/recolor-lpc.py`), sob a mesma licença e com os mesmos
+autores do sprite de origem.
+The `excl_*.png` files are recolors of the sprites above (a luminance
+gradient map, `build-aux/recolor-lpc.py`), under the same license and by the
+same authors as the source sprite.
+
+- `excl_capareal.png` — de `capa_walk.png` (`torso/jacket/iverness`, bluecarrot16).
+- `excl_coroarubi.png` — de `hat_coroa_walk.png` (`hat/formal/crown`,
+  DarkwallLKE, Charles Sanchez).
+- `excl_chifresdourados.png` — de `chifres_walk.png` (`head/horns/curled`,
+  Nila122; OGA-BY 3.0, GPL 3.0, CC-BY-SA 3.0).
+- `excl_asasdouradas_{bg,fg}.png` — de `asas_{bg,fg}_walk.png`
+  (`body/wings/feathered`, ElizaWy, Redshrike, JaidynReiman).
+- `excl_magoestelar.png` — de `hat_mago.png` (`hat/magic/wizard`,
+  bigbeargames, reemax, JaidynReiman).
+- `excl_elmosombrio.png` — de `hat_elmo.png` (`hat/helmet/greathelm`,
+  bluecarrot16).
+- `excl_asaschefao_{bg,fg}.png` — de `asas_morcego_{bg,fg}.png`
+  (`body/wings/bat`, ElizaWy, JaidynReiman).

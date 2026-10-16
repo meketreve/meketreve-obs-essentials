@@ -155,6 +155,8 @@ target_sources(
     src/tools/texuguito/bot-data.hpp
     src/tools/texuguito/bot-engine.cpp
     src/tools/texuguito/bot-engine.hpp
+    src/tools/texuguito/items.cpp
+    src/tools/texuguito/items.hpp
     src/tools/texuguito/overlay-server.cpp
     src/tools/texuguito/overlay-server.hpp
     src/tools/texuguito/quests.cpp

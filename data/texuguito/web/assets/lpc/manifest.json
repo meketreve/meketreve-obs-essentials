@@ -28,7 +28,11 @@
     "legionario": "hat_legionario.png",
     "bandana": "hat_bandana.png",
     "capuz": "hat_capuz.png",
-    "faixa": "hat_faixa.png"
+    "faixa": "hat_faixa.png",
+    "coroarubi": "excl_coroarubi.png",
+    "chifresdourados": "excl_chifresdourados.png",
+    "magoestelar": "excl_magoestelar.png",
+    "elmosombrio": "excl_elmosombrio.png"
   },
   "accessories": {
     "óculos": "oculos_walk.png",
@@ -38,13 +42,16 @@
     "laco": "acc_laco.png",
     "tapaolho": "acc_tapaolho.png",
     "oculosescuros": "acc_oculosescuros.png",
-    "monoculo": "acc_monoculo.png"
+    "monoculo": "acc_monoculo.png",
+    "capareal": "excl_capareal.png"
   },
   "wings": {
     "asas": {"bg": "asas_bg_walk.png", "fg": "asas_fg_walk.png"},
     "asasmorcego": {"bg": "asas_morcego_bg.png", "fg": "asas_morcego_fg.png"},
     "asasborboleta": {"bg": "asas_borboleta_bg.png", "fg": "asas_borboleta_fg.png"},
-    "asaslibelula": {"bg": "asas_libelula_bg.png", "fg": "asas_libelula_fg.png"}
+    "asaslibelula": {"bg": "asas_libelula_bg.png", "fg": "asas_libelula_fg.png"},
+    "asasdouradas": {"bg": "excl_asasdouradas_bg.png", "fg": "excl_asasdouradas_fg.png"},
+    "asaschefao": {"bg": "excl_asaschefao_bg.png", "fg": "excl_asaschefao_fg.png"}
   },
   "content_box": {
     "x": 14,

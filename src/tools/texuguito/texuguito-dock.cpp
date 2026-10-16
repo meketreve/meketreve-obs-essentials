@@ -262,6 +262,20 @@ QJsonObject TexuguitoDock::panelState() const
 	boss.insert(QStringLiteral("maxMinutes"), BossFight::kMaxMinutes);
 	boss.insert(QStringLiteral("maxAutoMinutes"), BossFight::kMaxAutoMinutes);
 	state.insert(QStringLiteral("boss"), boss);
+	/* The rules, with what the panel shows next to each one. */
+	const ItemBook &book = m_engine->items();
+	QJsonArray items;
+	for (const QJsonValue v : book.settingsJson().value(QStringLiteral("rules")).toArray()) {
+		QJsonObject item = v.toObject();
+		const Items::Item *def = Items::find(item.value(QStringLiteral("id")).toString());
+		item.insert(QStringLiteral("hat"), def->slot == Items::Slot::Hat);
+		item.insert(QStringLiteral("english"), def->english);
+		item.insert(QStringLiteral("preview"), def->preview);
+		item.insert(QStringLiteral("owners"), book.owners(def->id));
+		items.append(item);
+	}
+	state.insert(QStringLiteral("items"),
+		     QJsonObject{{QStringLiteral("rules"), items}, {QStringLiteral("maxLevel"), ItemBook::kMaxLevel}});
 	return state;
 }
 
@@ -269,8 +283,9 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 {
 	/* The quests come on their own ({quests} or {questDefaults}), the
 	 * adventure too ({adventure} or {adventureDefaults}), the boss
-	 * ({boss}, {bossDefaults} or {bossCall}), the look on its own: each
-	 * one leaves the others as they are. */
+	 * ({boss}, {bossDefaults} or {bossCall}), the exclusive items ({items}
+	 * or {itemsDefaults}), the look on its own: each one leaves the others
+	 * as they are. */
 	if (panel.contains(QStringLiteral("quests")) || panel.contains(QStringLiteral("questDefaults"))) {
 		QString error;
 		if (panel.value(QStringLiteral("questDefaults")).toBool())
@@ -308,6 +323,13 @@ QJsonObject TexuguitoDock::applyPanel(const QJsonObject &panel)
 		if (!error.isEmpty())
 			state.insert(QStringLiteral("error"), error);
 		return state;
+	}
+	if (panel.contains(QStringLiteral("items")) || panel.contains(QStringLiteral("itemsDefaults"))) {
+		if (panel.value(QStringLiteral("itemsDefaults")).toBool())
+			m_engine->items().restoreDefaults();
+		else
+			m_engine->items().applySettings(panel.value(QStringLiteral("items")).toObject());
+		return panelState();
 	}
 	m_scale = std::clamp(panel.value(QStringLiteral("scale")).toDouble(m_scale), 0.5, 4.0);
 	m_speed = std::clamp(panel.value(QStringLiteral("speed")).toDouble(m_speed), 0.25, 3.0);

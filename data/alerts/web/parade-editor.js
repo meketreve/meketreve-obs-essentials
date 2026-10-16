@@ -66,7 +66,7 @@ async function save() {
     const { scale, speed, names, nameSize } = state;
     const next = await post({ scale, speed, names, nameSize });
     // The quests and prizes keep what is being typed in them.
-    state = { ...next, quests: state.quests, adventure: state.adventure, boss: state.boss };
+    state = { ...next, quests: state.quests, adventure: state.adventure, boss: state.boss, items: state.items };
     setSave("ok");
   } catch (e) {
     setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
@@ -347,6 +347,75 @@ function bossCard() {
     el("div", { class: "group-head" }, call, defaults));
 }
 
+// --- Exclusive items: how each one is earned. Whoever earned one keeps it.
+const ITEM_RULES = ["off", "level", "adventure", "boss", "mvp"];
+let itemsTimer = null;
+function itemsChanged() {
+  setSave("saving");
+  clearTimeout(itemsTimer);
+  itemsTimer = setTimeout(saveItems, 400);
+}
+
+async function saveItems() {
+  try {
+    const rules = state.items.rules.map(({ id, rule, value }) => ({ id, rule, value }));
+    const next = await post({ items: { rules } });
+    next.items.rules.forEach((saved, i) => { if (state.items.rules[i]) state.items.rules[i].owners = saved.owners; });
+    setSave("ok");
+  } catch (e) {
+    setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
+  }
+}
+
+function itemRow(item) {
+  const it = state.items;
+  // The sprite sheet comes from the parade's own server, facing the viewer.
+  const sheet = state.url.replace(/\/overlay$/, "") + "/static/assets/lpc/" + item.preview;
+  const sprite = el("span", { class: "item-sprite", style: `background-image:url("${sheet}")` });
+  const rule = el("select", {}, ITEM_RULES.map((r) => {
+    const option = el("option", { value: r, text: t("ItemRule." + r) });
+    option.selected = r === item.rule;
+    return option;
+  }));
+  const max = item.rule === "adventure" ? 100 : it.maxLevel;
+  rule.addEventListener("change", () => {
+    item.rule = rule.value;
+    // A level or a chance needs a number: keep the one there, if it fits.
+    if (item.rule === "level" || item.rule === "adventure")
+      item.value = Math.min(item.rule === "adventure" ? 100 : it.maxLevel, Math.max(1, item.value || 10));
+    itemsChanged();
+    renderForm();
+  });
+  const value = item.rule === "level" || item.rule === "adventure"
+    ? numberCtl(item.value, 1, max, (v) => { item.value = v; itemsChanged(); })
+    : null;
+  const wear = (item.hat ? "!chapeu " + item.id + " · !hat " : "!acessorio " + item.id + " · !accessory ") + item.english;
+  return el("div", { class: "row item-row" },
+    el("label", { class: "item-name" }, sprite, el("span", { text: t("Item." + item.id) })),
+    el("div", { class: "inline" }, rule, value),
+    el("div", { class: "note", text: wear + " · " + t("ItemOwners", item.owners) }));
+}
+
+function itemsCard() {
+  const defaults = el("button", { type: "button", class: "btn small", text: t("ItemsDefaults") });
+  defaults.addEventListener("click", async () => {
+    if (!confirm(t("ItemsDefaultsConfirm"))) return;
+    clearTimeout(itemsTimer);
+    try {
+      const next = await post({ itemsDefaults: true });
+      state.items = next.items;
+      setSave("ok");
+      renderForm();
+    } catch (e) {
+      setSave("bad", e.message === "forbidden" ? t("BadToken") : t("SaveFailed", e.message));
+    }
+  });
+  return el("section", { class: "card" }, el("h3", { text: t("Items") }),
+    el("p", { class: "hint", text: t("ItemsNote") }),
+    state.items.rules.map(itemRow),
+    el("div", { class: "group-head" }, defaults));
+}
+
 function row(label, control, note) {
   return el("div", { class: "row" }, el("label", { text: label }), control, note ? el("div", { class: "note", text: note }) : null);
 }
@@ -389,7 +458,8 @@ function renderForm() {
       row(t("BrowserSource"), el("div", { class: "inline" }, el("code", { text: state.url }), copy), t("LinkNote"))),
     state.quests ? questsCard() : null,
     state.adventure ? adventureCard() : null,
-    state.boss ? bossCard() : null);
+    state.boss ? bossCard() : null,
+    state.items ? itemsCard() : null);
   if (state.adventure) refreshChances();
 }
 

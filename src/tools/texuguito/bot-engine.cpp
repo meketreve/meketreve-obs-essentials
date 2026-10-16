@@ -57,7 +57,7 @@ const QSet<QString> kEnglishInvocations{
 	QStringLiteral("level"),     QStringLiteral("adventure"),  QStringLiteral("attack"),
 	QStringLiteral("boss"),      QStringLiteral("quest"),      QStringLiteral("missions"),
 	QStringLiteral("lvl"),       QStringLiteral("colour"),     QStringLiteral("resetcolour"),
-	QStringLiteral("enter"),
+	QStringLiteral("enter"),     QStringLiteral("items"),      QStringLiteral("inventory"),
 };
 const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("cor"),
@@ -95,6 +95,9 @@ const QSet<QString> kPortugueseInvocations{
 	QStringLiteral("atacar"),
 	QStringLiteral("chefao"),
 	QStringLiteral("chefão"),
+	QStringLiteral("itens"),
+	QStringLiteral("inventario"),
+	QStringLiteral("inventário"),
 };
 
 } // namespace
@@ -155,6 +158,7 @@ BotEngine::BotEngine(const QString &dataDir, const QString &audioDir, QObject *p
 	  m_custom(dataDir + QStringLiteral("/custom_commands.json")),
 	  m_quests(dataDir + QStringLiteral("/quests.json")),
 	  m_boss(dataDir + QStringLiteral("/boss.json")),
+	  m_items(dataDir + QStringLiteral("/items.json")),
 	  m_audioDir(audioDir),
 	  m_library(dataDir + QStringLiteral("/sound-groups.json"))
 {
@@ -862,10 +866,90 @@ void BotEngine::questProgress(const QString &key, ChatPlatform platform, Quests:
 		if (r.levelUp && m_quests.announce() != QuestBook::Announce::None)
 			say(platform, tCmd(QString(), "Texuguito.Bot.LevelUp").arg(name).arg(r.level));
 	}
+	for (const QString &line : earnItems(key, QString(), {}, labels))
+		say(platform, line);
 	Status &s = m_status[key];
 	s.questUntil = m_clock.elapsed() + kQuestMs;
 	s.questLabel = labels.join(QLatin1Char(' '));
 	syncAvatar(key);
+}
+
+QStringList BotEngine::earnItems(const QString &key, const QString &invoked, QStringList fresh, QStringList &labels)
+{
+	fresh += m_items.onLevel(key, Quests::levelFor(m_quests.xp(key)));
+	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
+	QStringList lines;
+	for (const QString &id : std::as_const(fresh)) {
+		const Items::Item *item = Items::find(id);
+		if (!item)
+			continue;
+		const char *text = item->slot == Items::Slot::Hat ? "Texuguito.Bot.ItemUnlockedHat"
+								  : "Texuguito.Bot.ItemUnlockedAccessory";
+		lines.append(tCmd(invoked, text).arg(displayName(key), itemName(invoked, id), en ? item->english : id));
+		labels.append(QStringLiteral("🎁 ") + itemName(invoked, id));
+	}
+	return lines;
+}
+
+QString BotEngine::itemName(const QString &invoked, const QString &id) const
+{
+	return tCmd(invoked, (QByteArrayLiteral("Texuguito.Parade.Item.") + id.toLatin1()).constData());
+}
+
+QString BotEngine::itemHow(const QString &invoked, const QString &id) const
+{
+	switch (m_items.rule(id)) {
+	case Items::Rule::Level:
+		return tCmd(invoked, "Texuguito.Bot.ItemHowLevel").arg(m_items.value(id));
+	case Items::Rule::Adventure:
+		return tCmd(invoked, "Texuguito.Bot.ItemHowAdventure").arg(m_items.value(id));
+	case Items::Rule::Boss:
+		return tCmd(invoked, "Texuguito.Bot.ItemHowBoss");
+	case Items::Rule::Mvp:
+		return tCmd(invoked, "Texuguito.Bot.ItemHowMvp");
+	case Items::Rule::Off:
+		break;
+	}
+	return tCmd(invoked, "Texuguito.Bot.ItemHowOff");
+}
+
+bool BotEngine::mayWear(const BotMessage &msg, const QString &key, const QString &id)
+{
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	/* A level reached before the items came also counts. */
+	QStringList labels;
+	for (const QString &line : earnItems(key, invoked, {}, labels))
+		say(msg.platform, line);
+	if (m_items.owns(key, id))
+		return true;
+	say(msg.platform,
+	    tCmd(invoked, "Texuguito.Bot.ItemLocked").arg(msg.user, itemName(invoked, id), itemHow(invoked, id)));
+	return false;
+}
+
+QString BotEngine::itemsReply(const BotMessage &msg, const QString &key)
+{
+	const QString invoked = BotText::parseInvocation(msg.text, msg.isReply).first;
+	QStringList labels;
+	for (const QString &line : earnItems(key, invoked, {}, labels))
+		say(msg.platform, line);
+	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
+	QStringList mine;
+	QStringList next;
+	for (const Items::Item &item : Items::catalog()) {
+		if (m_items.owns(key, item.id))
+			mine.append(
+				QStringLiteral("%1 (%2)").arg(itemName(invoked, item.id), en ? item.english : item.id));
+		else if (m_items.rule(item.id) != Items::Rule::Off)
+			next.append(
+				QStringLiteral("%1: %2").arg(itemName(invoked, item.id), itemHow(invoked, item.id)));
+	}
+	QString text = mine.isEmpty()
+			       ? tCmd(invoked, "Texuguito.Bot.ItemsNone").arg(msg.user)
+			       : tCmd(invoked, "Texuguito.Bot.Items").arg(msg.user, mine.join(QStringLiteral(", ")));
+	if (!next.isEmpty())
+		text += tCmd(invoked, "Texuguito.Bot.ItemsNext").arg(next.join(QStringLiteral(", ")));
+	return BotText::truncate(text);
 }
 
 QString BotEngine::waitText(qint64 ms)
@@ -933,12 +1017,17 @@ void BotEngine::adventureTick()
 		m_status[r.key].questUntil = 0;
 		/* Coming back may finish an adventure quest: one label for both. */
 		questProgress(r.key, platform, Quests::Kind::Adventure);
+		QStringList items;
+		for (const QString &line : earnItems(r.key, invoked, m_items.onAdventure(r.key), items))
+			say(platform, line);
 		Status &s = m_status[r.key];
 		QString label = QStringLiteral("+%1 XP").arg(r.outcome.xp);
 		if (r.outcome.points > 0)
 			label.prepend(QStringLiteral("+%1 pts ").arg(r.outcome.points));
 		if (s.questUntil > 0)
 			label += QLatin1Char(' ') + s.questLabel;
+		if (!items.isEmpty())
+			label += QLatin1Char(' ') + items.join(QLatin1Char(' '));
 		s.questUntil = m_clock.elapsed() + kQuestMs;
 		s.questLabel = label;
 		syncAvatar(r.key);
@@ -1027,6 +1116,7 @@ void BotEngine::endBoss(const BossFight::Result &result)
 	const int points = m_boss.points();
 	const int xp = m_boss.xp();
 	QStringList levelUps;
+	QList<QPair<ChatPlatform, QString>> unlocked; /* told after the result, in each one's chat */
 	for (qsizetype i = 0; i < result.damage.size(); ++i) {
 		const QString &key = result.damage[i].first;
 		const int bonus = i == 0 ? m_boss.mvpPoints() : 0;
@@ -1039,10 +1129,15 @@ void BotEngine::endBoss(const BossFight::Result &result)
 		const ChatPlatform platform = m_status.value(key).platform;
 		m_status[key].questUntil = 0;
 		questProgress(key, platform, Quests::Kind::Boss);
+		QStringList items;
+		for (const QString &line : earnItems(key, QString(), m_items.onBoss(key, i == 0), items))
+			unlocked.append({platform, line});
 		Status &s = m_status[key];
 		QString label = QStringLiteral("+%1 pts +%2 XP").arg(points + bonus).arg(xp);
 		if (s.questUntil > 0)
 			label += QLatin1Char(' ') + s.questLabel;
+		if (!items.isEmpty())
+			label += QLatin1Char(' ') + items.join(QLatin1Char(' '));
 		s.questUntil = m_clock.elapsed() + kQuestMs;
 		s.questLabel = label;
 		syncAvatar(key);
@@ -1060,6 +1155,8 @@ void BotEngine::endBoss(const BossFight::Result &result)
 	if (m_quests.announce() != QuestBook::Announce::None)
 		for (const QString &line : std::as_const(levelUps))
 			sayEverywhere(line);
+	for (const auto &[platform, line] : std::as_const(unlocked))
+		say(platform, line);
 }
 
 void BotEngine::registerCommands()
@@ -1107,12 +1204,19 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.HatUsage").arg(m.user));
 				 return;
 			 }
-			 const auto [ok, value] = BotData::validateHat(args.join(QLatin1Char(' ')));
+			 const QString raw = args.join(QLatin1Char(' '));
+			 auto [ok, value] = BotData::validateHat(raw);
 			 if (!ok) {
-				 say(m.platform,
-				     tCmd(invoked, "Texuguito.Bot.HatInvalid")
-					     .arg(m.user, BotData::hatNames(listEnglish).join(QStringLiteral(", "))));
-				 return;
+				 value = Items::resolve(raw, Items::Slot::Hat);
+				 if (value.isEmpty()) {
+					 say(m.platform,
+					     tCmd(invoked, "Texuguito.Bot.HatInvalid")
+						     .arg(m.user,
+							  BotData::hatNames(listEnglish).join(QStringLiteral(", "))));
+					 return;
+				 }
+				 if (!mayWear(m, key, value))
+					 return;
 			 }
 			 for (const QString &k : lookKeys(key))
 				 m_viewers.setHat(k, value);
@@ -1127,13 +1231,18 @@ void BotEngine::registerCommands()
 				 say(m.platform, tCmd(invoked, "Texuguito.Bot.AccessoryUsage").arg(m.user));
 				 return;
 			 }
-			 const auto [ok, value] = BotData::validateAccessory(args.join(QLatin1Char(' ')));
+			 const QString raw = args.join(QLatin1Char(' '));
+			 auto [ok, value] = BotData::validateAccessory(raw);
 			 if (!ok) {
-				 say(m.platform,
-				     tCmd(invoked, "Texuguito.Bot.AccessoryInvalid")
-					     .arg(m.user,
-						  BotData::accessoryNames(listEnglish).join(QStringLiteral(", "))));
-				 return;
+				 value = Items::resolve(raw, Items::Slot::Accessory);
+				 if (value.isEmpty()) {
+					 say(m.platform, tCmd(invoked, "Texuguito.Bot.AccessoryInvalid")
+								 .arg(m.user, BotData::accessoryNames(listEnglish)
+										      .join(QStringLiteral(", "))));
+					 return;
+				 }
+				 if (!mayWear(m, key, value))
+					 return;
 			 }
 			 for (const QString &k : lookKeys(key))
 				 m_viewers.setAccessory(k, value);
@@ -1464,6 +1573,12 @@ void BotEngine::registerCommands()
 					       .arg(level)
 					       .arg(xp)
 					       .arg(Quests::xpForLevel(level + 1)));
+		 }},
+		{QStringLiteral("itens"),
+		 {QStringLiteral("items"), QStringLiteral("inventario"), QStringLiteral("inventário"),
+		  QStringLiteral("inventory")},
+		 [this](const BotMessage &m, const QString &key, const QStringList &) {
+			 sayPrivate(m, itemsReply(m, key));
 		 }},
 	};
 }
