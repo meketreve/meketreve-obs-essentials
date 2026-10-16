@@ -253,7 +253,7 @@ private:
 	void startAdventure(const BotMessage &msg, const QString &key);
 	QString outcomeTitle(const QString &invoked, const AdventureOutcome &outcome) const;
 	/* The exclusive items key just earned (fresh, plus those of the level
-	 * it is at now): the chat lines that tell it, in the language of
+	 * it is at now; items are kept by baseName): the chat lines that tell it, in the language of
 	 * invoked, and a label for over the head. */
 	QStringList earnItems(const QString &key, const QString &invoked, QStringList fresh, QStringList &labels);
 	/* Whether key has the exclusive item id (!hat, !accessory); says why

@@ -100,5 +100,5 @@ private:
 	QString m_path;
 	Chooser m_choose;
 	QHash<QString, Setting> m_rules;     /* by item id; missing = the default */
-	QHash<QString, QStringList> m_owned; /* by viewer key */
+	QHash<QString, QStringList> m_owned; /* by viewer (the bot passes the name, without platform) */
 };

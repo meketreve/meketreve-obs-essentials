@@ -876,7 +876,8 @@ void BotEngine::questProgress(const QString &key, ChatPlatform platform, Quests:
 
 QStringList BotEngine::earnItems(const QString &key, const QString &invoked, QStringList fresh, QStringList &labels)
 {
-	fresh += m_items.onLevel(key, Quests::levelFor(m_quests.xp(key)));
+	/* Items go by name, like the avatar: ana on Twitch and on Kick share them. */
+	fresh += m_items.onLevel(baseName(key), Quests::levelFor(m_quests.xp(key)));
 	const bool en = tCmd(invoked, "Texuguito.Bot.Language") == QLatin1String("en");
 	QStringList lines;
 	for (const QString &id : std::as_const(fresh)) {
@@ -920,7 +921,7 @@ bool BotEngine::mayWear(const BotMessage &msg, const QString &key, const QString
 	QStringList labels;
 	for (const QString &line : earnItems(key, invoked, {}, labels))
 		say(msg.platform, line);
-	if (m_items.owns(key, id))
+	if (m_items.owns(baseName(key), id))
 		return true;
 	say(msg.platform,
 	    tCmd(invoked, "Texuguito.Bot.ItemLocked").arg(msg.user, itemName(invoked, id), itemHow(invoked, id)));
@@ -937,7 +938,7 @@ QString BotEngine::itemsReply(const BotMessage &msg, const QString &key)
 	QStringList mine;
 	QStringList next;
 	for (const Items::Item &item : Items::catalog()) {
-		if (m_items.owns(key, item.id))
+		if (m_items.owns(baseName(key), item.id))
 			mine.append(
 				QStringLiteral("%1 (%2)").arg(itemName(invoked, item.id), en ? item.english : item.id));
 		else if (m_items.rule(item.id) != Items::Rule::Off)
@@ -1018,7 +1019,7 @@ void BotEngine::adventureTick()
 		/* Coming back may finish an adventure quest: one label for both. */
 		questProgress(r.key, platform, Quests::Kind::Adventure);
 		QStringList items;
-		for (const QString &line : earnItems(r.key, invoked, m_items.onAdventure(r.key), items))
+		for (const QString &line : earnItems(r.key, invoked, m_items.onAdventure(baseName(r.key)), items))
 			say(platform, line);
 		Status &s = m_status[r.key];
 		QString label = QStringLiteral("+%1 XP").arg(r.outcome.xp);
@@ -1130,7 +1131,7 @@ void BotEngine::endBoss(const BossFight::Result &result)
 		m_status[key].questUntil = 0;
 		questProgress(key, platform, Quests::Kind::Boss);
 		QStringList items;
-		for (const QString &line : earnItems(key, QString(), m_items.onBoss(key, i == 0), items))
+		for (const QString &line : earnItems(key, QString(), m_items.onBoss(baseName(key), i == 0), items))
 			unlocked.append({platform, line});
 		Status &s = m_status[key];
 		QString label = QStringLiteral("+%1 pts +%2 XP").arg(points + bonus).arg(xp);

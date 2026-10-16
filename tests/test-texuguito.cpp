@@ -1630,6 +1630,11 @@ private slots:
 				.endsWith(QStringLiteral("🎁 Capa Real")));
 		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!accessory royal cape")));
 		QCOMPARE(lastViewer().value(QStringLiteral("acessorio")).toString(), QStringLiteral("capareal"));
+		/* The same name on another platform has it too. */
+		bot.handleMessage(msg(QStringLiteral("Ana"), QStringLiteral("!acessorio nenhum"), ChatPlatform::Kick));
+		bot.handleMessage(
+			msg(QStringLiteral("Ana"), QStringLiteral("!acessorio capareal"), ChatPlatform::Kick));
+		QCOMPARE(lastViewer().value(QStringLiteral("acessorio")).toString(), QStringLiteral("capareal"));
 
 		/* A level reached before the items existed also counts. */
 		bot.quests().addXp(QStringLiteral("beto"), static_cast<int>(Quests::xpForLevel(5)));
@@ -1850,8 +1855,8 @@ private slots:
 		/* Everyone who hit gets the helm, the MVP the wings too, each in their own chat. */
 		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("elmosombrio")));
 		QVERIFY(bot.items().owns(QStringLiteral("ana"), QStringLiteral("asaschefao")));
-		QVERIFY(bot.items().owns(QStringLiteral("kick:beto"), QStringLiteral("elmosombrio")));
-		QVERIFY(!bot.items().owns(QStringLiteral("kick:beto"), QStringLiteral("asaschefao")));
+		QVERIFY(bot.items().owns(QStringLiteral("beto"), QStringLiteral("elmosombrio")));
+		QVERIFY(!bot.items().owns(QStringLiteral("beto"), QStringLiteral("asaschefao")));
 		QVERIFY(replies(said).contains(QStringLiteral(
 			"🎁 Ana ganhou o item exclusivo Asas do Chefão! Use com !acessorio asaschefao")));
 		QVERIFY(replies(said).contains(QStringLiteral(
