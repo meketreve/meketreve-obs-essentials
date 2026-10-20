@@ -73,6 +73,30 @@ panel (**Chat parade → Add to scene**, or the URL
   for the new permission; the account needs a verified phone and Twitch
   allows 40 different people a day); when a whisper fails, or on Kick and
   YouTube, the answer goes to the chat.
+- **Adventures:** `!aventura` / `!adventure` costs points (50 by default):
+  the avatar walks off the parade and comes back a few minutes later with a
+  prize drawn by weight (points and XP), which the bot tells the chat. One
+  at a time per viewer; the price, the time and the prizes are in the web
+  panel's **Chat parade** tab.
+- **Boss:** a boss the whole chat fights together on the parade, called by
+  the button in the **Chat parade** tab, by a mod or the streamer with
+  `!chefao` / `!boss`, or on its own every N minutes (off by default).
+  `!atacar` / `!attack` hits it (every 10 s), chatting hits too, and
+  support, subs and follows hit hard. Beaten in time, everyone who hit it
+  gets points and XP and whoever hit hardest (the MVP) gets a bonus;
+  whoever only watched gets nothing. `!chefao` shows its HP and time left.
+- **Exclusive items:** hats, capes and wings that only show up on whoever
+  earned them: by reaching a level, with luck on an adventure, by helping to
+  beat a boss, by being its MVP or by buying them in the shop. The streamer
+  picks how each one is earned in the **Chat parade** tab. An item goes by
+  name, so it is the same on Twitch, Kick and YouTube; it is worn with
+  `!chapeu` / `!acessorio`, and `!itens` / `!items` lists yours and how to
+  earn the rest. A new item is told in the chat with a 🎁 over the avatar.
+- **Shop:** `!loja` / `!shop` lists the items for sale with their price and
+  your points; `!comprar <item>` / `!buy <item>` (or `!loja <item>`) buys
+  one. Five items are sold by default (Neon Glasses 200, Emerald Top Hat
+  300, Crystal Tiara 400, Frost Viking 500, Fairy Wings 800 points), and any
+  exclusive item can go on sale with its own price.
 - **Sound groups:** the sounds are set up in the web panel's **Chat bot**
   tab, one panel per group. A group has a name, a price, a wait between two
   of its sounds and an on/off switch; changing the price changes it for every
