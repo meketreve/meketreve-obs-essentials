@@ -24,13 +24,22 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QUuid>
 
 #include <algorithm>
 
 namespace {
 
-const char *const kPusherUrl =
-	"wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0&flash=false";
+/* Kick hands out the Pusher key (it changed in 2026-10, breaking a fixed
+ * one); this is only the fallback when asking fails. */
+const char *const kFallbackKey = "34bf7a0ff419a2a775b9";
+const char *const kFallbackCluster = "us2";
+
+QString pusherUrl(const QString &key, const QString &cluster)
+{
+	return QStringLiteral("wss://ws-%1.pusher.com/app/%2?protocol=7&client=js&version=8.4.0&flash=false")
+		.arg(cluster, key);
+}
 
 } // namespace
 
@@ -52,6 +61,24 @@ QString KickChat::parseEmotes(const QString &content, QList<ChatEmote> &emotes)
 		last = m.capturedEnd();
 	}
 	return out + content.mid(last);
+}
+
+QString KickChat::pusherUrlFrom(const QJsonObject &realtime)
+{
+	static const QRegularExpression safe(QStringLiteral("^[A-Za-z0-9-]+$"));
+	const QJsonArray connections =
+		realtime.value(QStringLiteral("data")).toObject().value(QStringLiteral("connections")).toArray();
+	for (const QJsonValue v : connections) {
+		const QJsonObject c = v.toObject();
+		const QJsonObject credentials = c.value(QStringLiteral("credentials")).toObject();
+		const QString key = credentials.value(QStringLiteral("app_key")).toString();
+		const QString cluster = credentials.value(QStringLiteral("cluster")).toString();
+		/* Both go into the socket's host and path. */
+		if (c.value(QStringLiteral("provider")).toString() == QLatin1String("pusher") &&
+		    safe.match(key).hasMatch() && safe.match(cluster).hasMatch())
+			return pusherUrl(key, cluster);
+	}
+	return QString();
 }
 
 KickChat::KickChat(QNetworkAccessManager *net, QObject *parent) : ChatConnector(ChatPlatform::Kick, net, parent)
@@ -85,7 +112,7 @@ void KickChat::connectNow()
 	if (numeric) {
 		m_chatroomId = channel;
 		m_channelId.clear();
-		m_ws.open(QUrl(QString::fromLatin1(kPusherUrl)));
+		openSocket();
 		return;
 	}
 
@@ -171,7 +198,39 @@ void KickChat::onChannelInfo(QNetworkReply *reply)
 	/* Follows and some channel events come on channel.<id>, not the chatroom. */
 	const QJsonValue channelId = root.value(QStringLiteral("id"));
 	m_channelId = channelId.isUndefined() ? QString() : QString::number(channelId.toInteger());
-	m_ws.open(QUrl(QString::fromLatin1(kPusherUrl)));
+	openSocket();
+}
+
+void KickChat::openSocket()
+{
+	QNetworkRequest req(QUrl(QStringLiteral("https://web.kick.com/api/v1/realtime/connection")));
+	req.setHeader(QNetworkRequest::UserAgentHeader, QString::fromLatin1(kBrowserUserAgent));
+	req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+	req.setRawHeader("Accept", "application/json");
+	req.setTransferTimeout(15000);
+	/* As the site asks, but taking only Pusher: the protocol this speaks. */
+	const QJsonObject body{
+		{QStringLiteral("client"),
+		 QJsonObject{{QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)},
+			     {QStringLiteral("type"), QStringLiteral("web")}}},
+		{QStringLiteral("capabilities"),
+		 QJsonObject{{QStringLiteral("accepted_providers"),
+			      QJsonArray{QJsonObject{{QStringLiteral("provider"), QStringLiteral("pusher")}}}}}}};
+	m_pending = net()->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+	QNetworkReply *reply = m_pending;
+	connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+		reply->deleteLater();
+		if (m_pending != reply)
+			return;
+		m_pending = nullptr;
+		QString url;
+		if (reply->error() == QNetworkReply::NoError)
+			url = pusherUrlFrom(QJsonDocument::fromJson(reply->readAll()).object());
+		/* Blocked or changed: the key known to work, so the chat still tries. */
+		if (url.isEmpty())
+			url = pusherUrl(QLatin1String(kFallbackKey), QLatin1String(kFallbackCluster));
+		m_ws.open(QUrl(url));
+	});
 }
 
 void KickChat::subscribe(const QString &channel)

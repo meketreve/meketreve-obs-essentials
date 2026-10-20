@@ -42,6 +42,9 @@ public:
 	/* kick.com/api/v2/channels/<slug> -> livestream.viewer_count, -1 when
 	 * the channel is not live. */
 	static int viewersFromChannel(const QJsonObject &channel);
+	/* web.kick.com/api/v1/realtime/connection -> the Pusher socket to open;
+	 * empty when the answer has no Pusher key. */
+	static QString pusherUrlFrom(const QJsonObject &realtime);
 
 protected:
 	void connectNow() override;
@@ -50,6 +53,8 @@ protected:
 
 private:
 	void onChannelInfo(QNetworkReply *reply);
+	/* Asks Kick for the current Pusher key, then opens the socket. */
+	void openSocket();
 	void subscribe(const QString &channel);
 
 	WsClient m_ws;

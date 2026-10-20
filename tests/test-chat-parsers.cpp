@@ -424,6 +424,34 @@ private slots:
 		QCOMPARE(KickChat::viewersFromChannel(QJsonObject{{QStringLiteral("livestream"), QJsonValue()}}), -1);
 		QCOMPARE(KickChat::viewersFromChannel(QJsonObject()), -1);
 
+		/* The Pusher key comes from Kick; anything else is skipped. */
+		const auto realtime = [](const QJsonArray &connections) {
+			return QJsonObject{{QStringLiteral("data"),
+					    QJsonObject{{QStringLiteral("connections"), connections},
+							{QStringLiteral("mode"), QStringLiteral("websocket")}}}};
+		};
+		const QJsonObject centrifugo{
+			{QStringLiteral("provider"), QStringLiteral("centrifugo")},
+			{QStringLiteral("credentials"),
+			 QJsonObject{{QStringLiteral("url"),
+				      QStringLiteral("wss://realtime.kick.com/connection/websocket")}}}};
+		const QJsonObject pusher{
+			{QStringLiteral("provider"), QStringLiteral("pusher")},
+			{QStringLiteral("credentials"),
+			 QJsonObject{{QStringLiteral("app_key"), QStringLiteral("34bf7a0ff419a2a775b9")},
+				     {QStringLiteral("cluster"), QStringLiteral("us2")}}}};
+		QCOMPARE(KickChat::pusherUrlFrom(realtime({centrifugo, pusher})),
+			 QStringLiteral(
+				 "wss://ws-us2.pusher.com/app/34bf7a0ff419a2a775b9?protocol=7&client=js&version=8.4.0&"
+				 "flash=false"));
+		QCOMPARE(KickChat::pusherUrlFrom(realtime({centrifugo})), QString());
+		QCOMPARE(KickChat::pusherUrlFrom(QJsonObject()), QString());
+		const QJsonObject odd{{QStringLiteral("provider"), QStringLiteral("pusher")},
+				      {QStringLiteral("credentials"),
+				       QJsonObject{{QStringLiteral("app_key"), QStringLiteral("x/../evil")},
+						   {QStringLiteral("cluster"), QStringLiteral("us2")}}}};
+		QCOMPARE(KickChat::pusherUrlFrom(realtime({odd})), QString());
+
 		/* YouTube updated_metadata: the count rides in one of the actions. */
 		const QJsonObject renderer{{QStringLiteral("originalViewCount"), QStringLiteral("3990")},
 					   {QStringLiteral("isLive"), true}};
